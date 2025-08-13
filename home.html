@@ -1,0 +1,351 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head><script src="https://static.readdy.ai/static/e.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NCHire - Norzagaray College Hiring Portal</title>
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/remixicon/4.6.0/remixicon.min.css">
+<script>
+tailwind.config = {
+theme: {
+extend: {
+colors: {
+primary: '#1e3a8a',
+secondary: '#fbbf24'
+},
+borderRadius: {
+'none': '0px',
+'sm': '4px',
+DEFAULT: '8px',
+'md': '12px',
+'lg': '16px',
+'xl': '20px',
+'2xl': '24px',
+'3xl': '32px',
+'full': '9999px',
+'button': '8px'
+}
+}
+}
+}
+</script>
+<style>
+:where([class^="ri-"])::before {
+content: "\f3c2";
+}
+</style>
+</head>
+<body class="bg-gray-50">
+<nav class="bg-primary text-white px-6 py-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<img src="https://static.readdy.ai/image/2d44f09b25f25697de5dc274e7f0a5a3/04242d6bffded145c33d09c9dcfae98c.png" alt="Norzagaray College Logo" class="w-12 h-12 object-contain">
+<span class="text-2xl font-bold">NCHire</span>
+</div>
+<div class="flex items-center gap-8">
+    <a href="#home" class="text-white hover:text-secondary transition-colors">Home</a>
+    <a href="#mission" class="text-white hover:text-secondary transition-colors">Mission</a>
+    <a href="#vision" class="text-white hover:text-secondary transition-colors">Vision</a>
+    <a href="#about" class="text-white hover:text-secondary transition-colors">About NC</a>
+</div>
+<div class="flex items-center gap-3">
+<a href="#" id="openSignIn" class="px-4 py-2 border border-white text-white hover:bg-white hover:text-primary transition-colors !rounded-button whitespace-nowrap inline-block">Sign In</a>
+<button class="px-4 py-2 bg-secondary text-primary hover:bg-yellow-300 transition-colors !rounded-button whitespace-nowrap">Sign Up</button>
+</div>
+</div>
+</nav>
+
+<div id="signInModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden z-50">
+  <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-8 relative">
+    <!-- Close Button -->
+    <button id="closeSignIn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+
+    <!-- Title -->
+    <h2 class="text-3xl font-bold text-primary mb-6 text-center">Sign In</h2>
+
+    <!-- Sign In Form -->
+    <form>
+      <div class="mb-4">
+        <label class="block text-gray-700 mb-2">Email</label>
+        <input type="email" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Enter your email" required>
+      </div>
+      <div class="mb-4">
+        <label class="block text-gray-700 mb-2">Password</label>
+        <div class="relative">
+          <input type="password" id="passwordInput" class="w-full border border-gray-300 rounded-lg p-3 pr-12 focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Enter your password" required>
+          <button type="button" id="togglePassword" class="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-primary">
+            <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      <button type="submit" class="w-full bg-primary text-white py-3 rounded-lg hover:bg-blue-800 transition">Sign In</button>
+
+      <!-- Sign Up Link -->
+      <p class="mt-4 text-center text-gray-600">
+        Don’t have an account? 
+        <a href="#" class="text-primary hover:underline">Sign up here</a>
+      </p>
+    </form>
+  </div>
+</div>
+
+<!-- SCRIPT -->
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const openBtn = document.getElementById("openSignIn");
+    const modal = document.getElementById("signInModal");
+    const closeBtn = document.getElementById("closeSignIn");
+    const togglePassword = document.getElementById("togglePassword");
+    const passwordInput = document.getElementById("passwordInput");
+    const eyeIcon = document.getElementById("eyeIcon");
+
+    let passwordVisible = false;
+
+    // Open modal
+    openBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        modal.classList.remove("hidden");
+    });
+
+    // Close modal
+    closeBtn.addEventListener("click", () => {
+        modal.classList.add("hidden");
+    });
+
+    // Close if clicking outside modal
+    modal.addEventListener("click", (e) => {
+        if (e.target === modal) {
+            modal.classList.add("hidden");
+        }
+    });
+
+    // Show/Hide Password with icon change
+    togglePassword.addEventListener("click", (e) => {
+        e.preventDefault();
+        passwordVisible = !passwordVisible;
+        passwordInput.type = passwordVisible ? "text" : "password";
+        eyeIcon.innerHTML = passwordVisible
+          ? `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7a10.05 10.05 0 011.658-3.067M15 12a3 3 0 00-4.243-2.828M9.88 9.88a3 3 0 014.243 4.243M3 3l18 18" />`
+          : `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />`;
+    });
+});
+</script>
+
+<section class="relative bg-primary text-white min-h-[600px] flex items-center" style="background-image: url('https://scontent.fcrk1-3.fna.fbcdn.net/v/t1.15752-9/520382375_1065446909052636_3412465913398569974_n.jpg?stp=dst-jpg_s2048x2048_tt6&_nc_cat=101&ccb=1-7&_nc_sid=9f807c&_nc_eui2=AeHdqOkpssfofQIQA1KNCMljDHLnAKQLu_gMcucApAu7-FyU-FBMXF3BPi1C-68i7mH6Ec1uzOEx8jyvG4KvKhBV&_nc_ohc=4nXA410HvGQQ7kNvwGK0wQb&_nc_oc=AdmGWKibX91deb0vC2E5MgelIv9-9OfBaT2lBO7Ck1ZeW0uDzCY4NHTDPmhfhfaJFE0&_nc_zt=23&_nc_ht=scontent.fcrk1-3.fna&oh=03_Q7cD3AGgxp1v6Y9hcSj97---ZkPp11izoEVzvs4TDA6Ju3AGZA&oe=68C37AC8'); background-size: cover; background-position: center;">
+<div class="absolute inset-0 bg-primary bg-opacity-80"></div>
+<div class="relative z-10 w-full px-6">
+<div class="max-w-7xl mx-auto">
+<div class="max-w-2xl">
+<h1 class="text-6xl font-bold mb-6">
+YOUR JOB JOURNEY<br>
+<span class="text-secondary">BEGINS HERE</span>
+</h1>
+<p class="text-xl mb-8 leading-relaxed">
+At NCHire, we connect talented individuals with top employers to help you take the next step in your career. Are you ready to start your journey?
+</p>
+<div class="flex gap-4">
+<button class="px-8 py-4 border-2 border-white text-white hover:bg-white hover:text-primary transition-colors text-lg font-semibold !rounded-button whitespace-nowrap">APPLY NOW</button>
+<button class="px-8 py-4 bg-blue-600 text-white hover:bg-blue-700 transition-colors text-lg font-semibold !rounded-button whitespace-nowrap">LEARN MORE</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="py-16 px-6">
+<div class="max-w-7xl mx-auto">
+<h2 class="text-5xl font-bold text-primary mb-12">Browse Career<br>Opportunities</h2>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+<div class="bg-primary text-white p-8 rounded-lg relative group hover:transform hover:scale-105 transition-all duration-300">
+<div class="mb-6">
+<img src="https://readdy.ai/api/search-image?query=Professional%20instructor%20teaching%20in%20modern%20classroom%2C%20engaging%20with%20students%2C%20clean%20academic%20environment%20with%20natural%20lighting%2C%20contemporary%20educational%20setting&width=400&height=250&seq=card001&orientation=landscape" alt="Part-time Instructor" class="w-full h-40 object-cover rounded mb-4">
+</div>
+<h3 class="text-2xl font-bold mb-4">Part-time Instructor</h3>
+<p class="text-gray-200 mb-6">Join our faculty team to shape young minds and contribute to academic excellence. Flexible teaching schedules and opportunities for professional growth in a supportive environment.</p>
+<div class="absolute bottom-6 right-6 w-12 h-12 flex items-center justify-center">
+<i class="ri-arrow-right-line text-2xl group-hover:translate-x-1 transition-transform"></i>
+</div>
+</div>
+<div class="bg-primary text-white p-8 rounded-lg relative group hover:transform hover:scale-105 transition-all duration-300">
+<div class="mb-6">
+<img src="https://readdy.ai/api/search-image?query=Professional%20office%20secretary%20working%20at%20modern%20desk%20with%20computer%2C%20organized%20workspace%2C%20clean%20professional%20environment%20with%20warm%20lighting&width=400&height=250&seq=card002&orientation=landscape" alt="Office Secretary" class="w-full h-40 object-cover rounded mb-4">
+</div>
+<h3 class="text-2xl font-bold mb-4">Office Secretary</h3>
+<p class="text-gray-200 mb-6">Be the backbone of our administrative operations. Handle important documentation, coordinate with staff and students, and maintain efficient office operations.</p>
+<div class="absolute bottom-6 right-6 w-12 h-12 flex items-center justify-center">
+<i class="ri-arrow-right-line text-2xl group-hover:translate-x-1 transition-transform"></i>
+</div>
+</div>
+<div class="bg-primary text-white p-8 rounded-lg relative group hover:transform hover:scale-105 transition-all duration-300">
+<div class="mb-6">
+<img src="https://readdy.ai/api/search-image?query=Professional%20maintenance%20staff%20maintaining%20clean%20college%20campus%2C%20modern%20facilities%20management%2C%20well-organized%20workspace%20with%20professional%20equipment&width=400&height=250&seq=card003&orientation=landscape" alt="Utility Staff" class="w-full h-40 object-cover rounded mb-4">
+</div>
+<h3 class="text-2xl font-bold mb-4">Utility Staff</h3>
+<p class="text-gray-200 mb-6">Help maintain our campus facilities and ensure a conducive learning environment. Join our facilities team in keeping our college running smoothly and efficiently.</p>
+<div class="absolute bottom-6 right-6 w-12 h-12 flex items-center justify-center">
+<i class="ri-arrow-right-line text-2xl group-hover:translate-x-1 transition-transform"></i>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<section id="mission" class="py-16 px-6 bg-white">
+<div class="max-w-7xl mx-auto">
+<div class="text-center mb-12">
+<h2 class="text-4xl font-bold text-primary mb-4">NORZAGARAY COLLEGE MISSION</h2>
+<p class="text-xl text-gray-600 max-w-3xl mx-auto">Norzagaray College envision itself to transform lives of individuals through life long learning and productivity.</p>
+</div>
+
+</div>
+</div>
+</div>
+</section>
+<section class="py-16 px-6 bg-gray-100">
+<div class="max-w-7xl mx-auto">
+<div class="text-center mb-12">
+<h2 id="vision" class="text-4xl font-bold text-primary mb-4">NORZAGRAY COLLEGE VISION</h2>
+<p class="text-xl text-gray-600">To be recognized nationally and internationally as a benchmark for excellence, innovation, integrity, and distinctiveness in bachelor's level education taught from global perspective.</p>
+</div>
+
+</div>
+</div>
+</div>
+</section>
+<section class="py-16 px-6 bg-primary text-white">
+<div class="max-w-4xl mx-auto text-center">
+<h2 class="text-4xl font-bold mb-6">Ready to Advance Your Research Career?</h2>
+<p class="text-xl mb-8">Join thousands of researchers who have found their perfect opportunity through NCHire Research. Your next breakthrough is waiting.</p>
+<div class="flex flex-col sm:flex-row gap-4 justify-center">
+<button class="px-8 py-4 bg-secondary text-primary hover:bg-yellow-300 transition-colors text-lg font-semibold !rounded-button whitespace-nowrap">Start Your Application</button>
+<button class="px-8 py-4 border-2 border-white text-white hover:bg-white hover:text-primary transition-colors text-lg font-semibold !rounded-button whitespace-nowrap">Browse Opportunities</button>
+</div>
+</div>
+</section>
+<footer class="bg-gray-900 text-white py-12 px-6">
+<div class="max-w-7xl mx-auto">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+<div>
+<div class="flex items-center gap-3 mb-4">
+<img src="https://static.readdy.ai/image/2d44f09b25f25697de5dc274e7f0a5a3/04242d6bffded145c33d09c9dcfae98c.png" alt="Norzagaray College Logo" class="w-10 h-10 object-contain">
+<span class="text-xl font-bold">NCHire</span>
+</div>
+<p class="text-gray-400">Connecting talented researchers with world-class opportunities.</p>
+</div>
+<div>
+<h4 class="font-bold mb-4">Quick Links</h4>
+<ul class="space-y-2 text-gray-400">
+<li><a href="#" class="hover:text-white transition-colors">Home</a></li>
+<li><a href="#mission" class="hover:text-white transition-colors">Mission</a></li>
+<li><a href="#vision" class="hover:text-white transition-colors">Vision</a></li>
+<li><a href="#" class="hover:text-white transition-colors">About NC</a></li>
+</ul>
+</div>
+<div>
+<h4 class="font-bold mb-4">Research Areas</h4>
+<ul class="space-y-2 text-gray-400">
+<li><a href="#" class="hover:text-white transition-colors">Biotechnology</a></li>
+<li><a href="#" class="hover:text-white transition-colors">Environmental Science</a></li>
+<li><a href="#" class="hover:text-white transition-colors">Materials Science</a></li>
+<li><a href="#" class="hover:text-white transition-colors">Data Science</a></li>
+</ul>
+</div>
+<div>
+<h4 class="font-bold mb-4">Contact</h4>
+<ul class="space-y-2 text-gray-400">
+<li class="flex items-center gap-2">
+<div class="w-4 h-4 flex items-center justify-center">
+<i class="ri-mail-line"></i>
+</div>norzagaraycollege.edu.ph
+</li>
+<li class="flex items-center gap-2">
+<div class="w-4 h-4 flex items-center justify-center">
+<i class="ri-phone-line"></i>
+</div>
++1 (555) 123-4567
+</li>
+<li class="flex items-center gap-2">
+<div class="w-4 h-4 flex items-center justify-center">
+<i class="ri-map-pin-line"></i>
+</div>
+Norzagaray, Bulacan
+</li>
+</ul>
+</div>
+</div>
+<div class="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+<p>&copy; 2025 NCHire Research. All rights reserved.</p>
+</div>
+</div>
+</footer>
+<script id="navigation-interactions">
+document.addEventListener('DOMContentLoaded', function() {
+const navLinks = document.querySelectorAll('nav a');
+navLinks.forEach(link => {
+link.addEventListener('mouseenter', function() {
+this.style.transform = 'translateY(-1px)';
+});
+link.addEventListener('mouseleave', function() {
+this.style.transform = 'translateY(0)';
+});
+});
+});
+</script>
+<script id="card-hover-effects">
+document.addEventListener('DOMContentLoaded', function() {
+const cards = document.querySelectorAll('.group');
+cards.forEach(card => {
+card.addEventListener('mouseenter', function() {
+this.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)';
+});
+card.addEventListener('mouseleave', function() {
+this.style.boxShadow = '';
+});
+});
+});
+</script>
+<script id="smooth-scroll">
+document.addEventListener('DOMContentLoaded', function() {
+const buttons = document.querySelectorAll('button');
+buttons.forEach(button => {
+button.addEventListener('click', function(e) {
+if (this.textContent.includes('LEARN MORE') || this.textContent.includes('Browse Opportunities')) {
+e.preventDefault();
+document.querySelector('section:nth-of-type(2)').scrollIntoView({
+behavior: 'smooth'
+});
+}
+});
+});
+});
+</script>
+<script>
+    !function (t, e) { var o, n, p, r; e.__SV || (window.posthog = e, e._i = [], e.init = function (i, s, a) { function g(t, e) { var o = e.split("."); 2 == o.length && (t = t[o[0]], e = o[1]), t[e] = function () { t.push([e].concat(Array.prototype.slice.call(arguments, 0))) } } (p = t.createElement("script")).type = "text/javascript", p.crossOrigin = "anonymous", p.async = !0, p.src = s.api_host.replace(".i.posthog.com", "-assets.i.posthog.com") + "/static/array.js", (r = t.getElementsByTagName("script")[0]).parentNode.insertBefore(p, r); var u = e; for (void 0 !== a ? u = e[a] = [] : a = "posthog", u.people = u.people || [], u.toString = function (t) { var e = "posthog"; return "posthog" !== a && (e += "." + a), t || (e += " (stub)"), e }, u.people.toString = function () { return u.toString(1) + ".people (stub)" }, o = "init capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey getNextSurveyStep identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty createPersonProfile opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug".split(" "), n = 0; n < o.length; n++)g(u, o[n]); e._i.push([i, s, a]) }, e.__SV = 1) }(document, window.posthog || []);
+    posthog.init('phc_t9tkQZJiyi2ps9zUYm8TDsL6qXo4YmZx0Ot5rBlAlEd', {
+        api_host: 'https://us.i.posthog.com',
+        autocapture: false,
+        capture_pageview: false,
+        capture_pageleave: false,
+        capture_performance: {
+            web_vitals: false,
+        },
+        rageclick: false,
+    })
+    window.shareKey = '6sdg46JxL-BLHTAWMV5C5g';
+    window.host = 'readdy.ai';
+</script>
+
+
+</body>
+</html>
+
