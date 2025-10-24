@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear Session Storage - NCHire</title>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 1rem;
+        }
+        p {
+            color: #666;
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin: 0.5rem;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .danger {
+            background: #ef4444;
+        }
+        .danger:hover {
+            background: #dc2626;
+        }
+        .success {
+            background: #10b981;
+        }
+        .success:hover {
+            background: #059669;
+        }
+        .info-box {
+            background: #f0f9ff;
+            border: 2px solid #3b82f6;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin: 1rem 0;
+            text-align: left;
+        }
+        .info-box strong {
+            color: #1e40af;
+        }
+        .status {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            display: none;
+        }
+        .status.show {
+            display: block;
+        }
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><i class="ri-refresh-line"></i> Clear Session Storage</h1>
+        <p>This tool will clear all stored session data that might be causing the "Unable to open application wizard" error.</p>
+        
+        <div class="info-box">
+            <strong>Current Session Storage:</strong>
+            <ul id="storageList" style="text-align: left; margin: 0.5rem 0;">
+                <li>Loading...</li>
+            </ul>
+        </div>
+
+        <button onclick="clearWizardData()" class="danger">
+            <i class="ri-delete-bin-line"></i> Clear Wizard Data Only
+        </button>
+        
+        <button onclick="clearAllStorage()" class="danger">
+            <i class="ri-delete-bin-line"></i> Clear All Session Storage
+        </button>
+        
+        <button onclick="goToDashboard()" class="success">
+            <i class="ri-home-line"></i> Go to Dashboard
+        </button>
+
+        <div id="status" class="status"></div>
+    </div>
+
+    <script>
+        // Display current session storage
+        function updateStorageDisplay() {
+            const list = document.getElementById('storageList');
+            const items = [];
+            
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                const value = sessionStorage.getItem(key);
+                items.push(`<li><strong>${key}:</strong> ${value.substring(0, 50)}${value.length > 50 ? '...' : ''}</li>`);
+            }
+            
+            if (items.length === 0) {
+                list.innerHTML = '<li style="color: #10b981;">✓ No session storage data</li>';
+            } else {
+                list.innerHTML = items.join('');
+            }
+        }
+
+        // Clear only wizard-related data
+        function clearWizardData() {
+            const keys = ['openApplicationId', 'returnToMyApplications', 'wizardOpenRetry'];
+            let cleared = 0;
+            
+            keys.forEach(key => {
+                if (sessionStorage.getItem(key)) {
+                    sessionStorage.removeItem(key);
+                    cleared++;
+                }
+            });
+            
+            showStatus(`Cleared ${cleared} wizard-related items`, 'success');
+            updateStorageDisplay();
+        }
+
+        // Clear all session storage
+        function clearAllStorage() {
+            const count = sessionStorage.length;
+            sessionStorage.clear();
+            showStatus(`Cleared all ${count} session storage items`, 'success');
+            updateStorageDisplay();
+        }
+
+        // Go to dashboard
+        function goToDashboard() {
+            window.location.href = 'user.php';
+        }
+
+        // Show status message
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type} show`;
+            
+            setTimeout(() => {
+                status.classList.remove('show');
+            }, 3000);
+        }
+
+        // Initialize
+        updateStorageDisplay();
+    </script>
+</body>
+</html>
