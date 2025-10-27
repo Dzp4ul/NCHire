@@ -15,18 +15,21 @@ if ($conn->connect_error) {
 }
 
 // Fetch all rejected applicants (archived)
+// Join with applicants table to get profile_picture
 $query = "SELECT 
-            id,
-            full_name,
-            applicant_email,
-            position,
-            applied_date,
-            rejected_date,
-            rejection_reason,
-            status
-          FROM job_applicants 
-          WHERE status = 'Rejected'
-          ORDER BY rejected_date DESC";
+            ja.id,
+            ja.full_name,
+            ja.applicant_email,
+            ja.position,
+            ja.applied_date,
+            ja.rejected_date,
+            ja.rejection_reason,
+            ja.status,
+            a.profile_picture
+          FROM job_applicants ja
+          LEFT JOIN applicants a ON ja.user_id = a.id
+          WHERE ja.status = 'Rejected'
+          ORDER BY ja.rejected_date DESC";
 
 $result = $conn->query($query);
 

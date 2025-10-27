@@ -62,19 +62,14 @@ try {
         }
     }
 
-    // Get comprehensive recent activity - only show applications from last 2 hours
+    // Get recent admin activity only - no job applications
+    // Filter out NULL, empty, and 'application' types at database level
     $recent_activity_query = "
-        (SELECT 'application' as activity_type, 
-                CONCAT(full_name, ' applied for ', position) as description,
-                full_name as user_name,
-                applied_date as created_at
-         FROM job_applicants 
-         WHERE applied_date >= DATE_SUB(NOW(), INTERVAL 2 HOUR)
-         ORDER BY applied_date DESC LIMIT 5)
-        UNION ALL
-        (SELECT activity_type, description, user_name, created_at 
-         FROM admin_activity 
-         ORDER BY created_at DESC LIMIT 10)
+        SELECT activity_type, description, user_name, created_at 
+        FROM admin_activity 
+        WHERE activity_type IS NOT NULL 
+        AND activity_type != '' 
+        AND activity_type != 'application'
         ORDER BY created_at DESC 
         LIMIT 10";
     

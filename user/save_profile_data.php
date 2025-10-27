@@ -55,6 +55,61 @@ $create_skills_table = "CREATE TABLE IF NOT EXISTS user_skills (
 )";
 $conn->query($create_skills_table);
 
+// Handle DELETE requests
+if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+    parse_str(file_get_contents('php://input'), $_DELETE);
+    
+    $user_id = $_SESSION['user_id'] ?? null;
+    if (!$user_id) {
+        $response['message'] = 'User not logged in properly. Please log in again.';
+        echo json_encode($response);
+        exit();
+    }
+    
+    if (isset($_DELETE['delete_education'])) {
+        $id = (int)$_DELETE['id'];
+        $stmt = $conn->prepare("DELETE FROM user_education WHERE id = ? AND user_id = ?");
+        $stmt->bind_param("ii", $id, $user_id);
+        
+        if ($stmt->execute()) {
+            $response['success'] = true;
+            $response['message'] = 'Education record deleted successfully.';
+        } else {
+            $response['message'] = 'Error deleting education record.';
+        }
+        $stmt->close();
+    }
+    elseif (isset($_DELETE['delete_experience'])) {
+        $id = (int)$_DELETE['id'];
+        $stmt = $conn->prepare("DELETE FROM user_experience WHERE id = ? AND user_id = ?");
+        $stmt->bind_param("ii", $id, $user_id);
+        
+        if ($stmt->execute()) {
+            $response['success'] = true;
+            $response['message'] = 'Work experience deleted successfully.';
+        } else {
+            $response['message'] = 'Error deleting work experience.';
+        }
+        $stmt->close();
+    }
+    elseif (isset($_DELETE['delete_skill'])) {
+        $id = (int)$_DELETE['id'];
+        $stmt = $conn->prepare("DELETE FROM user_skills WHERE id = ? AND user_id = ?");
+        $stmt->bind_param("ii", $id, $user_id);
+        
+        if ($stmt->execute()) {
+            $response['success'] = true;
+            $response['message'] = 'Skill deleted successfully.';
+        } else {
+            $response['message'] = 'Error deleting skill.';
+        }
+        $stmt->close();
+    }
+    
+    echo json_encode($response);
+    exit();
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Get user ID from session
     $user_id = $_SESSION['user_id'] ?? null;
@@ -139,7 +194,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $stmt->close();
     }
-    // Handle Education form submission
+    // Handle Education form submission (add or update)
     elseif (isset($_POST['saveEducation']) || (isset($_POST['ed_degree']) && isset($_POST['ed_fs']))) {
         if (empty($_POST['ed_degree']) || empty($_POST['ed_fs']) || empty($_POST['ed_ins']) || 
             empty($_POST['ed_sy']) || empty($_POST['ed_ey'])) {
@@ -151,72 +206,124 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ed_sy = (int)$_POST['ed_sy'];
             $ed_ey = (int)$_POST['ed_ey'];
             $ed_gpa = isset($_POST['ed_gpa']) ? $conn->real_escape_string($_POST['ed_gpa']) : '';
-
-            $stmt = $conn->prepare("INSERT INTO user_education (user_id, degree, field_of_study, institution, start_year, end_year, gpa) 
-                           VALUES (?, ?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("isssiss", $user_id, $ed_degree, $ed_fs, $ed_ins, $ed_sy, $ed_ey, $ed_gpa);
-
-            if ($stmt->execute()) {
-                error_log("Education added successfully for user_id: 1");
-                $educationData = [
-                    'degree' => $ed_degree,
-                    'field_of_study' => $ed_fs,
-                    'institution' => $ed_ins,
-                    'start_year' => $ed_sy,
-                    'end_year' => $ed_ey,
-                    'gpa' => $ed_gpa
-                ];
-                $response['success'] = true;
-                $response['message'] = 'Education added successfully!';
-                $response['data'] = $educationData;
+            
+            // Check if this is an update (edit_id present) or insert
+            if (isset($_POST['edit_id']) && !empty($_POST['edit_id'])) {
+                $edit_id = (int)$_POST['edit_id'];
+                $stmt = $conn->prepare("UPDATE user_education SET degree = ?, field_of_study = ?, institution = ?, start_year = ?, end_year = ?, gpa = ? WHERE id = ? AND user_id = ?");
+                $stmt->bind_param("sssiisii", $ed_degree, $ed_fs, $ed_ins, $ed_sy, $ed_ey, $ed_gpa, $edit_id, $user_id);
+                
+                if ($stmt->execute()) {
+                    $response['success'] = true;
+                    $response['message'] = 'Education updated successfully!';
+                    $response['data'] = [
+                        'id' => $edit_id,
+                        'degree' => $ed_degree,
+                        'field_of_study' => $ed_fs,
+                        'institution' => $ed_ins,
+                        'start_year' => $ed_sy,
+                        'end_year' => $ed_ey,
+                        'gpa' => $ed_gpa
+                    ];
+                } else {
+                    $response['message'] = 'Error updating education data: ' . $stmt->error;
+                }
             } else {
-                error_log("Error executing education insert: " . $stmt->error);
-                $response['message'] = 'Error saving education data: ' . $stmt->error;
+                // Insert new education
+                $stmt = $conn->prepare("INSERT INTO user_education (user_id, degree, field_of_study, institution, start_year, end_year, gpa) 
+                               VALUES (?, ?, ?, ?, ?, ?, ?)");
+                $stmt->bind_param("isssiss", $user_id, $ed_degree, $ed_fs, $ed_ins, $ed_sy, $ed_ey, $ed_gpa);
+
+                if ($stmt->execute()) {
+                    error_log("Education added successfully for user_id: " . $user_id);
+                    $educationData = [
+                        'id' => $conn->insert_id,
+                        'degree' => $ed_degree,
+                        'field_of_study' => $ed_fs,
+                        'institution' => $ed_ins,
+                        'start_year' => $ed_sy,
+                        'end_year' => $ed_ey,
+                        'gpa' => $ed_gpa
+                    ];
+                    $response['success'] = true;
+                    $response['message'] = 'Education added successfully!';
+                    $response['data'] = $educationData;
+                } else {
+                    error_log("Error executing education insert: " . $stmt->error);
+                    $response['message'] = 'Error saving education data: ' . $stmt->error;
+                }
             }
         }
     }
     
-    // Handle Experience form submission
+    // Handle Experience form submission (add or update)
     elseif (isset($_POST['saveExperience']) || (isset($_POST['job_title']) && isset($_POST['work_comp']))) {
-        if (empty($_POST['job_title']) || empty($_POST['work_comp']) || empty($_POST['start_date'])) {
+        if (empty($_POST['job_title']) || empty($_POST['work_comp']) || empty($_POST['start_date']) || empty($_POST['end_date'])) {
             $response['message'] = 'Please fill in all required fields.';
         } else {
             $job_title = $conn->real_escape_string($_POST['job_title']);
             $work_comp = $conn->real_escape_string($_POST['work_comp']);
             $work_loc = isset($_POST['work_loc']) ? $conn->real_escape_string($_POST['work_loc']) : '';
             $start_date = $conn->real_escape_string($_POST['start_date']);
-            $end_date = isset($_POST['is_current']) ? NULL : (isset($_POST['end_date']) ? $conn->real_escape_string($_POST['end_date']) : NULL);
-            $work_descript = isset($_POST['work_descript']) ? $conn->real_escape_string($_POST['work_descript']) : '';
-            $is_current = isset($_POST['is_current']) ? 1 : 0;
+            $end_date = $conn->real_escape_string($_POST['end_date']);
+            $work_descript = ''; // Description removed from form
+            $is_current = 0; // Checkbox removed from form
 
             // Convert date format from YYYY-MM to YYYY-MM-01 for MySQL DATE type
             $start_date_formatted = $start_date . '-01';
-            $end_date_formatted = $end_date ? $end_date . '-01' : NULL;
-
-            $sql_insert = "INSERT INTO user_experience (user_id, job_title, company, location, start_date, end_date, description, is_current) 
-                           VALUES ('$user_id', '$job_title', '$work_comp', '$work_loc', '$start_date_formatted', " . 
-                           ($end_date_formatted ? "'$end_date_formatted'" : "NULL") . ", '$work_descript', '$is_current')";
-
-            if ($conn->query($sql_insert) === TRUE) {
-                $experienceData = [
-                    'job_title' => $job_title,
-                    'company' => $work_comp,
-                    'location' => $work_loc,
-                    'start_date' => $start_date_formatted,
-                    'end_date' => $end_date_formatted,
-                    'description' => $work_descript,
-                    'is_current' => $is_current
-                ];
-                $response['success'] = true;
-                $response['message'] = 'Work experience added successfully.';
-                $response['data'] = $experienceData;
+            $end_date_formatted = $end_date . '-01';
+            
+            // Check if this is an update (edit_id present) or insert
+            if (isset($_POST['edit_id']) && !empty($_POST['edit_id'])) {
+                $edit_id = (int)$_POST['edit_id'];
+                $stmt = $conn->prepare("UPDATE user_experience SET job_title = ?, company = ?, location = ?, start_date = ?, end_date = ?, description = ?, is_current = ? WHERE id = ? AND user_id = ?");
+                $stmt->bind_param("ssssssiis", $job_title, $work_comp, $work_loc, $start_date_formatted, $end_date_formatted, $work_descript, $is_current, $edit_id, $user_id);
+                
+                if ($stmt->execute()) {
+                    $response['success'] = true;
+                    $response['message'] = 'Work experience updated successfully!';
+                    $response['data'] = [
+                        'id' => $edit_id,
+                        'job_title' => $job_title,
+                        'company' => $work_comp,
+                        'location' => $work_loc,
+                        'start_date' => $start_date_formatted,
+                        'end_date' => $end_date_formatted,
+                        'description' => $work_descript,
+                        'is_current' => $is_current
+                    ];
+                } else {
+                    $response['message'] = 'Error updating work experience: ' . $stmt->error;
+                }
+                $stmt->close();
             } else {
-                $response['message'] = 'Error adding work experience: ' . $conn->error;
+                // Insert new experience
+                $sql_insert = "INSERT INTO user_experience (user_id, job_title, company, location, start_date, end_date, description, is_current) 
+                               VALUES ('$user_id', '$job_title', '$work_comp', '$work_loc', '$start_date_formatted', " . 
+                               ($end_date_formatted ? "'$end_date_formatted'" : "NULL") . ", '$work_descript', '$is_current')";
+
+                if ($conn->query($sql_insert) === TRUE) {
+                    $experienceData = [
+                        'id' => $conn->insert_id,
+                        'job_title' => $job_title,
+                        'company' => $work_comp,
+                        'location' => $work_loc,
+                        'start_date' => $start_date_formatted,
+                        'end_date' => $end_date_formatted,
+                        'description' => $work_descript,
+                        'is_current' => $is_current
+                    ];
+                    $response['success'] = true;
+                    $response['message'] = 'Work experience added successfully.';
+                    $response['data'] = $experienceData;
+                } else {
+                    $response['message'] = 'Error adding work experience: ' . $conn->error;
+                }
             }
         }
     }
     
-    // Handle Skill form submission
+    // Handle Skill form submission (add or update)
     elseif (isset($_POST['saveSkill']) || (isset($_POST['skill_name']) && isset($_POST['skill_category']))) {
         if (empty($_POST['skill_name']) || empty($_POST['skill_category']) || empty($_POST['skill_level']) || $_POST['skill_level'] == '0') {
             $response['message'] = 'Please fill in all required fields and select a skill level.';
@@ -228,20 +335,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($skill_level < 1 || $skill_level > 5) {
                 $response['message'] = 'Please select a valid skill level (1-5).';
             } else {
-                $sql_insert = "INSERT INTO user_skills (user_id, skill_name, skill_category, skill_level) 
-                               VALUES ('$user_id', '$skill_name', '$skill_category', '$skill_level')";
-
-                if ($conn->query($sql_insert) === TRUE) {
-                    $skillData = [
-                        'skill_name' => $skill_name,
-                        'skill_category' => $skill_category,
-                        'skill_level' => $skill_level
-                    ];
-                    $response['success'] = true;
-                    $response['message'] = 'Skill added successfully.';
-                    $response['data'] = $skillData;
+                // Check if this is an update (edit_id present) or insert
+                if (isset($_POST['edit_id']) && !empty($_POST['edit_id'])) {
+                    $edit_id = (int)$_POST['edit_id'];
+                    $stmt = $conn->prepare("UPDATE user_skills SET skill_name = ?, skill_category = ?, skill_level = ? WHERE id = ? AND user_id = ?");
+                    $stmt->bind_param("ssiii", $skill_name, $skill_category, $skill_level, $edit_id, $user_id);
+                    
+                    if ($stmt->execute()) {
+                        $response['success'] = true;
+                        $response['message'] = 'Skill updated successfully!';
+                        $response['data'] = [
+                            'id' => $edit_id,
+                            'skill_name' => $skill_name,
+                            'skill_category' => $skill_category,
+                            'skill_level' => $skill_level
+                        ];
+                    } else {
+                        $response['message'] = 'Error updating skill: ' . $stmt->error;
+                    }
+                    $stmt->close();
                 } else {
-                    $response['message'] = 'Error adding skill: ' . $conn->error;
+                    // Insert new skill
+                    $sql_insert = "INSERT INTO user_skills (user_id, skill_name, skill_category, skill_level) 
+                                   VALUES ('$user_id', '$skill_name', '$skill_category', '$skill_level')";
+
+                    if ($conn->query($sql_insert) === TRUE) {
+                        $skillData = [
+                            'id' => $conn->insert_id,
+                            'skill_name' => $skill_name,
+                            'skill_category' => $skill_category,
+                            'skill_level' => $skill_level
+                        ];
+                        $response['success'] = true;
+                        $response['message'] = 'Skill added successfully.';
+                        $response['data'] = $skillData;
+                    } else {
+                        $response['message'] = 'Error adding skill: ' . $conn->error;
+                    }
                 }
             }
         }

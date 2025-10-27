@@ -25,10 +25,10 @@ if (!$user_id && !$user_email) {
 
 try {
     if ($user_id) {
-        $stmt = $conn->prepare("SELECT id, position, applied_date, status, job_id, interview_date, interview_notes, resubmission_documents, resubmission_notes, rejection_reason, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert FROM job_applicants WHERE user_id = ? ORDER BY applied_date DESC, id DESC");
+        $stmt = $conn->prepare("SELECT id, position, applied_date, status, job_id, interview_date, interview_notes, resubmission_documents, resubmission_notes, rejection_reason, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, letter_of_intent FROM job_applicants WHERE user_id = ? ORDER BY applied_date DESC, id DESC");
         $stmt->bind_param("i", $user_id);
     } else {
-        $stmt = $conn->prepare("SELECT id, position, applied_date, status, job_id, interview_date, interview_notes, resubmission_documents, resubmission_notes, rejection_reason, applicant_email, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert FROM job_applicants WHERE applicant_email = ? ORDER BY applied_date DESC, id DESC");
+        $stmt = $conn->prepare("SELECT id, position, applied_date, status, job_id, interview_date, interview_notes, resubmission_documents, resubmission_notes, rejection_reason, applicant_email, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, letter_of_intent FROM job_applicants WHERE applicant_email = ? ORDER BY applied_date DESC, id DESC");
         $stmt->bind_param("s", $user_email);
     }
 
@@ -58,6 +58,7 @@ try {
             'coe' => $row['coe'] ?? null,
             'seminars_trainings' => $row['seminars_trainings'] ?? null,
             'masteral_cert' => $row['masteral_cert'] ?? null,
+            'letter_of_intent' => $row['letter_of_intent'] ?? null,
         ];
     }
 

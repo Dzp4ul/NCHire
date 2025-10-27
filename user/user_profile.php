@@ -326,14 +326,13 @@ if ($skills_result && $skills_result->num_rows > 0) {
 }
 $skills_stmt->close();
 ?>
-
-
-<!DOCTYPE html>
 <html lang="en">
 <head><script src="https://static.readdy.ai/static/e.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NCHire - My Profile</title>
+<link rel="icon" type="image/png" href="../assets/images/image-removebg-preview (1).png">
+<link rel="shortcut icon" type="image/png" href="../assets/images/image-removebg-preview (1).png">
 <script src="https://cdn.tailwindcss.com/3.4.16"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -638,10 +637,10 @@ document.addEventListener('DOMContentLoaded', function() {
 </p>
 </div>
 <div class="flex space-x-1 ml-4">
-<button class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors">
+<button onclick="editEducation(<?php echo $education['id']; ?>)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
 <i class="ri-edit-line text-sm"></i>
 </button>
-<button class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors">
+<button onclick="deleteEducation(<?php echo $education['id']; ?>)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors" title="Delete">
 <i class="ri-delete-bin-line text-sm"></i>
 </button>
 </div>
@@ -680,15 +679,12 @@ if (!empty($experience['location'])) {
     echo ' | ' . htmlspecialchars($experience['location']);
 }
 ?></p>
-<?php if (!empty($experience['description'])): ?>
-<p class="text-gray-700 mt-2 text-sm leading-relaxed"><?php echo nl2br(htmlspecialchars($experience['description'])); ?></p>
-<?php endif; ?>
 </div>
 <div class="flex space-x-1 ml-4">
-<button class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors">
+<button onclick="editExperience(<?php echo $experience['id']; ?>)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
 <i class="ri-edit-line text-sm"></i>
 </button>
-<button class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors">
+<button onclick="deleteExperience(<?php echo $experience['id']; ?>)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors" title="Delete">
 <i class="ri-delete-bin-line text-sm"></i>
 </button>
 </div>
@@ -730,10 +726,10 @@ echo $levels[$skill['skill_level']];
 </div>
 </div>
 <div class="flex space-x-1 ml-4">
-<button class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors">
+<button onclick="editSkill(<?php echo $skill['id']; ?>)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
 <i class="ri-edit-line text-sm"></i>
 </button>
-<button class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors">
+<button onclick="deleteSkill(<?php echo $skill['id']; ?>)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors" title="Delete">
 <i class="ri-delete-bin-line text-sm"></i>
 </button>
 </div>
@@ -1280,8 +1276,9 @@ window.showNotification = showNotification;
 <div id="educationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
   <div class="bg-white rounded-xl max-w-md w-full mx-4">
     <form method="POST" action="" class="p-6 space-y-4" id="educationForm">
+      <input type="hidden" name="edit_id" id="edit_education_id" value="">
       <div class="border-b border-gray-200 flex justify-between items-center pb-4">
-        <h3 class="text-lg font-semibold text-gray-900">Add Education</h3>
+        <h3 class="text-lg font-semibold text-gray-900" id="educationModalTitle">Add Education</h3>
         <button type="button" id="closeEducationModal" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600">
           <i class="ri-close-line text-xl"></i>
         </button>
@@ -1324,8 +1321,9 @@ window.showNotification = showNotification;
 <div id="experienceModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
   <div class="bg-white rounded-xl max-w-md w-full mx-4">
     <form method="POST" action="" class="p-6 space-y-4" id="experienceForm">
+      <input type="hidden" name="edit_id" id="edit_experience_id" value="">
       <div class="border-b border-gray-200 flex justify-between items-center pb-4">
-        <h3 class="text-lg font-semibold text-gray-900">Add Work Experience</h3>
+        <h3 class="text-lg font-semibold text-gray-900" id="experienceModalTitle">Add Work Experience</h3>
         <button type="button" id="closeExperienceModal" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600">
           <i class="ri-close-line text-xl"></i>
         </button>
@@ -1349,18 +1347,10 @@ window.showNotification = showNotification;
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2" for="end_date">End Date</label>
-          <input type="month" name="end_date" id="end_date" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
+          <input type="month" name="end_date" id="end_date" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
         </div>
       </div>
-      <div class="flex items-center">
-        <input type="checkbox" name="is_current" id="is_current" class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded">
-        <label for="is_current" class="ml-2 block text-sm text-gray-700">I currently work here</label>
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2" for="work_descript">Description</label>
-        <textarea name="work_descript" id="work_descript" placeholder="Describe your responsibilities and achievements..." rows="3" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm resize-none"></textarea>
-      </div>
-{{ ... }}
+
         <button type="button" id="cancelExperienceBtn" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors !rounded-button">Cancel</button>
         <button type="submit" name="saveExperience" id="saveExperienceBtn" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors text-sm !rounded-button">Add Experience</button>
       </div>
@@ -1372,8 +1362,9 @@ window.showNotification = showNotification;
 <div id="skillModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
   <div class="bg-white rounded-xl max-w-md w-full mx-4">
     <form method="POST" action="" class="p-6 space-y-4" id="skillForm">
+      <input type="hidden" name="edit_id" id="edit_skill_id" value="">
       <div class="border-b border-gray-200 flex justify-between items-center pb-4">
-        <h3 class="text-lg font-semibold text-gray-900">Add Skill</h3>
+        <h3 class="text-lg font-semibold text-gray-900" id="skillModalTitle">Add Skill</h3>
         <button type="button" id="closeSkillModal" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600">
           <i class="ri-close-line text-xl"></i>
         </button>
@@ -1415,6 +1406,235 @@ window.showNotification = showNotification;
   </div>
 </div>
 
+<script id="editDeleteFunctions">
+// Education Edit/Delete Functions
+function editEducation(id) {
+  // Fetch education data from the page
+  const educationItems = <?php echo json_encode($education_data); ?>;
+  const education = educationItems.find(item => item.id == id);
+  
+  if (!education) {
+    showNotification('Education record not found', 'error');
+    return;
+  }
+  
+  // Populate form fields
+  document.getElementById('edit_education_id').value = education.id;
+  document.getElementById('ed_degree').value = education.degree;
+  document.getElementById('ed_fs').value = education.field_of_study;
+  document.getElementById('ed_ins').value = education.institution;
+  document.getElementById('ed_sy').value = education.start_year;
+  document.getElementById('ed_ey').value = education.end_year;
+  document.getElementById('ed_gpa').value = education.gpa || '';
+  
+  // Update modal title and button
+  document.getElementById('educationModalTitle').textContent = 'Edit Education';
+  document.getElementById('saveEducationBtn').textContent = 'Update Education';
+  
+  // Show modal
+  const modal = document.getElementById('educationModal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+
+function deleteEducation(id) {
+  if (!confirm('Are you sure you want to delete this education record?')) {
+    return;
+  }
+  
+  fetch('save_profile_data.php', {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: 'delete_education=1&id=' + id
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      showNotification(data.message, 'success');
+      setTimeout(() => location.reload(), 1000);
+    } else {
+      showNotification('Error: ' + data.message, 'error');
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    showNotification('Error deleting education record', 'error');
+  });
+}
+
+// Experience Edit/Delete Functions
+function editExperience(id) {
+  const experienceItems = <?php echo json_encode($experience_data); ?>;
+  const experience = experienceItems.find(item => item.id == id);
+  
+  if (!experience) {
+    showNotification('Experience record not found', 'error');
+    return;
+  }
+  
+  // Populate form fields
+  document.getElementById('edit_experience_id').value = experience.id;
+  document.getElementById('job_title').value = experience.job_title;
+  document.getElementById('work_comp').value = experience.company;
+  document.getElementById('work_loc').value = experience.location || '';
+  
+  // Format dates for month input (YYYY-MM)
+  const startDate = experience.start_date.substring(0, 7);
+  document.getElementById('start_date').value = startDate;
+  
+  if (experience.end_date) {
+    const endDate = experience.end_date.substring(0, 7);
+    document.getElementById('end_date').value = endDate;
+  } else {
+    document.getElementById('end_date').value = '';
+  }
+  
+  // Update modal title and button
+  document.getElementById('experienceModalTitle').textContent = 'Edit Work Experience';
+  document.getElementById('saveExperienceBtn').textContent = 'Update Experience';
+  
+  // Show modal
+  const modal = document.getElementById('experienceModal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+
+function deleteExperience(id) {
+  if (!confirm('Are you sure you want to delete this work experience?')) {
+    return;
+  }
+  
+  fetch('save_profile_data.php', {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: 'delete_experience=1&id=' + id
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      showNotification(data.message, 'success');
+      setTimeout(() => location.reload(), 1000);
+    } else {
+      showNotification('Error: ' + data.message, 'error');
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    showNotification('Error deleting experience record', 'error');
+  });
+}
+
+// Skill Edit/Delete Functions
+function editSkill(id) {
+  const skillItems = <?php echo json_encode($skills_data); ?>;
+  const skill = skillItems.find(item => item.id == id);
+  
+  if (!skill) {
+    showNotification('Skill record not found', 'error');
+    return;
+  }
+  
+  // Populate form fields
+  document.getElementById('edit_skill_id').value = skill.id;
+  document.getElementById('skill_name').value = skill.skill_name;
+  document.getElementById('skill_category').value = skill.skill_category;
+  document.getElementById('skill_level').value = skill.skill_level;
+  
+  // Update skill level buttons
+  const skillLevelButtons = document.querySelectorAll('.skill-level');
+  skillLevelButtons.forEach((btn, index) => {
+    if (index < skill.skill_level) {
+      btn.classList.remove('bg-gray-300');
+      btn.classList.add('bg-primary');
+    } else {
+      btn.classList.remove('bg-primary');
+      btn.classList.add('bg-gray-300');
+    }
+  });
+  
+  // Update modal title and button
+  document.getElementById('skillModalTitle').textContent = 'Edit Skill';
+  document.getElementById('saveSkillBtn').textContent = 'Update Skill';
+  
+  // Show modal
+  const modal = document.getElementById('skillModal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+
+function deleteSkill(id) {
+  if (!confirm('Are you sure you want to delete this skill?')) {
+    return;
+  }
+  
+  fetch('save_profile_data.php', {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: 'delete_skill=1&id=' + id
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      showNotification(data.message, 'success');
+      setTimeout(() => location.reload(), 1000);
+    } else {
+      showNotification('Error: ' + data.message, 'error');
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    showNotification('Error deleting skill record', 'error');
+  });
+}
+
+// Reset forms when adding new items
+document.addEventListener('DOMContentLoaded', function() {
+  const addEducationBtn = document.getElementById('addEducationBtn');
+  const addExperienceBtn = document.getElementById('addExperienceBtn');
+  const addSkillBtn = document.getElementById('addSkillBtn');
+  
+  if (addEducationBtn) {
+    addEducationBtn.addEventListener('click', function() {
+      document.getElementById('educationForm').reset();
+      document.getElementById('edit_education_id').value = '';
+      document.getElementById('educationModalTitle').textContent = 'Add Education';
+      document.getElementById('saveEducationBtn').textContent = 'Add Education';
+    });
+  }
+  
+  if (addExperienceBtn) {
+    addExperienceBtn.addEventListener('click', function() {
+      document.getElementById('experienceForm').reset();
+      document.getElementById('edit_experience_id').value = '';
+      document.getElementById('experienceModalTitle').textContent = 'Add Work Experience';
+      document.getElementById('saveExperienceBtn').textContent = 'Add Experience';
+    });
+  }
+  
+  if (addSkillBtn) {
+    addSkillBtn.addEventListener('click', function() {
+      document.getElementById('skillForm').reset();
+      document.getElementById('edit_skill_id').value = '';
+      document.getElementById('skillModalTitle').textContent = 'Add Skill';
+      document.getElementById('saveSkillBtn').textContent = 'Add Skill';
+      
+      // Reset skill level buttons
+      const skillLevelButtons = document.querySelectorAll('.skill-level');
+      skillLevelButtons.forEach(btn => {
+        btn.classList.remove('bg-primary');
+        btn.classList.add('bg-gray-300');
+      });
+      document.getElementById('skill_level').value = '0';
+    });
+  }
+});
+</script>
 
 </body>
 </html>

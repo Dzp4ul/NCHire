@@ -1,4 +1,5 @@
 <?php
+session_start();
 header('Content-Type: application/json');
 
 // Include email helper and admin notification helper
@@ -17,6 +18,10 @@ if ($conn->connect_error) {
     echo json_encode(['success' => false, 'error' => 'Database connection failed']);
     exit;
 }
+
+// Get admin info from session
+$admin_name = $_SESSION['admin_name'] ?? 'Unknown Admin';
+$admin_id = $_SESSION['admin_id'] ?? null;
 
 $action = $_POST['action'] ?? '';
 $applicant_id = $_POST['applicant_id'] ?? '';
@@ -71,7 +76,7 @@ try {
             
             if ($stmt->execute()) {
                 // Simple notification system using email matching
-                $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name FROM job_applicants WHERE id = ?");
+                $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name, position FROM job_applicants WHERE id = ?");
                 $applicant_stmt->bind_param("i", $applicant_id);
                 $applicant_stmt->execute();
                 $applicant_result = $applicant_stmt->get_result();
@@ -80,6 +85,7 @@ try {
                     $applicant_data = $applicant_result->fetch_assoc();
                     $applicant_email = $applicant_data['applicant_email'];
                     $applicant_name = $applicant_data['full_name'];
+                    $position = $applicant_data['position'];
                     
                     // Create notification using email as identifier
                     $notif_stmt = $conn->prepare("INSERT INTO notifications (user_email, user_name, title, message, type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
@@ -101,6 +107,14 @@ try {
                     $admin_title = "Interview Scheduled";
                     $admin_message = "Interview scheduled for " . $applicant_name . " on " . date('F j, Y \\a\\t g:i A', strtotime($interview_datetime));
                     createAdminNotification($conn, $admin_title, $admin_message, 'info', 'interview_scheduled', $applicant_id, $applicant_name, true);
+                    
+                    // Log admin activity
+                    $activity_stmt = $conn->prepare("INSERT INTO admin_activity (activity_type, description, user_name, related_table, related_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                    $activity_type = "interview_scheduled";
+                    $activity_desc = "$admin_name scheduled an interview for $applicant_name ($position) on " . date('M j, Y \\a\\t g:i A', strtotime($interview_datetime));
+                    $related_table = "job_applicants";
+                    $activity_stmt->bind_param("ssssi", $activity_type, $activity_desc, $admin_name, $related_table, $applicant_id);
+                    $activity_stmt->execute();
                 }
                 
                 echo json_encode(['success' => true, 'message' => 'Interview scheduled successfully']);
@@ -128,7 +142,7 @@ try {
             
             if ($stmt->execute()) {
                 // Simple notification system using email matching
-                $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name FROM job_applicants WHERE id = ?");
+                $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name, position FROM job_applicants WHERE id = ?");
                 $applicant_stmt->bind_param("i", $applicant_id);
                 $applicant_stmt->execute();
                 $applicant_result = $applicant_stmt->get_result();
@@ -137,6 +151,7 @@ try {
                     $applicant_data = $applicant_result->fetch_assoc();
                     $applicant_email = $applicant_data['applicant_email'];
                     $applicant_name = $applicant_data['full_name'];
+                    $position = $applicant_data['position'];
                     
                     // Create notification using email as identifier
                     $notif_stmt = $conn->prepare("INSERT INTO notifications (user_email, user_name, title, message, type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
@@ -153,6 +168,14 @@ try {
                     
                     // Send email notification
                     sendResubmissionEmail($applicant_email, $applicant_name, $documents, $notes);
+                    
+                    // Log admin activity
+                    $activity_stmt = $conn->prepare("INSERT INTO admin_activity (activity_type, description, user_name, related_table, related_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                    $activity_type = "resubmission_requested";
+                    $activity_desc = "$admin_name requested resubmission from $applicant_name ($position)";
+                    $related_table = "job_applicants";
+                    $activity_stmt->bind_param("ssssi", $activity_type, $activity_desc, $admin_name, $related_table, $applicant_id);
+                    $activity_stmt->execute();
                 }
                 
                 echo json_encode(['success' => true, 'message' => 'Resubmission request sent successfully']);
@@ -179,7 +202,7 @@ try {
             
             if ($stmt->execute()) {
                 // Simple notification system using email matching
-                $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name FROM job_applicants WHERE id = ?");
+                $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name, position FROM job_applicants WHERE id = ?");
                 $applicant_stmt->bind_param("i", $applicant_id);
                 $applicant_stmt->execute();
                 $applicant_result = $applicant_stmt->get_result();
@@ -188,6 +211,7 @@ try {
                     $applicant_data = $applicant_result->fetch_assoc();
                     $applicant_email = $applicant_data['applicant_email'];
                     $applicant_name = $applicant_data['full_name'];
+                    $position = $applicant_data['position'];
                     
                     // Create notification using email as identifier
                     $notif_stmt = $conn->prepare("INSERT INTO notifications (user_email, user_name, title, message, type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
@@ -204,6 +228,14 @@ try {
                     
                     // Send email notification
                     sendRejectionEmail($applicant_email, $applicant_name, $rejection_reason);
+                    
+                    // Log admin activity
+                    $activity_stmt = $conn->prepare("INSERT INTO admin_activity (activity_type, description, user_name, related_table, related_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                    $activity_type = "applicant_rejected";
+                    $activity_desc = "$admin_name rejected application from $applicant_name for $position";
+                    $related_table = "job_applicants";
+                    $activity_stmt->bind_param("ssssi", $activity_type, $activity_desc, $admin_name, $related_table, $applicant_id);
+                    $activity_stmt->execute();
                 }
                 
                 echo json_encode(['success' => true, 'message' => 'Application rejected successfully']);
@@ -255,7 +287,7 @@ try {
             
             if ($stmt->execute()) {
                 // Create notification
-                $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name FROM job_applicants WHERE id = ?");
+                $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name, position FROM job_applicants WHERE id = ?");
                 $applicant_stmt->bind_param("i", $applicant_id);
                 $applicant_stmt->execute();
                 $applicant_result = $applicant_stmt->get_result();
@@ -264,6 +296,7 @@ try {
                     $applicant_data = $applicant_result->fetch_assoc();
                     $applicant_email = $applicant_data['applicant_email'];
                     $applicant_name = $applicant_data['full_name'];
+                    $position = $applicant_data['position'];
                     
                     $notif_stmt = $conn->prepare("INSERT INTO notifications (user_email, user_name, title, message, type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
                     $title = "Demo Teaching Scheduled";
@@ -279,6 +312,14 @@ try {
                     $admin_title = "Demo Teaching Scheduled";
                     $admin_message = "Demo teaching scheduled for " . $applicant_name . " on " . date('F j, Y \\a\\t g:i A', strtotime($demo_datetime));
                     createAdminNotification($conn, $admin_title, $admin_message, 'info', 'demo_scheduled', $applicant_id, $applicant_name, true);
+                    
+                    // Log admin activity
+                    $activity_stmt = $conn->prepare("INSERT INTO admin_activity (activity_type, description, user_name, related_table, related_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                    $activity_type = "demo_scheduled";
+                    $activity_desc = "$admin_name scheduled demo teaching for $applicant_name ($position) on " . date('M j, Y \\a\\t g:i A', strtotime($demo_datetime));
+                    $related_table = "job_applicants";
+                    $activity_stmt->bind_param("ssssi", $activity_type, $activity_desc, $admin_name, $related_table, $applicant_id);
+                    $activity_stmt->execute();
                 }
                 
                 echo json_encode(['success' => true, 'message' => 'Demo scheduled successfully']);
@@ -299,7 +340,7 @@ try {
             
             if ($stmt->execute()) {
                 // Create notification
-                $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name FROM job_applicants WHERE id = ?");
+                $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name, position FROM job_applicants WHERE id = ?");
                 $applicant_stmt->bind_param("i", $applicant_id);
                 $applicant_stmt->execute();
                 $applicant_result = $applicant_stmt->get_result();
@@ -308,6 +349,7 @@ try {
                     $applicant_data = $applicant_result->fetch_assoc();
                     $applicant_email = $applicant_data['applicant_email'];
                     $applicant_name = $applicant_data['full_name'];
+                    $position = $applicant_data['position'];
                     
                     $notif_stmt = $conn->prepare("INSERT INTO notifications (user_email, user_name, title, message, type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
                     $title = "Interview Approved";
@@ -318,6 +360,14 @@ try {
                     
                     // Send email notification
                     sendInterviewApprovedEmail($applicant_email, $applicant_name, $interview_notes);
+                    
+                    // Log admin activity
+                    $activity_stmt = $conn->prepare("INSERT INTO admin_activity (activity_type, description, user_name, related_table, related_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                    $activity_type = "interview_approved";
+                    $activity_desc = "$admin_name approved interview for $applicant_name ($position)";
+                    $related_table = "job_applicants";
+                    $activity_stmt->bind_param("ssssi", $activity_type, $activity_desc, $admin_name, $related_table, $applicant_id);
+                    $activity_stmt->execute();
                 }
                 
                 echo json_encode(['success' => true, 'message' => 'Interview approved successfully']);
@@ -338,7 +388,7 @@ try {
             
             if ($stmt->execute()) {
                 // Create notification
-                $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name FROM job_applicants WHERE id = ?");
+                $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name, position FROM job_applicants WHERE id = ?");
                 $applicant_stmt->bind_param("i", $applicant_id);
                 $applicant_stmt->execute();
                 $applicant_result = $applicant_stmt->get_result();
@@ -347,6 +397,7 @@ try {
                     $applicant_data = $applicant_result->fetch_assoc();
                     $applicant_email = $applicant_data['applicant_email'];
                     $applicant_name = $applicant_data['full_name'];
+                    $position = $applicant_data['position'];
                     
                     $notif_stmt = $conn->prepare("INSERT INTO notifications (user_email, user_name, title, message, type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
                     $title = "Demo Teaching Approved";
@@ -357,6 +408,14 @@ try {
                     
                     // Send email notification
                     sendDemoApprovedEmail($applicant_email, $applicant_name, $demo_notes);
+                    
+                    // Log admin activity
+                    $activity_stmt = $conn->prepare("INSERT INTO admin_activity (activity_type, description, user_name, related_table, related_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                    $activity_type = "demo_approved";
+                    $activity_desc = "$admin_name approved demo teaching for $applicant_name ($position)";
+                    $related_table = "job_applicants";
+                    $activity_stmt->bind_param("ssssi", $activity_type, $activity_desc, $admin_name, $related_table, $applicant_id);
+                    $activity_stmt->execute();
                 }
                 
                 echo json_encode(['success' => true, 'message' => 'Demo approved successfully']);
@@ -389,7 +448,7 @@ try {
             
             if ($stmt->execute()) {
                 // Create notification
-                $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name FROM job_applicants WHERE id = ?");
+                $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name, position FROM job_applicants WHERE id = ?");
                 $applicant_stmt->bind_param("i", $applicant_id);
                 $applicant_stmt->execute();
                 $applicant_result = $applicant_stmt->get_result();
@@ -398,6 +457,7 @@ try {
                     $applicant_data = $applicant_result->fetch_assoc();
                     $applicant_email = $applicant_data['applicant_email'];
                     $applicant_name = $applicant_data['full_name'];
+                    $position = $applicant_data['position'];
                     
                     $notif_stmt = $conn->prepare("INSERT INTO notifications (user_email, user_name, title, message, type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
                     $title = "Psychological Exam Scheduled";
@@ -408,6 +468,14 @@ try {
                     
                     // Send email notification
                     sendPsychExamScheduleEmail($applicant_email, $applicant_name, $psych_exam_datetime, $psych_exam_notes);
+                    
+                    // Log admin activity
+                    $activity_stmt = $conn->prepare("INSERT INTO admin_activity (activity_type, description, user_name, related_table, related_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                    $activity_type = "psych_exam_scheduled";
+                    $activity_desc = "$admin_name scheduled psychological exam for $applicant_name ($position) on " . date('M j, Y \\a\\t g:i A', strtotime($psych_exam_datetime));
+                    $related_table = "job_applicants";
+                    $activity_stmt->bind_param("ssssi", $activity_type, $activity_desc, $admin_name, $related_table, $applicant_id);
+                    $activity_stmt->execute();
                 }
                 
                 echo json_encode(['success' => true, 'message' => 'Psychological exam scheduled successfully']);
@@ -429,7 +497,7 @@ try {
             
             if ($stmt->execute()) {
                 // Create notification
-                $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name FROM job_applicants WHERE id = ?");
+                $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name, position FROM job_applicants WHERE id = ?");
                 $applicant_stmt->bind_param("i", $applicant_id);
                 $applicant_stmt->execute();
                 $applicant_result = $applicant_stmt->get_result();
@@ -438,6 +506,7 @@ try {
                     $applicant_data = $applicant_result->fetch_assoc();
                     $applicant_email = $applicant_data['applicant_email'];
                     $applicant_name = $applicant_data['full_name'];
+                    $position = $applicant_data['position'];
                     
                     $notif_stmt = $conn->prepare("INSERT INTO notifications (user_email, user_name, title, message, type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
                     $title = "Marked as Initially Hired";
@@ -448,6 +517,14 @@ try {
                     
                     // Send email notification
                     sendInitiallyHiredEmail($applicant_email, $applicant_name, $initially_hired_notes);
+                    
+                    // Log admin activity
+                    $activity_stmt = $conn->prepare("INSERT INTO admin_activity (activity_type, description, user_name, related_table, related_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                    $activity_type = "applicant_initially_hired";
+                    $activity_desc = "$admin_name marked $applicant_name as Initially Hired for $position";
+                    $related_table = "job_applicants";
+                    $activity_stmt->bind_param("ssssi", $activity_type, $activity_desc, $admin_name, $related_table, $applicant_id);
+                    $activity_stmt->execute();
                 }
                 
                 echo json_encode(['success' => true, 'message' => 'Applicant marked as initially hired successfully']);
@@ -469,7 +546,7 @@ try {
             
             if ($stmt->execute()) {
                 // Create notification
-                $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name FROM job_applicants WHERE id = ?");
+                $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name, position FROM job_applicants WHERE id = ?");
                 $applicant_stmt->bind_param("i", $applicant_id);
                 $applicant_stmt->execute();
                 $applicant_result = $applicant_stmt->get_result();
@@ -478,6 +555,7 @@ try {
                     $applicant_data = $applicant_result->fetch_assoc();
                     $applicant_email = $applicant_data['applicant_email'];
                     $applicant_name = $applicant_data['full_name'];
+                    $position = $applicant_data['position'];
                     
                     $notif_stmt = $conn->prepare("INSERT INTO notifications (user_email, user_name, title, message, type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
                     $title = "Permanently Hired - Welcome Aboard!";
@@ -488,6 +566,14 @@ try {
                     
                     // Send email notification
                     sendPermanentlyHiredEmail($applicant_email, $applicant_name, $hired_notes);
+                    
+                    // Log admin activity
+                    $activity_stmt = $conn->prepare("INSERT INTO admin_activity (activity_type, description, user_name, related_table, related_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                    $activity_type = "applicant_hired";
+                    $activity_desc = "$admin_name permanently hired $applicant_name for $position";
+                    $related_table = "job_applicants";
+                    $activity_stmt->bind_param("ssssi", $activity_type, $activity_desc, $admin_name, $related_table, $applicant_id);
+                    $activity_stmt->execute();
                 }
                 
                 echo json_encode(['success' => true, 'message' => 'Applicant permanently hired successfully']);

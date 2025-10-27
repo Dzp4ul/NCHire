@@ -66,8 +66,23 @@ function uploadDraftFile($fileKey, $uploadDir, $user_id, $multiple = false) {
 }
 
 try {
+    // Debug logging
+    error_log("=== SAVE DRAFT DEBUG ===");
+    error_log("User ID: " . $user_id);
+    error_log("FILES received: " . print_r(array_keys($_FILES), true));
+    
+    // Check if letter_of_intent was uploaded
+    if (isset($_FILES['letter_of_intent'])) {
+        error_log("letter_of_intent file info:");
+        error_log("  name: " . $_FILES['letter_of_intent']['name']);
+        error_log("  error: " . $_FILES['letter_of_intent']['error']);
+        error_log("  size: " . $_FILES['letter_of_intent']['size']);
+    } else {
+        error_log("letter_of_intent NOT in $_FILES");
+    }
+    
     // Check if draft already exists for this user
-    $check_stmt = $conn->prepare("SELECT id, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert FROM user_draft_documents WHERE user_id = ?");
+    $check_stmt = $conn->prepare("SELECT id, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, letter_of_intent FROM user_draft_documents WHERE user_id = ?");
     $check_stmt->bind_param("i", $user_id);
     $check_stmt->execute();
     $result = $check_stmt->get_result();
@@ -75,14 +90,19 @@ try {
     $check_stmt->close();
     
     // Upload new files or keep existing ones
-    $application_letter = uploadDraftFile('applicationLetter', $userDraftDir, $user_id) ?? ($existing_draft['application_letter'] ?? null);
-    $resume = uploadDraftFile('resume_file', $userDraftDir, $user_id) ?? ($existing_draft['resume'] ?? null);
-    $tor = uploadDraftFile('transcript', $userDraftDir, $user_id) ?? ($existing_draft['tor'] ?? null);
-    $diploma = uploadDraftFile('diploma', $userDraftDir, $user_id) ?? ($existing_draft['diploma'] ?? null);
-    $professional_license = uploadDraftFile('license', $userDraftDir, $user_id) ?? ($existing_draft['professional_license'] ?? null);
-    $coe = uploadDraftFile('coe', $userDraftDir, $user_id) ?? ($existing_draft['coe'] ?? null);
-    $seminars_trainings = uploadDraftFile('certificates', $userDraftDir, $user_id, true) ?? ($existing_draft['seminars_trainings'] ?? null);
-    $masteral_cert = uploadDraftFile('masteral_cert', $userDraftDir, $user_id) ?? ($existing_draft['masteral_cert'] ?? null);
+    // Check for existing draft filenames sent from hidden inputs
+    $application_letter = uploadDraftFile('applicationLetter', $userDraftDir, $user_id) ?? ($_POST['existing_applicationLetter'] ?? ($existing_draft['application_letter'] ?? null));
+    $resume = uploadDraftFile('resume_file', $userDraftDir, $user_id) ?? ($_POST['existing_resume_file'] ?? ($existing_draft['resume'] ?? null));
+    $tor = uploadDraftFile('transcript', $userDraftDir, $user_id) ?? ($_POST['existing_transcript'] ?? ($existing_draft['tor'] ?? null));
+    $diploma = uploadDraftFile('diploma', $userDraftDir, $user_id) ?? ($_POST['existing_diploma'] ?? ($existing_draft['diploma'] ?? null));
+    $professional_license = uploadDraftFile('license', $userDraftDir, $user_id) ?? ($_POST['existing_license'] ?? ($existing_draft['professional_license'] ?? null));
+    $coe = uploadDraftFile('coe', $userDraftDir, $user_id) ?? ($_POST['existing_coe'] ?? ($existing_draft['coe'] ?? null));
+    $seminars_trainings = uploadDraftFile('certificates', $userDraftDir, $user_id, true) ?? ($_POST['existing_certificates[]'] ?? ($existing_draft['seminars_trainings'] ?? null));
+    $masteral_cert = uploadDraftFile('masteral_cert', $userDraftDir, $user_id) ?? ($_POST['existing_masteral_cert'] ?? ($existing_draft['masteral_cert'] ?? null));
+    $letter_of_intent = uploadDraftFile('letter_of_intent', $userDraftDir, $user_id) ?? ($_POST['existing_letter_of_intent'] ?? ($existing_draft['letter_of_intent'] ?? null));
+    
+    error_log("letter_of_intent result after upload: " . ($letter_of_intent ?? 'NULL'));
+    error_log("existing_letter_of_intent from POST: " . ($_POST['existing_letter_of_intent'] ?? 'NOT SET'));
     
     if ($existing_draft) {
         // Update existing draft
@@ -95,21 +115,22 @@ try {
             coe = COALESCE(?, coe),
             seminars_trainings = COALESCE(?, seminars_trainings),
             masteral_cert = COALESCE(?, masteral_cert),
+            letter_of_intent = COALESCE(?, letter_of_intent),
             updated_at = CURRENT_TIMESTAMP
             WHERE user_id = ?");
-        $stmt->bind_param("ssssssssi", 
+        $stmt->bind_param("sssssssssi", 
             $application_letter, $resume, $tor, $diploma, 
             $professional_license, $coe, $seminars_trainings, 
-            $masteral_cert, $user_id
+            $masteral_cert, $letter_of_intent, $user_id
         );
     } else {
         // Insert new draft
         $stmt = $conn->prepare("INSERT INTO user_draft_documents 
-            (user_id, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("issssssss", 
+            (user_id, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, letter_of_intent) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("isssssssss", 
             $user_id, $application_letter, $resume, $tor, $diploma, 
-            $professional_license, $coe, $seminars_trainings, $masteral_cert
+            $professional_license, $coe, $seminars_trainings, $masteral_cert, $letter_of_intent
         );
     }
     
@@ -125,7 +146,8 @@ try {
                 'professional_license' => $professional_license,
                 'coe' => $coe,
                 'seminars_trainings' => $seminars_trainings,
-                'masteral_cert' => $masteral_cert
+                'masteral_cert' => $masteral_cert,
+                'letter_of_intent' => $letter_of_intent
             ]
         ]);
     } else {

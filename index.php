@@ -21,7 +21,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login_submit'])) {
     $login_found = false;
 
     // Check admin_users table first (new admin system)
-    $stmt = $conn->prepare("SELECT * FROM admin_users WHERE email = ? AND status = 'Active' LIMIT 1");
+    $stmt = $conn->prepare("SELECT id, full_name, email, password, role, department, profile_picture, password_change_required FROM admin_users WHERE email = ?");
     $stmt->bind_param("s", $email);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -40,6 +40,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login_submit'])) {
             $_SESSION['admin_role'] = $row['role'];
             $_SESSION['admin_department'] = $row['department'];
             $_SESSION['admin_profile_picture'] = $row['profile_picture'];
+            $_SESSION['password_change_required'] = $row['password_change_required'];
             
             // Update last login timestamp
             $update_stmt = $conn->prepare("UPDATE admin_users SET last_login = NOW() WHERE id = ?");
@@ -47,7 +48,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login_submit'])) {
             $update_stmt->execute();
             $update_stmt->close();
             
-            header("Location: admin/index.php");
+            // Check if password change is required
+            if ($row['password_change_required'] == 1) {
+                header("Location: admin/change_password.php");
+            } else {
+                header("Location: admin/index.php");
+            }
             exit();
         }
         // If admin password wrong, continue to check applicants table
@@ -257,6 +263,8 @@ $conn->close();
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NCHire - Norzagaray College Hiring Portal</title>
+<link rel="icon" type="image/png" href="assets/images/image-removebg-preview (1).png">
+<link rel="shortcut icon" type="image/png" href="assets/images/image-removebg-preview (1).png">
 <script src="https://cdn.tailwindcss.com/3.4.16"></script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1591,6 +1599,26 @@ document.addEventListener('DOMContentLoaded', function() {
     window.host = 'readdy.ai';
 </script>
 
+<script>
+// Auto-open login modal if redirected after password change
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('open_login') === '1') {
+        const signInModal = document.getElementById('signInModal');
+        if (signInModal) {
+            signInModal.classList.remove('hidden');
+            // Lock body scroll when modal opens
+            document.body.style.overflow = 'hidden';
+            
+            // Show success message
+            showToast('Password changed successfully! Please log in with your new password.', 'success', 5000);
+            
+            // Clean up URL (remove the parameter)
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }
+});
+</script>
 
 </body>
 </html>

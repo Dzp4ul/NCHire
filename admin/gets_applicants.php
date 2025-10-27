@@ -12,7 +12,22 @@ try {
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
     // Exclude rejected applicants - they appear in Archive section
-    $stmt = $pdo->query("SELECT id, full_name, position, applied_date, status, applicant_email, contact_num FROM job_applicants WHERE status != 'Rejected' ORDER BY applied_date DESC");
+    // Join with applicants table to get profile_picture
+    $stmt = $pdo->query("
+        SELECT 
+            ja.id, 
+            ja.full_name, 
+            ja.position, 
+            ja.applied_date, 
+            ja.status, 
+            ja.applicant_email, 
+            ja.contact_num,
+            a.profile_picture
+        FROM job_applicants ja
+        LEFT JOIN applicants a ON ja.user_id = a.id
+        WHERE ja.status != 'Rejected' 
+        ORDER BY ja.applied_date DESC
+    ");
     $applicants = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode($applicants);

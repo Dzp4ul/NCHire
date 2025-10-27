@@ -106,12 +106,15 @@ switch ($method) {
             }
         }
         
-        // Hash password
-        $hashed_password = password_hash($input['password'], PASSWORD_DEFAULT);
+        // Generate random temporary password (8 characters)
+        $temporaryPassword = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%'), 0, 10);
         
-        // Insert new user
-        $stmt = $conn->prepare("INSERT INTO admin_users (full_name, email, password, role, department, phone, profile_picture, status) 
-                                VALUES (?, ?, ?, ?, ?, ?, ?, 'Active')");
+        // Hash the temporary password
+        $hashed_password = password_hash($temporaryPassword, PASSWORD_DEFAULT);
+        
+        // Insert new user with password_change_required = 1
+        $stmt = $conn->prepare("INSERT INTO admin_users (full_name, email, password, password_change_required, role, department, phone, profile_picture, status) 
+                                VALUES (?, ?, ?, 1, ?, ?, ?, ?, 'Active')");
         $phone = isset($input['phone']) ? $input['phone'] : null;
         $stmt->bind_param("sssssss", $input['name'], $input['email'], $hashed_password, 
                          $input['role'], $input['department'], $phone, $profile_picture);
@@ -119,13 +122,29 @@ switch ($method) {
         if ($stmt->execute()) {
             $newUserId = $conn->insert_id;
             
+            // Send temporary password email
+            require_once '../send_temp_password_email.php';
+            $emailResult = sendTemporaryPasswordEmail($input['email'], $input['name'], $temporaryPassword, $input['role']);
+            
             // Fetch the newly created user
             $fetch = $conn->query("SELECT id, full_name as name, email, role, department, profile_picture, status, 
                                   'Never' as lastLogin, DATE_FORMAT(created_at, '%Y-%m-%d') as createdDate 
                                   FROM admin_users WHERE id = $newUserId");
             $newUser = $fetch->fetch_assoc();
             
-            echo json_encode(['success' => true, 'user' => $newUser, 'message' => 'User created successfully']);
+            // Log admin activity for creating new user
+            $creator_name = $_SESSION['admin_name'] ?? 'Unknown Admin';
+            $activity_stmt = $conn->prepare("INSERT INTO admin_activity (activity_type, description, user_name, related_table, related_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+            $activity_type = "user_created";
+            $activity_desc = "$creator_name created new admin user: {$input['name']} ({$input['role']})";
+            $related_table = "admin_users";
+            $activity_stmt->bind_param("ssssi", $activity_type, $activity_desc, $creator_name, $related_table, $newUserId);
+            $activity_stmt->execute();
+            
+            $message = 'User created successfully. ';
+            $message .= $emailResult['success'] ? 'Temporary password sent to email.' : 'However, email notification failed.';
+            
+            echo json_encode(['success' => true, 'user' => $newUser, 'message' => $message, 'emailSent' => $emailResult['success']]);
         } else {
             // If database insert fails, delete uploaded file
             if ($profile_picture && file_exists($upload_dir . $profile_picture)) {

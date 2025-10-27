@@ -1,4 +1,5 @@
 <?php
+session_start();
 header('Content-Type: application/json');
 // Prevent PHP notices/warnings from corrupting JSON output
 ini_set('display_errors', 0);
@@ -14,6 +15,9 @@ if ($conn->connect_error) {
     echo json_encode(["success" => false, "message" => "Connection failed: " . $conn->connect_error]);
     exit;
 }
+
+// Get admin info from session
+$admin_name = $_SESSION['admin_name'] ?? 'Unknown Admin';
 
 $data = json_decode(file_get_contents("php://input"), true);
 
@@ -52,13 +56,15 @@ try {
     $stmt->bind_param("sssssssssssss", $title, $department, $type, $location, $salary, $deadline, $description, $requirements, $education, $experience, $training, $eligibility, $competency);
     $ok = $stmt->execute();
     if ($ok) {
-        // Log the activity
-        $activity_sql = "INSERT INTO admin_activity (activity_type, description, created_at) VALUES (?, ?, NOW())";
+        $job_id = $conn->insert_id;
+        // Log the activity with admin name
+        $activity_sql = "INSERT INTO admin_activity (activity_type, description, user_name, related_table, related_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())";
         $astmt = $conn->prepare($activity_sql);
         if ($astmt) {
             $activity_type = "job_created";
-            $desc = "Created job posting: " . $title;
-            $astmt->bind_param("ss", $activity_type, $desc);
+            $desc = "$admin_name created job posting: $title";
+            $related_table = "job";
+            $astmt->bind_param("ssssi", $activity_type, $desc, $admin_name, $related_table, $job_id);
             $astmt->execute();
             $astmt->close();
         }

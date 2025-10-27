@@ -15,23 +15,43 @@ if ($conn->connect_error) {
     exit;
 }
 
-$notification_id = $_POST['notification_id'] ?? null;
 $user_email = $_SESSION['user_email'] ?? null;
 
-if (!$notification_id || !$user_email) {
-    echo json_encode(['success' => false, 'error' => 'Missing required parameters']);
+if (!$user_email) {
+    echo json_encode(['success' => false, 'error' => 'User not logged in']);
     exit;
 }
 
+$action = $_POST['action'] ?? 'mark_one';
+$notification_id = $_POST['notification_id'] ?? null;
+
 try {
-    // Mark notification as read using email
-    $stmt = $conn->prepare("UPDATE notifications SET is_read = TRUE WHERE id = ? AND user_email = ?");
-    $stmt->bind_param("is", $notification_id, $user_email);
-    
-    if ($stmt->execute()) {
-        echo json_encode(['success' => true, 'message' => 'Notification marked as read']);
+    if ($action === 'mark_all_read') {
+        // Mark all notifications as read for this user
+        $stmt = $conn->prepare("UPDATE notifications SET is_read = TRUE WHERE user_email = ? AND is_read = FALSE");
+        $stmt->bind_param("s", $user_email);
+        
+        if ($stmt->execute()) {
+            $affected = $stmt->affected_rows;
+            echo json_encode(['success' => true, 'message' => "Marked $affected notifications as read"]);
+        } else {
+            echo json_encode(['success' => false, 'error' => 'Failed to mark notifications as read']);
+        }
     } else {
-        echo json_encode(['success' => false, 'error' => 'Failed to mark notification as read']);
+        // Mark single notification as read
+        if (!$notification_id) {
+            echo json_encode(['success' => false, 'error' => 'Missing notification_id']);
+            exit;
+        }
+        
+        $stmt = $conn->prepare("UPDATE notifications SET is_read = TRUE WHERE id = ? AND user_email = ?");
+        $stmt->bind_param("is", $notification_id, $user_email);
+        
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true, 'message' => 'Notification marked as read']);
+        } else {
+            echo json_encode(['success' => false, 'error' => 'Failed to mark notification as read']);
+        }
     }
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'error' => 'Server error: ' . $e->getMessage()]);

@@ -7,6 +7,12 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     exit();
 }
 
+// Check if password change is required
+if (isset($_SESSION['password_change_required']) && $_SESSION['password_change_required'] == 1) {
+    header("Location: change_password.php");
+    exit();
+}
+
 // Database connection
 $host = "127.0.0.1";
 $user = "root";
@@ -146,19 +152,14 @@ switch($chart_filter) {
         }
 }
 
-// Get comprehensive recent activity from multiple sources - only show applications from last 2 hours
+// Get recent admin activity only - no job applications
+// Filter out NULL, empty, and 'application' types at database level
 $recent_activity_query = "
-    (SELECT 'application' as activity_type, 
-            CONCAT(full_name, ' applied for ', position) as description,
-            full_name as user_name,
-            applied_date as created_at
-     FROM job_applicants 
-     WHERE applied_date >= DATE_SUB(NOW(), INTERVAL 2 HOUR)
-     ORDER BY applied_date DESC LIMIT 5)
-    UNION ALL
-    (SELECT activity_type, description, user_name, created_at 
-     FROM admin_activity 
-     ORDER BY created_at DESC LIMIT 10)
+    SELECT activity_type, description, user_name, created_at 
+    FROM admin_activity 
+    WHERE activity_type IS NOT NULL 
+    AND activity_type != '' 
+    AND activity_type != 'application'
     ORDER BY created_at DESC 
     LIMIT 10";
 $recent_activity = $conn->query($recent_activity_query);
@@ -170,6 +171,8 @@ $recent_activity = $conn->query($recent_activity_query);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NCHire Admin Dashboard</title>
+    <link rel="icon" type="image/png" href="../assets/images/image-removebg-preview (1).png">
+    <link rel="shortcut icon" type="image/png" href="../assets/images/image-removebg-preview (1).png">
     <script src="https://cdn.tailwindcss.com/3.4.16"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script>
@@ -247,7 +250,7 @@ $recent_activity = $conn->query($recent_activity_query);
         </div>
 
         <nav class="mt-8 px-4">
-            <button onclick="showSection('dashboard')" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg mb-2 text-gray-700 hover:bg-gray-100 active">
+            <button onclick="showSection('dashboard')" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg mb-2 text-gray-700 hover:bg-gray-100">
                 <i class="fas fa-chart-line w-5 h-5"></i>
                 Dashboard
             </button>
@@ -263,10 +266,12 @@ $recent_activity = $conn->query($recent_activity_query);
                 <i class="fas fa-archive w-5 h-5"></i>
                 Archive
             </button>
+            <?php if ($admin_role === 'Admin'): ?>
             <button onclick="showSection('users')" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg mb-2 text-gray-700 hover:bg-gray-100">
                 <i class="fas fa-users w-5 h-5"></i>
                 Users
             </button>
+            <?php endif; ?>
         </nav>
     </div>
 
@@ -448,13 +453,17 @@ $recent_activity = $conn->query($recent_activity_query);
                         <div class="h-80 overflow-y-auto space-y-4 pr-2" id="recentActivityContainer">
                             <?php if ($recent_activity && $recent_activity->num_rows > 0): ?>
                                 <?php while ($activity = $recent_activity->fetch_assoc()): ?>
-                                    <div class="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg transition-colors">
-                                        <?php
-                                        $icon_class = 'fas fa-user-plus text-green-600';
-                                        $bg_class = 'bg-green-100';
-                                        $activity_title = 'New application received';
-                                        
-                                        switch($activity['activity_type']) {
+                                    <?php
+                                    // SKIP entries with NULL, empty, or 'application' activity_type
+                                    if (empty($activity['activity_type']) || $activity['activity_type'] == 'application') {
+                                        continue;
+                                    }
+                                    
+                                    $icon_class = 'fas fa-circle text-gray-600';
+                                    $bg_class = 'bg-gray-100';
+                                    $activity_title = 'Activity';
+                                    
+                                    switch($activity['activity_type']) {
                                             case 'job_created':
                                                 $icon_class = 'fas fa-briefcase text-blue-600';
                                                 $bg_class = 'bg-blue-100';
@@ -469,6 +478,56 @@ $recent_activity = $conn->query($recent_activity_query);
                                                 $icon_class = 'fas fa-trash text-red-600';
                                                 $bg_class = 'bg-red-100';
                                                 $activity_title = 'Job posting deleted';
+                                                break;
+                                            case 'interview_scheduled':
+                                                $icon_class = 'fas fa-calendar-check text-blue-600';
+                                                $bg_class = 'bg-blue-100';
+                                                $activity_title = 'Interview scheduled';
+                                                break;
+                                            case 'demo_scheduled':
+                                                $icon_class = 'fas fa-chalkboard-teacher text-blue-600';
+                                                $bg_class = 'bg-blue-100';
+                                                $activity_title = 'Demo teaching scheduled';
+                                                break;
+                                            case 'psych_exam_scheduled':
+                                                $icon_class = 'fas fa-brain text-purple-600';
+                                                $bg_class = 'bg-purple-100';
+                                                $activity_title = 'Psychological exam scheduled';
+                                                break;
+                                            case 'interview_approved':
+                                                $icon_class = 'fas fa-check-circle text-green-600';
+                                                $bg_class = 'bg-green-100';
+                                                $activity_title = 'Interview approved';
+                                                break;
+                                            case 'demo_approved':
+                                                $icon_class = 'fas fa-check-double text-green-600';
+                                                $bg_class = 'bg-green-100';
+                                                $activity_title = 'Demo teaching approved';
+                                                break;
+                                            case 'resubmission_requested':
+                                                $icon_class = 'fas fa-file-upload text-orange-600';
+                                                $bg_class = 'bg-orange-100';
+                                                $activity_title = 'Resubmission requested';
+                                                break;
+                                            case 'applicant_rejected':
+                                                $icon_class = 'fas fa-times-circle text-red-600';
+                                                $bg_class = 'bg-red-100';
+                                                $activity_title = 'Application rejected';
+                                                break;
+                                            case 'applicant_hired':
+                                                $icon_class = 'fas fa-user-check text-green-600';
+                                                $bg_class = 'bg-green-100';
+                                                $activity_title = 'Applicant hired';
+                                                break;
+                                            case 'applicant_initially_hired':
+                                                $icon_class = 'fas fa-user-plus text-green-600';
+                                                $bg_class = 'bg-green-100';
+                                                $activity_title = 'Applicant initially hired';
+                                                break;
+                                            case 'user_created':
+                                                $icon_class = 'fas fa-user-shield text-purple-600';
+                                                $bg_class = 'bg-purple-100';
+                                                $activity_title = 'Admin user created';
                                                 break;
                                             case 'status_changed':
                                                 $icon_class = 'fas fa-exchange-alt text-purple-600';
@@ -485,8 +544,33 @@ $recent_activity = $conn->query($recent_activity_query);
                                                 $bg_class = 'bg-teal-100';
                                                 $activity_title = 'Data exported';
                                                 break;
+                                            default:
+                                                // Fallback - use the description to determine type
+                                                if (strpos($activity['description'], 'requested resubmission') !== false) {
+                                                    $icon_class = 'fas fa-file-upload text-orange-600';
+                                                    $bg_class = 'bg-orange-100';
+                                                    $activity_title = 'Resubmission requested';
+                                                } elseif (strpos($activity['description'], 'scheduled an interview') !== false || strpos($activity['description'], 'scheduled interview') !== false) {
+                                                    $icon_class = 'fas fa-calendar-check text-blue-600';
+                                                    $bg_class = 'bg-blue-100';
+                                                    $activity_title = 'Interview scheduled';
+                                                } elseif (strpos($activity['description'], 'scheduled demo') !== false) {
+                                                    $icon_class = 'fas fa-chalkboard-teacher text-blue-600';
+                                                    $bg_class = 'bg-blue-100';
+                                                    $activity_title = 'Demo teaching scheduled';
+                                                } elseif (strpos($activity['description'], 'rejected') !== false) {
+                                                    $icon_class = 'fas fa-times-circle text-red-600';
+                                                    $bg_class = 'bg-red-100';
+                                                    $activity_title = 'Application rejected';
+                                                } elseif (strpos($activity['description'], 'hired') !== false) {
+                                                    $icon_class = 'fas fa-user-check text-green-600';
+                                                    $bg_class = 'bg-green-100';
+                                                    $activity_title = 'Applicant hired';
+                                                }
+                                                break;
                                         }
                                         ?>
+                                    <div class="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg transition-colors">
                                         <div class="w-8 h-8 <?php echo $bg_class; ?> rounded-full flex items-center justify-center flex-shrink-0">
                                             <i class="<?php echo $icon_class; ?> text-sm"></i>
                                         </div>
@@ -981,7 +1065,8 @@ $recent_activity = $conn->query($recent_activity_query);
                 </div>
             </div>
 
-            <!-- Users Section -->
+            <!-- Users Section (Admin Only) -->
+            <?php if ($admin_role === 'Admin'): ?>
             <div id="usersSection" class="section hidden">
                 <div class="flex items-center justify-between mb-6">
                     <h1 class="text-3xl font-bold text-gray-900">Users</h1>
@@ -1012,8 +1097,9 @@ $recent_activity = $conn->query($recent_activity_query);
                     </div>
                 </div>
             </div>
-        </main>
-    </div>
+            <?php endif; ?>
+    </main>
+</div>
 <!-- Job Type Selection Modal -->
 <div id="jobTypeSelectionModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
     <div class="bg-white rounded-lg w-full max-w-md m-4">
@@ -1702,6 +1788,8 @@ $recent_activity = $conn->query($recent_activity_query);
 
 
 
+    <!-- User Management Modals (Admin Only) -->
+    <?php if ($admin_role === 'Admin'): ?>
     <!-- Create User Modal -->
     <div id="createUserModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
         <div class="bg-white rounded-lg w-full max-w-2xl m-4 max-h-[90vh] overflow-y-auto">
@@ -1751,24 +1839,30 @@ $recent_activity = $conn->query($recent_activity_query);
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Password *</label>
-                            <div class="relative">
-                                <input type="password" name="password" id="createUserPassword" required minlength="6" autocomplete="new-password"
-                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                       placeholder="Minimum 6 characters">
-                                <button type="button" onclick="togglePasswordVisibility('createUserPassword', 'createPasswordIcon')" 
-                                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700">
-                                    <i id="createPasswordIcon" class="fas fa-eye"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
                             <input type="tel" name="phone"
                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                                    placeholder="Enter phone number">
                         </div>
+                    </div>
+                    
+                    <!-- Password Info Box -->
+                    <div class="bg-blue-50 border-l-4 border-primary p-4 rounded mt-4">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-key text-primary text-xl"></i>
+                            </div>
+                            <div class="ml-3">
+                                <h4 class="text-sm font-semibold text-primary mb-1">Automatic Password Generation</h4>
+                                <p class="text-sm text-gray-700">
+                                    A secure temporary password will be automatically generated and sent to the user's email address.
+                                    They will be required to change this password on first login.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="hidden">
                     </div>
                 </div>
 
@@ -1945,6 +2039,7 @@ $recent_activity = $conn->query($recent_activity_query);
             </form>
         </div>
     </div>
+    <?php endif; ?>
 
     <!-- My Profile Modal -->
     <div id="myProfileModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
@@ -2125,6 +2220,11 @@ $recent_activity = $conn->query($recent_activity_query);
             
             let html = '';
             activities.forEach(activity => {
+                // SKIP entries with NULL, empty, or 'application' activity_type
+                if (!activity.activity_type || activity.activity_type === 'application') {
+                    return; // Skip this iteration
+                }
+                
                 const iconInfo = getActivityIcon(activity.activity_type);
                 const timeAgo = getTimeAgo(activity.created_at);
                 
@@ -2143,25 +2243,73 @@ $recent_activity = $conn->query($recent_activity_query);
             });
             
             container.innerHTML = html;
+            
+            // After updating, remove any remaining "New application received" entries
+            setTimeout(removeNewApplicationEntries, 100);
         }
         
         // Get activity icon and styling
         function getActivityIcon(activityType) {
             const icons = {
-                'application': {
-                    iconClass: 'fas fa-user-plus text-green-600',
-                    bgClass: 'bg-green-100',
-                    title: 'New application received'
-                },
                 'job_created': {
                     iconClass: 'fas fa-briefcase text-blue-600',
                     bgClass: 'bg-blue-100',
                     title: 'Job posting created'
                 },
-                'job_updated': {
+                'job_edited': {
                     iconClass: 'fas fa-edit text-orange-600',
                     bgClass: 'bg-orange-100',
                     title: 'Job posting updated'
+                },
+                'job_deleted': {
+                    iconClass: 'fas fa-trash text-red-600',
+                    bgClass: 'bg-red-100',
+                    title: 'Job posting deleted'
+                },
+                'interview_scheduled': {
+                    iconClass: 'fas fa-calendar-check text-blue-600',
+                    bgClass: 'bg-blue-100',
+                    title: 'Interview scheduled'
+                },
+                'demo_scheduled': {
+                    iconClass: 'fas fa-chalkboard-teacher text-blue-600',
+                    bgClass: 'bg-blue-100',
+                    title: 'Demo teaching scheduled'
+                },
+                'psych_exam_scheduled': {
+                    iconClass: 'fas fa-brain text-purple-600',
+                    bgClass: 'bg-purple-100',
+                    title: 'Psychological exam scheduled'
+                },
+                'interview_approved': {
+                    iconClass: 'fas fa-check-circle text-green-600',
+                    bgClass: 'bg-green-100',
+                    title: 'Interview approved'
+                },
+                'demo_approved': {
+                    iconClass: 'fas fa-check-double text-green-600',
+                    bgClass: 'bg-green-100',
+                    title: 'Demo teaching approved'
+                },
+                'resubmission_requested': {
+                    iconClass: 'fas fa-file-upload text-orange-600',
+                    bgClass: 'bg-orange-100',
+                    title: 'Resubmission requested'
+                },
+                'applicant_rejected': {
+                    iconClass: 'fas fa-times-circle text-red-600',
+                    bgClass: 'bg-red-100',
+                    title: 'Application rejected'
+                },
+                'applicant_hired': {
+                    iconClass: 'fas fa-user-check text-green-600',
+                    bgClass: 'bg-green-100',
+                    title: 'Applicant hired'
+                },
+                'applicant_initially_hired': {
+                    iconClass: 'fas fa-user-plus text-green-600',
+                    bgClass: 'bg-green-100',
+                    title: 'Applicant initially hired'
                 },
                 'status_changed': {
                     iconClass: 'fas fa-exchange-alt text-purple-600',
@@ -2173,6 +2321,11 @@ $recent_activity = $conn->query($recent_activity_query);
                     bgClass: 'bg-indigo-100',
                     title: 'Admin logged in'
                 },
+                'user_created': {
+                    iconClass: 'fas fa-user-shield text-purple-600',
+                    bgClass: 'bg-purple-100',
+                    title: 'Admin user created'
+                },
                 'data_export': {
                     iconClass: 'fas fa-download text-teal-600',
                     bgClass: 'bg-teal-100',
@@ -2180,7 +2333,12 @@ $recent_activity = $conn->query($recent_activity_query);
                 }
             };
             
-            return icons[activityType] || icons['application'];
+            // Default for unknown types
+            return icons[activityType] || {
+                iconClass: 'fas fa-circle text-gray-600',
+                bgClass: 'bg-gray-100',
+                title: 'Activity'
+            };
         }
         
         // Calculate time ago
@@ -2299,6 +2457,9 @@ $recent_activity = $conn->query($recent_activity_query);
         
         // Initialize dashboard
         document.addEventListener('DOMContentLoaded', function() {
+            // IMMEDIATELY remove any "New application received" entries
+            removeNewApplicationEntries();
+            
             // Start auto-refresh automatically
             startAutoRefresh();
             
@@ -2308,6 +2469,22 @@ $recent_activity = $conn->query($recent_activity_query);
                 sessionStorage.setItem('adminLoginLogged', 'true');
             }
         });
+        
+        // Function to remove "New application received" entries
+        function removeNewApplicationEntries() {
+            const container = document.getElementById('recentActivityContainer');
+            if (!container) return;
+            
+            // Find all activity items
+            const activityItems = container.querySelectorAll('.flex.items-center.gap-3');
+            
+            activityItems.forEach(item => {
+                const titleElement = item.querySelector('.text-sm.font-medium');
+                if (titleElement && titleElement.textContent.includes('New application received')) {
+                    item.remove(); // Remove the entire activity item
+                }
+            });
+        }
         
         // Log activity function
         function logActivity(type, description, relatedTable = null, relatedId = null) {
@@ -2507,6 +2684,11 @@ $recent_activity = $conn->query($recent_activity_query);
                                 <input type="checkbox" name="resubmit_documents" value="application_letter" 
                                        class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                                 <span class="ml-2 text-sm text-gray-700">Application Letter</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" name="resubmit_documents" value="letter_of_intent" 
+                                       class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                <span class="ml-2 text-sm text-gray-700">Letter of Intent</span>
                             </label>
                             <label class="flex items-center">
                                 <input type="checkbox" name="resubmit_documents" value="resume" 

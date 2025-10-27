@@ -314,10 +314,22 @@ function displayArchivedApplicants(archived) {
                 day: 'numeric'
             }) : 'N/A';
         
+        // Create profile picture HTML
+        const profilePictureHTML = applicant.profile_picture 
+            ? `<img src="../user/uploads/profile_pictures/${applicant.profile_picture}" alt="Profile" class="w-10 h-10 rounded-full object-cover mr-3">`
+            : `<div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                 <span class="text-blue-600 font-semibold text-sm">${getInitials(applicant.full_name)}</span>
+               </div>`;
+        
         row.innerHTML = `
             <td class="px-6 py-4">
-                <div class="font-medium text-gray-900">${applicant.full_name}</div>
-                <div class="text-sm text-gray-500">${applicant.applicant_email}</div>
+                <div class="flex items-center">
+                    ${profilePictureHTML}
+                    <div>
+                        <div class="font-medium text-gray-900">${applicant.full_name}</div>
+                        <div class="text-sm text-gray-500">${applicant.applicant_email}</div>
+                    </div>
+                </div>
             </td>
             <td class="px-6 py-4 text-sm text-gray-900">${applicant.position}</td>
             <td class="px-6 py-4 text-sm text-gray-500">${appliedDate}</td>
@@ -560,13 +572,16 @@ async function createUser(event) {
     const formData = new FormData(event.target);
     
     // Validate required fields on client side
-    if (!formData.get('name') || !formData.get('email') || !formData.get('password') || 
+    if (!formData.get('name') || !formData.get('email') || 
         !formData.get('role') || !formData.get('department')) {
         showToast('Please fill in all required fields', 'error');
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
         return;
     }
+    
+    // Add dummy password (API will generate its own temporary password)
+    formData.append('password', 'temporary_will_be_replaced');
     
     // Validate file size if profile picture is uploaded
     const profilePicture = formData.get('profile_picture');
@@ -605,7 +620,10 @@ async function createUser(event) {
         }
         
         if (result.success) {
-            showToast('User created successfully!', 'success');
+            const message = result.emailSent 
+                ? 'User created successfully! Temporary password sent to their email.' 
+                : 'User created successfully! However, email notification failed.';
+            showToast(message, result.emailSent ? 'success' : 'warning');
             closeCreateUserModal();
             loadUsers();
         } else {
@@ -1292,13 +1310,6 @@ document.addEventListener('click', (e) => {
     // Intentionally left blank to prevent closing on outside clicks
 });
 
-// Initialize dashboard on page load
-document.addEventListener('DOMContentLoaded', () => {
-    // Set dashboard as active by default
-    document.querySelector('.nav-item').classList.add('active', 'text-white');
-    document.querySelector('.nav-item').classList.remove('text-gray-700');
-});
-
 function openJobTypeSelectionModal() {
     document.getElementById('jobTypeSelectionModal').classList.remove('hidden');
 }
@@ -1552,21 +1563,7 @@ async function viewApplicantDetails(applicantId) {
             // Update personal information
             const personalInfo = document.getElementById('personalInfo');
             
-            // Create profile picture HTML
-            const profilePictureHTML = applicant.profile_picture 
-                ? `<div class="flex justify-center mb-4">
-                     <div class="w-24 h-24 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
-                       <img src="../user/uploads/profile_pictures/${applicant.profile_picture}" alt="Profile Picture" class="w-full h-full object-cover">
-                     </div>
-                   </div>`
-                : `<div class="flex justify-center mb-4">
-                     <div class="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
-                       <span class="text-white font-bold text-2xl">${(applicant.full_name || 'N').charAt(0).toUpperCase()}</span>
-                     </div>
-                   </div>`;
-            
             personalInfo.innerHTML = `
-                ${profilePictureHTML}
                 <div>
                     <label class="block text-sm font-medium text-gray-600">Full Name</label>
                     <p class="text-gray-900">${applicant.full_name || 'N/A'}</p>
@@ -1678,6 +1675,7 @@ async function viewApplicantDetails(applicantId) {
             const documentsGrid = document.getElementById('documentsGrid');
             const documents = [
                 { field: 'application_letter', label: 'Application Letter' },
+                { field: 'letter_of_intent', label: 'Letter of Intent' },
                 { field: 'resume', label: 'Updated and Comprehensive Resume' },
                 { field: 'tor', label: 'Transcript of Record (TOR)' },
                 { field: 'diploma', label: 'Diploma' },
@@ -1689,6 +1687,7 @@ async function viewApplicantDetails(applicantId) {
             
             console.log('📄 Document files from database:');
             console.log('  Application Letter:', applicant.application_letter);
+            console.log('  Letter of Intent:', applicant.letter_of_intent);
             console.log('  Resume:', applicant.resume);
             console.log('  TOR:', applicant.tor);
             console.log('  Diploma:', applicant.diploma);
@@ -3025,8 +3024,24 @@ function closeDocumentViewer() {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Admin panel initializing...');
     
-    // Show dashboard by default
-    showSection('dashboard');
+    // Set dashboard as active and show dashboard by default
+    const dashboardBtn = document.querySelector('[onclick="showSection(\'dashboard\')"]');
+    if (dashboardBtn) {
+        dashboardBtn.classList.add('active', 'text-white');
+        dashboardBtn.classList.remove('text-gray-700');
+    }
+    
+    // Show dashboard section
+    document.querySelectorAll('.section').forEach(section => {
+        section.classList.add('hidden');
+    });
+    const dashboardSection = document.getElementById('dashboardSection');
+    if (dashboardSection) {
+        dashboardSection.classList.remove('hidden');
+    }
+    
+    // Load dashboard data
+    loadDashboardData();
     
     // Auto-refresh dashboard every 30 seconds when on dashboard page
     if (window.location.pathname.includes('admin') && !window.location.pathname.includes('user')) {
@@ -3072,13 +3087,18 @@ function displayFilteredApplicants(status) {
         return;
     }
     
-    tbody.innerHTML = filteredApplicants.map(applicant => `
+    tbody.innerHTML = filteredApplicants.map(applicant => {
+        const profilePictureHTML = applicant.profile_picture 
+            ? `<img src="../user/uploads/profile_pictures/${applicant.profile_picture}" alt="Profile" class="w-10 h-10 rounded-full object-cover mr-3">`
+            : `<div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                 <span class="text-blue-600 font-semibold text-sm">${getInitials(applicant.full_name)}</span>
+               </div>`;
+        
+        return `
         <tr class="hover:bg-gray-50 cursor-pointer" onclick="viewApplicantDetails(${applicant.id})">
             <td class="px-6 py-4">
                 <div class="flex items-center">
-                    <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                        <span class="text-blue-600 font-semibold text-sm">${getInitials(applicant.full_name)}</span>
-                    </div>
+                    ${profilePictureHTML}
                     <div>
                         <div class="font-medium text-gray-900">${applicant.full_name}</div>
                         <div class="text-gray-500 text-sm">${applicant.applicant_email}</div>
@@ -3099,7 +3119,8 @@ function displayFilteredApplicants(status) {
                 </button>
             </td>
         </tr>
-    `).join('');
+        `;
+    }).join('');
 }
 
 // Update status counts in filter display

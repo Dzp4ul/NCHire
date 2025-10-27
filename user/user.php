@@ -242,7 +242,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
     
     // Get draft documents from database
     $draft_docs = null;
-    $draft_stmt = $conn->prepare("SELECT application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert FROM user_draft_documents WHERE user_id = ?");
+    $draft_stmt = $conn->prepare("SELECT application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, letter_of_intent FROM user_draft_documents WHERE user_id = ?");
     $draft_stmt->bind_param("i", $user_id);
     $draft_stmt->execute();
     $draft_result = $draft_stmt->get_result();
@@ -338,6 +338,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         $masteral_cert = copyDraftFile($draft_docs['masteral_cert'], $user_id, $uploadDir);
     }
     
+    $letter_of_intent = uploadFile('letter_of_intent', $uploadDir);
+    error_log("Letter of Intent upload result: " . ($letter_of_intent ?? 'NULL'));
+    if (!$letter_of_intent && $draft_docs && isset($draft_docs['letter_of_intent'])) {
+        error_log("Trying to copy letter_of_intent from draft: " . $draft_docs['letter_of_intent']);
+        $letter_of_intent = copyDraftFile($draft_docs['letter_of_intent'], $user_id, $uploadDir);
+        error_log("Letter of Intent from draft copy result: " . ($letter_of_intent ?? 'NULL'));
+    } else {
+        error_log("Letter of Intent - draft_docs exists: " . ($draft_docs ? 'YES' : 'NO'));
+        if ($draft_docs && isset($draft_docs['letter_of_intent'])) {
+            error_log("  letter_of_intent value in draft: " . $draft_docs['letter_of_intent']);
+        }
+    }
+    
     // Check if required files were uploaded or available from draft
     if (!$application_letter) {
         $upload_errors[] = 'Application Letter is required';
@@ -356,6 +369,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
     }
     if (!$seminars_trainings) {
         $upload_errors[] = 'Seminar/Training Certificates are required';
+    }
+    if (!$letter_of_intent) {
+        $upload_errors[] = 'Letter of Intent is required';
     }
     
     if (!empty($upload_errors)) {
@@ -407,16 +423,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         $full_name = $applicant_name; // Use session name as fallback
     }
 
-    // ✅ Check if this is a RESUBMISSION or new application
+    // Check if this is a RESUBMISSION or new application
     $is_resubmission = isset($_POST['is_resubmission']) && $_POST['is_resubmission'] == '1';
     $resubmit_app_id = isset($_POST['resubmit_application_id']) ? intval($_POST['resubmit_application_id']) : 0;
     
     if ($is_resubmission && $resubmit_app_id > 0) {
-        // ✅ RESUBMISSION - Update existing application
+        // RESUBMISSION - Update existing application
         error_log("RESUBMISSION DETECTED: App ID = $resubmit_app_id, User ID = $user_id");
         
         // First, get the existing file data and job_id
-        $existing_stmt = $conn->prepare("SELECT job_id, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert FROM job_applicants WHERE id = ? AND user_id = ?");
+        $existing_stmt = $conn->prepare("SELECT job_id, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, letter_of_intent FROM job_applicants WHERE id = ? AND user_id = ?");
         $existing_stmt->bind_param("ii", $resubmit_app_id, $user_id);
         $existing_stmt->execute();
         $existing_result = $existing_stmt->get_result();
@@ -445,6 +461,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
             $coe = $coe ?: $existing_data['coe'];
             $seminars_trainings = $seminars_trainings ?: $existing_data['seminars_trainings'];
             $masteral_cert = $masteral_cert ?: $existing_data['masteral_cert'];
+            $letter_of_intent = $letter_of_intent ?: ($existing_data['letter_of_intent'] ?? null);
             
             error_log("AFTER MERGE - Final values to update:");
             error_log("  AL final: " . ($application_letter ?? "NULL"));
@@ -461,14 +478,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
                 coe = ?, 
                 seminars_trainings = ?, 
                 masteral_cert = ?,
+                letter_of_intent = ?,
                 status = 'Resubmitted',
                 resubmission_documents = NULL,
                 resubmission_notes = NULL
                 WHERE id = ? AND user_id = ?");
             
-            $update_stmt->bind_param("ssssssssii", 
+            $update_stmt->bind_param("sssssssssii", 
                 $application_letter, $resume, $tor, $diploma, 
-                $professional_license, $coe, $seminars_trainings, $masteral_cert,
+                $professional_license, $coe, $seminars_trainings, $masteral_cert, $letter_of_intent,
                 $resubmit_app_id, $user_id);
             
             if ($update_stmt->execute()) {
@@ -570,21 +588,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         exit(); // Always exit after resubmission attempt
         
     } else {
-        // ✅ NEW APPLICATION - Insert into job_applicants table
+        // NEW APPLICATION - Insert into job_applicants table
         $stmt = $conn->prepare("INSERT INTO job_applicants 
             (applicant_name, position, applied_date, status, full_name, applicant_email, contact_num, user_id, job_id, 
-             application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+             application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, letter_of_intent) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         
         // Files are already filenames (not full paths) from uploadFile function
         // Types: s=string, i=integer
-        $stmt->bind_param("sssssssisssssssss", 
+        $stmt->bind_param("sssssssissssssssss", 
             $applicant_name, $position, $applied_date, $status, $full_name, $applicant_email, $contact_num, 
             $user_id, $job_id, $application_letter, $resume, $tor, $diploma, 
-            $professional_license, $coe, $seminars_trainings, $masteral_cert);
+            $professional_license, $coe, $seminars_trainings, $masteral_cert, $letter_of_intent);
 
         if ($stmt->execute()) {
-        // ✅ Success - Get the application ID
+        // Success - Get the application ID
         $application_id = $conn->insert_id;
         $_SESSION['application_success'] = "Application submitted successfully! We will review your application and contact you soon.";
         $_SESSION['applied_job_id'] = $job_id;
@@ -663,14 +681,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
 ?>
 
 
-
-
-<!DOCTYPE html>
 <html lang="en">
 <head><script src="https://static.readdy.ai/static/e.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NCHire - Job Opportunities</title>
+<link rel="icon" type="image/png" href="../assets/images/image-removebg-preview (1).png">
+<link rel="shortcut icon" type="image/png" href="../assets/images/image-removebg-preview (1).png">
 <script src="https://cdn.tailwindcss.com/3.4.16"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1276,6 +1293,16 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                                                    class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
                                         </div>
                                     </div>
+                                    
+                                    <div class="space-y-2">
+                                        <label class="block text-sm font-semibold text-gray-700">
+                                            <i class="ri-file-text-line mr-2 text-blue-600"></i>Letter of Intent <span class="text-red-500">*</span>
+                                        </label>
+                                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-blue-400 transition-colors">
+                                            <input type="file" name="letter_of_intent" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required
+                                                   class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <!-- Educational Documents -->
@@ -1380,9 +1407,14 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                             <button type="button" id="backToStep1" class="flex items-center px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
                                 <i class="ri-arrow-left-line mr-2"></i>Back
                             </button>
-                            <button type="submit" class="flex items-center px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg font-semibold">
-                                <i class="ri-send-plane-line mr-2"></i>Submit Application
-                            </button>
+                            <div class="flex gap-3">
+                                <button type="button" id="saveDraftBtn" class="flex items-center px-6 py-3 border-2 border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors font-semibold">
+                                    <i class="ri-save-line mr-2"></i>Save Draft
+                                </button>
+                                <button type="submit" class="flex items-center px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg font-semibold">
+                                    <i class="ri-send-plane-line mr-2"></i>Submit Application
+                                </button>
+                            </div>
                             <button type="button" id="step2NextBtn" onclick="setStep(3)" class="hidden flex items-center px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg font-semibold">
                                 Next <i class="ri-arrow-right-line ml-2"></i>
                             </button>
@@ -1876,11 +1908,12 @@ document.addEventListener('DOMContentLoaded', function() {
               const docMap = {
                 'application_letter': { name: 'applicationLetter', label: 'Application Letter' },
                 'resume': { name: 'resume_file', label: 'Resume' },
+                'letter_of_intent': { name: 'letter_of_intent', label: 'Letter of Intent' },
                 'tor': { name: 'transcript', label: 'Transcript of Records' },
                 'diploma': { name: 'diploma', label: 'Diploma' },
                 'professional_license': { name: 'license', label: 'Professional License' },
                 'coe': { name: 'coe', label: 'Certificate of Employment' },
-                'seminars_trainings': { name: 'certificates', label: 'Seminar Certificates' },
+                'seminars_trainings': { name: 'certificates[]', label: 'Seminars/Trainings' },
                 'masteral_cert': { name: 'masteral_cert', label: 'Masteral Certificate' }
               };
               
@@ -1902,6 +1935,14 @@ document.addEventListener('DOMContentLoaded', function() {
                       // Hide original file input
                       input.style.display = 'none';
                       input.removeAttribute('required');
+                      
+                      // Create a hidden input to preserve draft filename for future saves
+                      const hiddenInput = document.createElement('input');
+                      hiddenInput.type = 'hidden';
+                      hiddenInput.name = `existing_${inputInfo.name}`;
+                      hiddenInput.value = data.draft[dbField];
+                      hiddenInput.className = 'existing-draft-input';
+                      container.appendChild(hiddenInput);
                       
                       // Create draft display with filename and remove button
                       const draftDisplay = document.createElement('div');
@@ -1955,6 +1996,12 @@ document.addEventListener('DOMContentLoaded', function() {
                   
                   // Remove draft display
                   this.closest('.draft-file-display').remove();
+                  
+                  // Remove hidden input for existing draft
+                  const hiddenInput = container.querySelector('.existing-draft-input');
+                  if (hiddenInput) {
+                    hiddenInput.remove();
+                  }
                   
                   // Show file input again
                   if (input) {
@@ -3905,8 +3952,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Step 2 actions - handle form submission with AJAX (no page reload)
   document.getElementById('backToStep1').addEventListener('click', () => setStep(1));
   
-  // Save Draft button handler - REMOVED (button no longer exists)
-  /*
+  // Save Draft button handler
   document.getElementById('saveDraftBtn').addEventListener('click', async function(e) {
     e.preventDefault();
     console.log('💾 Saving draft...');
@@ -3919,6 +3965,32 @@ document.addEventListener('DOMContentLoaded', function() {
     try {
       const formData = new FormData(requirementsForm);
       
+      // Debug: Log what files are being sent
+      console.log('📦 FormData contents:');
+      for (let [key, value] of formData.entries()) {
+        if (value instanceof File) {
+          console.log(`  ${key}: File(${value.name}, ${value.size} bytes)`);
+        } else {
+          console.log(`  ${key}: ${value}`);
+        }
+      }
+      
+      // Specifically check letter_of_intent
+      const letterOfIntentInput = requirementsForm.querySelector('input[name="letter_of_intent"]');
+      if (letterOfIntentInput) {
+        console.log('📄 Letter of Intent input found:');
+        console.log('  Files:', letterOfIntentInput.files);
+        console.log('  File count:', letterOfIntentInput.files.length);
+        if (letterOfIntentInput.files.length > 0) {
+          console.log('  File name:', letterOfIntentInput.files[0].name);
+          console.log('  File size:', letterOfIntentInput.files[0].size);
+        } else {
+          console.warn('⚠️ Letter of Intent input has NO files selected');
+        }
+      } else {
+        console.error('❌ Letter of Intent input NOT FOUND in form');
+      }
+      
       // Submit to save_draft.php
       const response = await fetch('save_draft.php', {
         method: 'POST',
@@ -3926,6 +3998,7 @@ document.addEventListener('DOMContentLoaded', function() {
       });
       
       const data = await response.json();
+      console.log('📥 Response from save_draft.php:', data);
       
       if (data.success) {
         // Show success notification
@@ -3941,6 +4014,136 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(() => successNotif.remove(), 5000);
         
         console.log('✅ Draft saved successfully');
+        console.log('📋 Draft data received:', data.draft);
+        console.log('📋 Fields in draft:', Object.keys(data.draft));
+        console.log('📋 letter_of_intent value:', data.draft.letter_of_intent);
+        
+        // Immediately update UI to show saved draft indicators
+        const docMap = {
+          'application_letter': { name: 'applicationLetter', label: 'Application Letter' },
+          'resume': { name: 'resume_file', label: 'Resume' },
+          'letter_of_intent': { name: 'letter_of_intent', label: 'Letter of Intent' },
+          'tor': { name: 'transcript', label: 'Transcript of Records' },
+          'diploma': { name: 'diploma', label: 'Diploma' },
+          'professional_license': { name: 'license', label: 'Professional License' },
+          'coe': { name: 'coe', label: 'Certificate of Employment' },
+          'seminars_trainings': { name: 'certificates[]', label: 'Seminars/Trainings' },
+          'masteral_cert': { name: 'masteral_cert', label: 'Masteral Certificate' }
+        };
+        
+        // Update UI for each saved file
+        Object.keys(data.draft).forEach(dbField => {
+          console.log(`🔍 Processing field: ${dbField}, value: ${data.draft[dbField]}`);
+          
+          if (data.draft[dbField] && docMap[dbField]) {
+            const inputInfo = docMap[dbField];
+            console.log(`  ✓ Field ${dbField} has value and is in docMap`);
+            console.log(`  Looking for input with name: ${inputInfo.name}`);
+            
+            const input = document.querySelector(`input[name="${inputInfo.name}"], input[name="${inputInfo.name}[]"]`);
+            console.log(`  Input found:`, input ? 'YES' : 'NO');
+            
+            if (input) {
+              const container = input.closest('.border-dashed');
+              console.log(`  Container found:`, container ? 'YES' : 'NO');
+              
+              if (container) {
+                console.log(`  📝 Updating UI for ${dbField}...`);
+                
+                // Check if draft display already exists
+                let existingDraftDisplay = container.querySelector('.draft-file-display');
+                if (existingDraftDisplay) {
+                  console.log(`  ⚠️ Draft display already exists for ${dbField}, skipping`);
+                  return;
+                }
+                
+                // Check if hidden input already exists (already showing draft)
+                let existingHiddenInput = container.querySelector('.existing-draft-input');
+                if (existingHiddenInput) {
+                  console.log(`  ⚠️ Hidden input already exists for ${dbField}, skipping`);
+                  return;
+                }
+                
+                let filenames = data.draft[dbField];
+                if (dbField === 'seminars_trainings') {
+                  filenames = filenames.split(',');
+                } else {
+                  filenames = [filenames];
+                }
+                
+                // Hide original file input
+                input.style.display = 'none';
+                input.removeAttribute('required');
+                
+                // Create hidden input to preserve draft filename
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = `existing_${inputInfo.name}`;
+                hiddenInput.value = data.draft[dbField];
+                hiddenInput.className = 'existing-draft-input';
+                container.appendChild(hiddenInput);
+                
+                // Create draft display
+                const draftDisplay = document.createElement('div');
+                draftDisplay.className = 'draft-file-display';
+                draftDisplay.innerHTML = `
+                  <div class="bg-green-50 border-2 border-green-400 rounded-lg p-3">
+                    <div class="flex items-start gap-3">
+                      <i class="ri-checkbox-circle-fill text-green-600 text-2xl"></i>
+                      <div class="flex-1">
+                        <div class="font-semibold text-green-900 text-sm">Saved Draft - Ready to Use</div>
+                        ${filenames.map(filename => {
+                          const displayName = filename.replace(/^draft_\d+_\d+_/, '');
+                          return `<div class="text-sm text-green-700 mt-1 flex items-center gap-1">
+                            <i class="ri-file-text-fill"></i>
+                            <span>${displayName}</span>
+                          </div>`;
+                        }).join('')}
+                        <div class="mt-2 text-xs text-green-600">
+                          <i class="ri-information-line mr-1"></i>
+                          This file will be used automatically, or click X to upload a new one
+                        </div>
+                      </div>
+                      <button type="button" 
+                              class="remove-draft-btn-new text-red-500 hover:text-red-700 hover:bg-red-50 rounded p-1 transition-colors"
+                              data-field="${dbField}"
+                              data-input-name="${inputInfo.name}"
+                              title="Remove and upload new file">
+                        <i class="ri-close-circle-fill text-2xl"></i>
+                      </button>
+                    </div>
+                  </div>
+                `;
+                
+                container.insertBefore(draftDisplay, input);
+                
+                // Add remove button handler
+                const removeBtn = draftDisplay.querySelector('.remove-draft-btn-new');
+                removeBtn.addEventListener('click', function() {
+                  draftDisplay.remove();
+                  const hiddenInput = container.querySelector('.existing-draft-input');
+                  if (hiddenInput) hiddenInput.remove();
+                  input.style.display = 'block';
+                  input.setAttribute('required', 'required');
+                  
+                  const notif = document.createElement('div');
+                  notif.className = 'fixed top-4 right-4 bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded shadow-md animate-fade-in z-[10001]';
+                  notif.innerHTML = `
+                    <div class='flex items-center'>
+                      <i class='ri-alert-line mr-2'></i>
+                      <span>Draft removed. Please upload a new file.</span>
+                    </div>
+                  `;
+                  document.body.appendChild(notif);
+                  setTimeout(() => notif.remove(), 3000);
+                });
+                
+                console.log(`✅ UI updated for ${dbField}`);
+              }
+            }
+          }
+        });
+        
       } else {
         throw new Error(data.error || 'Failed to save draft');
       }
@@ -3963,7 +4166,6 @@ document.addEventListener('DOMContentLoaded', function() {
       btn.innerHTML = originalHtml;
     }
   });
-  */
   
   // Intercept form submission to avoid page reload
   const requirementsForm = document.getElementById('requirementsForm');
@@ -3989,6 +4191,7 @@ document.addEventListener('DOMContentLoaded', function() {
           const docFieldMap = {
             'application_letter': 'applicationLetter',
             'resume': 'resume_file',
+            'letter_of_intent': 'letter_of_intent',
             'tor': 'transcript',
             'diploma': 'diploma',
             'professional_license': 'license',
@@ -4022,6 +4225,7 @@ document.addEventListener('DOMContentLoaded', function() {
               const docLabels = {
                 'application_letter': 'Application Letter',
                 'resume': 'Resume',
+                'letter_of_intent': 'Letter of Intent',
                 'tor': 'Transcript of Records (TOR)',
                 'diploma': 'Diploma',
                 'professional_license': 'Professional License',
@@ -4661,6 +4865,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('NOW ADDING FILE INDICATORS...');
         if (app.application_letter) addUploadedIndicator('applicationLetter', app.application_letter, 'application_letter');
         if (app.resume) addUploadedIndicator('resume_file', app.resume, 'resume');
+        if (app.letter_of_intent) addUploadedIndicator('letter_of_intent', app.letter_of_intent, 'letter_of_intent');
         if (app.tor) addUploadedIndicator('transcript', app.tor, 'tor');
         if (app.diploma) addUploadedIndicator('diploma', app.diploma, 'diploma');
         if (app.professional_license) addUploadedIndicator('license', app.professional_license, 'professional_license');
@@ -5325,11 +5530,16 @@ document.addEventListener('DOMContentLoaded', function () {
       });
   }
 
+  // Helper function to load My Applications page
+  function loadApplicationsPage() {
+    loadContent('user_application.php');
+  }
+
   // Load My Applications content
   applicationsLink.addEventListener('click', function (e) {
     e.preventDefault();
     updateActiveNavigation('applications');
-    loadContent('user_application.php'); // Event listeners are built into user_application.php
+    loadApplicationsPage(); // Event listeners are built into user_application.php
   });
 
   // Load Profile content
@@ -5410,20 +5620,30 @@ document.addEventListener('DOMContentLoaded', function () {
   function setupMarkAllReadListener() {
     if (markAllReadBtn) {
       markAllReadBtn.addEventListener('click', function() {
+        console.log('Mark all as read clicked');
         fetch('mark_notification_read.php', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
           },
-          body: 'mark_all=true'
+          body: 'action=mark_all_read'
         })
         .then(response => response.json())
         .then(data => {
+          console.log('Mark all as read response:', data);
           if (data.success) {
+            // Show success message
+            showNotification(data.message || 'All notifications marked as read', 'success');
+            // Reload notifications to update UI
             loadNotifications();
+          } else {
+            showNotification(data.error || 'Failed to mark notifications as read', 'error');
           }
         })
-        .catch(error => console.error('Error:', error));
+        .catch(error => {
+          console.error('Error marking all as read:', error);
+          showNotification('Failed to mark notifications as read', 'error');
+        });
       });
     }
   }
@@ -5583,19 +5803,33 @@ document.addEventListener('DOMContentLoaded', function () {
     return Math.floor(diffInSeconds / 86400) + ' days ago';
   }
 
-  // Mark notification as read
+  // Mark notification as read and navigate to My Applications
   window.markNotificationRead = function(notificationId) {
     fetch('mark_notification_read.php', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: 'notification_id=' + notificationId
+      body: 'notification_id=' + notificationId + '&action=mark_one'
     })
     .then(response => response.json())
     .then(data => {
       if (data.success) {
-        loadNotifications();
+        // Close notification dropdown
+        const notificationDropdown = document.getElementById('notificationDropdown');
+        if (notificationDropdown) {
+          notificationDropdown.classList.add('hidden');
+        }
+        
+        // Navigate to My Applications page
+        console.log('Navigating to My Applications...');
+        loadApplicationsPage();
+        
+        // Update active navigation
+        updateActiveNavigation('applications');
+        
+        // Reload notifications to update badge
+        setTimeout(() => loadNotifications(), 500);
       }
     })
     .catch(error => console.error('Error:', error));
@@ -6432,10 +6666,8 @@ function loadJobs(page = 1, filters = {}) {
         displayJobs(data.jobs);
         updatePagination(data.pagination);
         
-        // Update existing application states
-        setTimeout(() => {
-          updateExistingApplicationStates();
-        }, 100);
+        // Update existing application states immediately
+        updateExistingApplicationStates();
       } else {
         document.getElementById('noJobsMessage').classList.remove('hidden');
         document.getElementById('paginationContainer').style.display = 'none';
@@ -6612,7 +6844,45 @@ function attachJobEventListeners() {
       const buttonText = this.textContent.trim();
       
       // If this is a "View Application" button, load and show the wizard at current step
-      if (buttonText === 'View Application' && applicationId) {
+      if (buttonText === 'View Application') {
+        console.log('View Application clicked - checking for application ID...');
+        
+        // If no application ID is set, try to fetch it from user applications
+        if (!applicationId) {
+          console.log('⚠️ No application ID on button - fetching from user applications...');
+          
+          // Show loading toast
+          showToast('Loading your application...', 'info');
+          
+          try {
+            const appsResponse = await fetch('get_user_applications.php');
+            const appsData = await appsResponse.json();
+            
+            if (appsData.success && appsData.applications) {
+              const application = appsData.applications.find(app => app.job_id == jobId);
+              
+              if (application) {
+                applicationId = application.id;
+                console.log('✅ Found application ID:', applicationId);
+                // Update button with the application ID for future clicks
+                this.setAttribute('data-application-id', applicationId);
+              } else {
+                console.error('❌ No application found for this job');
+                showToast('Application not found. Please try again.', 'error');
+                return;
+              }
+            } else {
+              console.error('❌ Failed to fetch applications');
+              showToast('Failed to load application data. Please try again.', 'error');
+              return;
+            }
+          } catch (error) {
+            console.error('❌ Error fetching application:', error);
+            showToast('Error loading application. Please try again.', 'error');
+            return;
+          }
+        }
+        
         console.log('Opening existing application:', applicationId);
         
         // CRITICAL: Clear ALL previous application data before loading new one
@@ -7112,6 +7382,7 @@ function attachJobEventListeners() {
                 const docLabels = {
                   'application_letter': 'Application Letter',
                   'resume': 'Resume',
+                  'letter_of_intent': 'Letter of Intent',
                   'tor': 'Transcript of Records (TOR)',
                   'diploma': 'Diploma',
                   'professional_license': 'Professional License',
