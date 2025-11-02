@@ -32,12 +32,14 @@ try {
         echo json_encode([
             'success' => true,
             'has_draft' => true,
+            'user_id' => $user_id, // Include user_id for validation
             'draft' => $draft
         ]);
     } else {
         echo json_encode([
             'success' => true,
             'has_draft' => false,
+            'user_id' => $user_id,
             'draft' => null
         ]);
     }

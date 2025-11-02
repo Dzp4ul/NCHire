@@ -1,9 +1,33 @@
 <?php
+// Clean output buffer and ensure JSON response
+while (ob_get_level()) {
+    ob_end_clean();
+}
+ob_start();
+
 session_start();
+
+// Set error handler to catch any PHP errors and return JSON
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    ob_clean();
+    header('Content-Type: application/json');
+    echo json_encode(['success' => false, 'error' => "PHP Error: $errstr in $errfile on line $errline"]);
+    exit();
+});
+
+// Set exception handler
+set_exception_handler(function($exception) {
+    ob_clean();
+    header('Content-Type: application/json');
+    echo json_encode(['success' => false, 'error' => 'Exception: ' . $exception->getMessage()]);
+    exit();
+});
+
 header('Content-Type: application/json');
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
+    ob_clean();
     echo json_encode(['success' => false, 'error' => 'User not logged in']);
     exit();
 }
@@ -156,8 +180,12 @@ try {
     
     $stmt->close();
 } catch (Exception $e) {
+    ob_clean();
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
 }
 
 $conn->close();
-?>
+
+// Clean output and send JSON
+ob_end_flush();
+exit();

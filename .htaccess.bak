@@ -1,0 +1,36 @@
+# NCHire - Main .htaccess file
+# Root directory access control
+
+# Redirect root index to public folder for security
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Only redirect index.php to public folder
+    # Allow admin/, user/, and other folders to work normally
+    # RewriteCond %{REQUEST_URI} ^/FinalResearch - Copy/?$
+    # RewriteRule ^$ public/index.php [L]
+</IfModule>
+
+# Prevent directory listing
+Options -Indexes
+
+# Protect sensitive directories
+<IfModule mod_authz_core.c>
+    <FilesMatch "^\.">
+        Require all denied
+    </FilesMatch>
+</IfModule>
+
+# Protect config and database directories
+RedirectMatch 403 ^/config/
+RedirectMatch 403 ^/database/
+RedirectMatch 403 ^/vendor/
+RedirectMatch 403 ^/tests/
+
+# Set default charset
+AddDefaultCharset UTF-8
+
+# Compress text files
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript
+</IfModule>

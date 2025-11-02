@@ -290,13 +290,24 @@ session_start();
 
     if (action === 'view') {
       console.log('🖱️ View button clicked for application:', id);
-      // Always use viewExistingApplication if available (stays on current page)
+      
+      // Try to use wizard function from user.php (if available)
       if (typeof window.viewExistingApplication === 'function') {
-        console.log('✅ Opening wizard via viewExistingApplication...');
+        console.log('✅ Opening application wizard...');
         window.viewExistingApplication(id);
-      } else {
-        console.log('⚠️ viewExistingApplication not available, showing modal view');
-        viewApplicationDetails(id);
+      } 
+      // Fallback: Try waiting a bit (function might be loading)
+      else {
+        console.log('⏳ Wizard function not ready, waiting...');
+        setTimeout(() => {
+          if (typeof window.viewExistingApplication === 'function') {
+            console.log('✅ Wizard function now available, opening...');
+            window.viewExistingApplication(id);
+          } else {
+            console.log('📋 Using modal progress view instead');
+            viewApplicationDetails(id);
+          }
+        }, 200);
       }
     }
 

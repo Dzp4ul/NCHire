@@ -33,7 +33,7 @@ function sendEmailNotification($to_email, $to_name, $subject, $title, $message, 
         $mail->addAddress($to_email, $to_name);
         
         // Embed the logo image
-        $logoPath = __DIR__ . '/../assets/images/image-removebg-preview (1).png';
+        $logoPath = __DIR__ . '/../public/assets/images/image-removebg-preview (1).png';
         if (file_exists($logoPath)) {
             $mail->addEmbeddedImage($logoPath, 'college_logo', 'logo.png', 'base64', 'image/png');
             error_log("Logo embedded successfully from: $logoPath");
@@ -120,11 +120,15 @@ function sendEmailNotification($to_email, $to_name, $subject, $title, $message, 
 /**
  * Send interview schedule email notification
  */
-function sendInterviewScheduleEmail($to_email, $to_name, $interview_datetime, $interview_notes = '') {
+function sendInterviewScheduleEmail($to_email, $to_name, $interview_datetime, $interview_location = '', $interview_room = '', $interview_notes = '') {
     $formatted_date = date('F j, Y \\a\\t g:i A', strtotime($interview_datetime));
     $subject = "Interview Scheduled - NCHire";
     $title = "Interview Scheduled";
     $message = "Your interview has been scheduled for $formatted_date.\n\n";
+    if ($interview_location && $interview_room) {
+        $message .= "Location: $interview_location\n";
+        $message .= "Room: $interview_room\n\n";
+    }
     if ($interview_notes) {
         $message .= "Additional Notes:\n$interview_notes\n\n";
     }
@@ -136,11 +140,15 @@ function sendInterviewScheduleEmail($to_email, $to_name, $interview_datetime, $i
 /**
  * Send demo schedule email notification
  */
-function sendDemoScheduleEmail($to_email, $to_name, $demo_datetime, $demo_notes = '') {
+function sendDemoScheduleEmail($to_email, $to_name, $demo_datetime, $demo_location = '', $demo_room = '', $demo_notes = '') {
     $formatted_date = date('F j, Y \\a\\t g:i A', strtotime($demo_datetime));
     $subject = "Demo Teaching Scheduled - NCHire";
     $title = "Demo Teaching Scheduled";
     $message = "Your demo teaching has been scheduled for $formatted_date.\n\n";
+    if ($demo_location && $demo_room) {
+        $message .= "Location: $demo_location\n";
+        $message .= "Room: $demo_room\n\n";
+    }
     if ($demo_notes) {
         $message .= "Additional Notes:\n$demo_notes\n\n";
     }
@@ -152,11 +160,15 @@ function sendDemoScheduleEmail($to_email, $to_name, $demo_datetime, $demo_notes 
 /**
  * Send interview rescheduled email notification
  */
-function sendInterviewRescheduledEmail($to_email, $to_name, $interview_datetime, $reschedule_reason = '') {
+function sendInterviewRescheduledEmail($to_email, $to_name, $interview_datetime, $interview_location = '', $interview_room = '', $reschedule_reason = '') {
     $formatted_date = date('F j, Y \\a\\t g:i A', strtotime($interview_datetime));
     $subject = "Interview Rescheduled - NCHire";
     $title = "Interview Rescheduled";
     $message = "Your interview has been rescheduled to $formatted_date.\n\n";
+    if ($interview_location && $interview_room) {
+        $message .= "Location: $interview_location\n";
+        $message .= "Room: $interview_room\n\n";
+    }
     if ($reschedule_reason) {
         $message .= "Reason for Rescheduling:\n$reschedule_reason\n\n";
     }
@@ -168,11 +180,15 @@ function sendInterviewRescheduledEmail($to_email, $to_name, $interview_datetime,
 /**
  * Send demo teaching rescheduled email notification
  */
-function sendDemoRescheduledEmail($to_email, $to_name, $demo_datetime, $reschedule_reason = '') {
+function sendDemoRescheduledEmail($to_email, $to_name, $demo_datetime, $demo_location = '', $demo_room = '', $reschedule_reason = '') {
     $formatted_date = date('F j, Y \\a\\t g:i A', strtotime($demo_datetime));
     $subject = "Demo Teaching Rescheduled - NCHire";
     $title = "Demo Teaching Rescheduled";
     $message = "Your demo teaching has been rescheduled to $formatted_date.\n\n";
+    if ($demo_location && $demo_room) {
+        $message .= "Location: $demo_location\n";
+        $message .= "Room: $demo_room\n\n";
+    }
     if ($reschedule_reason) {
         $message .= "Reason for Rescheduling:\n$reschedule_reason\n\n";
     }

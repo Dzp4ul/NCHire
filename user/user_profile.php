@@ -1,6 +1,13 @@
 <?php
 
 session_start();
+
+// Check if user is logged in
+if (!isset($_SESSION['user_id']) && !isset($_SESSION['user_email'])) {
+    header("Location: ../public/index.php");
+    exit();
+}
+
 // Database connection
 $servername = "localhost";
 $username = "root";
@@ -14,6 +21,10 @@ if ($conn->connect_error) {
 
 $success_message = '';
 $error_message = '';
+
+// Debug: Log session data
+error_log("user_profile.php - Session user_id: " . ($_SESSION['user_id'] ?? 'NOT SET'));
+error_log("user_profile.php - Session user_email: " . ($_SESSION['user_email'] ?? 'NOT SET'));
 
 // Debug: Log POST data for troubleshooting
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -36,8 +47,8 @@ if (!$conn->query($create_education_table)) {
     error_log("Error creating education table: " . $conn->error);
 }
 
-// Handle Education form submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['saveEducation'])) {
+// Handle Education form submission - DISABLED (handled by save_profile_data.php via AJAX)
+if (false && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['saveEducation'])) {
     // Validate required fields
     if (empty($_POST['ed_degree']) || empty($_POST['ed_fs']) || empty($_POST['ed_ins']) || 
         empty($_POST['ed_sy']) || empty($_POST['ed_ey'])) {
@@ -51,9 +62,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['saveEducation'])) {
         $ed_gpa = isset($_POST['ed_gpa']) ? $conn->real_escape_string($_POST['ed_gpa']) : '';
         // Get user ID from session
         $user_id = $_SESSION['user_id'] ?? null;
+        
+        // If user_id not set, try to get it from email
+        if (!$user_id && isset($_SESSION['user_email'])) {
+            $email_stmt = $conn->prepare("SELECT id FROM applicants WHERE applicant_email = ?");
+            $email_stmt->bind_param("s", $_SESSION['user_email']);
+            $email_stmt->execute();
+            $email_result = $email_stmt->get_result();
+            if ($email_result->num_rows > 0) {
+                $user_row = $email_result->fetch_assoc();
+                $user_id = $user_row['id'];
+                $_SESSION['user_id'] = $user_id; // Store for future use
+            }
+            $email_stmt->close();
+        }
+        
         if (!$user_id) {
             $error_message = "User not logged in properly. Please log in again.";
-            header("Location: ../index.php");
+            error_log("Education save error: No user_id found in session");
+            header("Location: ../public/index.php");
             exit();
         }
 
@@ -86,8 +113,8 @@ if (!$conn->query($create_experience_table)) {
     error_log("Error creating experience table: " . $conn->error);
 }
 
-// Handle Experience form submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['saveExperience'])) {
+// Handle Experience form submission - DISABLED (handled by save_profile_data.php via AJAX)
+if (false && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['saveExperience'])) {
     // Validate required fields
     if (empty($_POST['job_title']) || empty($_POST['work_comp']) || empty($_POST['start_date'])) {
         $error_message = "Please fill in all required fields.";
@@ -101,9 +128,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['saveExperience'])) {
         $is_current = isset($_POST['is_current']) ? 1 : 0;
         // Get user ID from session
         $user_id = $_SESSION['user_id'] ?? null;
+        
+        // If user_id not set, try to get it from email
+        if (!$user_id && isset($_SESSION['user_email'])) {
+            $email_stmt = $conn->prepare("SELECT id FROM applicants WHERE applicant_email = ?");
+            $email_stmt->bind_param("s", $_SESSION['user_email']);
+            $email_stmt->execute();
+            $email_result = $email_stmt->get_result();
+            if ($email_result->num_rows > 0) {
+                $user_row = $email_result->fetch_assoc();
+                $user_id = $user_row['id'];
+                $_SESSION['user_id'] = $user_id;
+            }
+            $email_stmt->close();
+        }
+        
         if (!$user_id) {
             $error_message = "User not logged in properly. Please log in again.";
-            header("Location: ../index.php");
+            error_log("Experience save error: No user_id found in session");
+            header("Location: ../public/index.php");
             exit();
         }
 
@@ -129,11 +172,33 @@ $create_skills_table = "CREATE TABLE IF NOT EXISTS user_skills (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     skill_name VARCHAR(255) NOT NULL,
-    proficiency_level ENUM('Beginner', 'Intermediate', 'Advanced', 'Expert') DEFAULT 'Beginner',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES applicants(id) ON DELETE CASCADE
+    skill_category VARCHAR(100) NOT NULL,
+    skill_level INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )";
 $conn->query($create_skills_table);
+
+// Check if old column exists and migrate if needed
+$check_old_column = "SHOW COLUMNS FROM user_skills LIKE 'proficiency_level'";
+$old_col_result = $conn->query($check_old_column);
+if ($old_col_result && $old_col_result->num_rows > 0) {
+    // Drop old column if it exists
+    $conn->query("ALTER TABLE user_skills DROP COLUMN proficiency_level");
+}
+
+// Add skill_category column if it doesn't exist
+$check_category = "SHOW COLUMNS FROM user_skills LIKE 'skill_category'";
+$cat_result = $conn->query($check_category);
+if ($cat_result && $cat_result->num_rows == 0) {
+    $conn->query("ALTER TABLE user_skills ADD COLUMN skill_category VARCHAR(100) NOT NULL DEFAULT 'general' AFTER skill_name");
+}
+
+// Add skill_level column if it doesn't exist
+$check_level = "SHOW COLUMNS FROM user_skills LIKE 'skill_level'";
+$level_result = $conn->query($check_level);
+if ($level_result && $level_result->num_rows == 0) {
+    $conn->query("ALTER TABLE user_skills ADD COLUMN skill_level INT NOT NULL DEFAULT 1 AFTER skill_category");
+}
 
 // Add profile_picture column to applicants table if it doesn't exist
 $check_column = "SHOW COLUMNS FROM applicants LIKE 'profile_picture'";
@@ -178,9 +243,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['savePersonal'])) {
         } else {
             // Get user ID from session
             $user_id = $_SESSION['user_id'] ?? null;
+            
+            // If user_id not set, try to get it from email
+            if (!$user_id && isset($_SESSION['user_email'])) {
+                $email_stmt = $conn->prepare("SELECT id FROM applicants WHERE applicant_email = ?");
+                $email_stmt->bind_param("s", $_SESSION['user_email']);
+                $email_stmt->execute();
+                $email_result = $email_stmt->get_result();
+                if ($email_result->num_rows > 0) {
+                    $user_row = $email_result->fetch_assoc();
+                    $user_id = $user_row['id'];
+                    $_SESSION['user_id'] = $user_id;
+                }
+                $email_stmt->close();
+            }
+            
             if (!$user_id) {
                 $error_message = "User not logged in properly. Please log in again.";
-                header("Location: ../index.php");
+                error_log("Personal info save error: No user_id found in session");
+                header("Location: ../public/index.php");
                 exit();
             }
 
@@ -215,8 +296,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['savePersonal'])) {
     }
 }
 
-// Handle Skill form submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['saveSkill'])) {
+// Handle Skill form submission - DISABLED (handled by save_profile_data.php via AJAX)
+if (false && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['saveSkill'])) {
     // Validate required fields
     if (empty($_POST['skill_name']) || empty($_POST['skill_category']) || empty($_POST['skill_level']) || $_POST['skill_level'] == '0') {
         $error_message = "Please fill in all required fields and select a skill level.";
@@ -226,9 +307,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['saveSkill'])) {
         $skill_level = (int)$_POST['skill_level'];
         // Get user ID from session
         $user_id = $_SESSION['user_id'] ?? null;
+        
+        // If user_id not set, try to get it from email
+        if (!$user_id && isset($_SESSION['user_email'])) {
+            $email_stmt = $conn->prepare("SELECT id FROM applicants WHERE applicant_email = ?");
+            $email_stmt->bind_param("s", $_SESSION['user_email']);
+            $email_stmt->execute();
+            $email_result = $email_stmt->get_result();
+            if ($email_result->num_rows > 0) {
+                $user_row = $email_result->fetch_assoc();
+                $user_id = $user_row['id'];
+                $_SESSION['user_id'] = $user_id;
+            }
+            $email_stmt->close();
+        }
+        
         if (!$user_id) {
             $error_message = "User not logged in properly. Please log in again.";
-            header("Location: ../index.php");
+            error_log("Skill save error: No user_id found in session");
+            header("Location: ../public/index.php");
             exit();
         }
 
@@ -331,8 +428,8 @@ $skills_stmt->close();
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NCHire - My Profile</title>
-<link rel="icon" type="image/png" href="../assets/images/image-removebg-preview (1).png">
-<link rel="shortcut icon" type="image/png" href="../assets/images/image-removebg-preview (1).png">
+<link rel="icon" type="image/png" href="../public/assets/images/image-removebg-preview (1).png">
+<link rel="shortcut icon" type="image/png" href="../public/assets/images/image-removebg-preview (1).png">
 <script src="https://cdn.tailwindcss.com/3.4.16"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -495,9 +592,113 @@ function confirmSave() {
   document.getElementById('personalInfoForm').submit();
 }
 
-// Handle Save Changes button click
+// Handle Edit, Save, and Cancel for Personal Information
 document.addEventListener('DOMContentLoaded', function() {
+  const editBtn = document.getElementById('editPersonalBtn');
   const saveBtn = document.getElementById('savePersonalBtn');
+  const cancelBtn = document.getElementById('cancelPersonalBtn');
+  const personalActions = document.getElementById('personalActions');
+  
+  // Get all personal info inputs
+  const firstNameInput = document.querySelector('input[name="applicant_fname"]');
+  const lastNameInput = document.querySelector('input[name="applicant_lname"]');
+  const emailInput = document.querySelector('input[name="applicant_email"]');
+  const phoneInput = document.querySelector('input[name="applicant_num"]');
+  const addressInput = document.querySelector('textarea[name="applicant_address"]');
+  
+  // Store original values for cancel functionality
+  let originalValues = {};
+  
+  // Prevent numbers from being entered in first name and last name fields
+  function preventNumbersInNames(event) {
+    const char = event.key;
+    // Allow navigation keys, backspace, delete, tab
+    if (event.ctrlKey || event.metaKey || 
+        ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(char)) {
+        return;
+    }
+    // Block if character is a number
+    if (/[0-9]/.test(char)) {
+        event.preventDefault();
+        showToast('Numbers are not allowed in name fields', 'warning');
+    }
+  }
+  
+  // Function to attach number validation to name fields
+  function attachNameValidation() {
+    if (firstNameInput) {
+      firstNameInput.addEventListener('keydown', preventNumbersInNames);
+      // Also prevent pasted numbers
+      firstNameInput.addEventListener('input', function(e) {
+        this.value = this.value.replace(/[0-9]/g, '');
+      });
+    }
+    
+    if (lastNameInput) {
+      lastNameInput.addEventListener('keydown', preventNumbersInNames);
+      // Also prevent pasted numbers
+      lastNameInput.addEventListener('input', function(e) {
+        this.value = this.value.replace(/[0-9]/g, '');
+      });
+    }
+  }
+  
+  // Attach validation on page load
+  attachNameValidation();
+  
+  // Handle Edit button click
+  if (editBtn) {
+    editBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      
+      // Store original values
+      originalValues = {
+        fname: firstNameInput ? firstNameInput.value : '',
+        lname: lastNameInput ? lastNameInput.value : '',
+        email: emailInput ? emailInput.value : '',
+        phone: phoneInput ? phoneInput.value : '',
+        address: addressInput ? addressInput.value : ''
+      };
+      
+      // Enable all inputs
+      if (firstNameInput) firstNameInput.disabled = false;
+      if (lastNameInput) lastNameInput.disabled = false;
+      if (emailInput) emailInput.disabled = false;
+      if (phoneInput) phoneInput.disabled = false;
+      if (addressInput) addressInput.disabled = false;
+      
+      // Show Save/Cancel buttons, hide Edit button
+      if (personalActions) personalActions.classList.remove('hidden');
+      editBtn.style.display = 'none';
+    });
+  }
+  
+  // Handle Cancel button click
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      
+      // Restore original values
+      if (firstNameInput) firstNameInput.value = originalValues.fname;
+      if (lastNameInput) lastNameInput.value = originalValues.lname;
+      if (emailInput) emailInput.value = originalValues.email;
+      if (phoneInput) phoneInput.value = originalValues.phone;
+      if (addressInput) addressInput.value = originalValues.address;
+      
+      // Disable all inputs
+      if (firstNameInput) firstNameInput.disabled = true;
+      if (lastNameInput) lastNameInput.disabled = true;
+      if (emailInput) emailInput.disabled = true;
+      if (phoneInput) phoneInput.disabled = true;
+      if (addressInput) addressInput.disabled = true;
+      
+      // Hide Save/Cancel buttons, show Edit button
+      if (personalActions) personalActions.classList.add('hidden');
+      if (editBtn) editBtn.style.display = 'block';
+    });
+  }
+  
+  // Handle Save button click
   if (saveBtn) {
     saveBtn.addEventListener('click', function(e) {
       e.preventDefault();
@@ -572,11 +773,11 @@ document.addEventListener('DOMContentLoaded', function() {
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 <div>
 <label class="block text-sm font-medium text-gray-700 mb-2">First Name</label>
-<input type="text" name="applicant_fname" value="<?php echo htmlspecialchars($applicant['applicant_fname']); ?>" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm" disabled>
+<input type="text" name="applicant_fname" value="<?php echo htmlspecialchars($applicant['applicant_fname']); ?>" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm" pattern="[A-Za-z\s\-']+" title="Please enter only letters, spaces, hyphens, and apostrophes" disabled>
 </div>
 <div>
 <label class="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
-<input type="text" name="applicant_lname" value="<?php echo htmlspecialchars($applicant['applicant_lname']); ?>" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm" disabled>
+<input type="text" name="applicant_lname" value="<?php echo htmlspecialchars($applicant['applicant_lname']); ?>" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm" pattern="[A-Za-z\s\-']+" title="Please enter only letters, spaces, hyphens, and apostrophes" disabled>
 </div>
 <div>
 <label class="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
@@ -748,31 +949,49 @@ echo $levels[$skill['skill_level']];
 </div>
 
 <div id="settings" class="tab-content hidden">
-<h3 class="text-xl font-semibold text-gray-900 mb-6">Account Settings</h3>
+<div class="px-4 -mt-2">
+<h3 class="text-xl font-semibold text-gray-900 mb-3">Account Settings</h3>
 <div class="space-y-6">
-<div class="border border-gray-200 rounded-lg p-4">
+<div class="border border-gray-200 rounded-lg p-8">
 <h4 class="font-medium text-gray-900 mb-3">Change Password</h4>
-<p class="text-sm text-gray-600 mb-4">Update your account password to keep your account secure.</p>
-<div class="space-y-4">
+<p class="text-sm text-gray-600 mb-6">Update your account password to keep your account secure.</p>
+<div class="space-y-5">
 <div>
 <label class="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
-<input type="password" id="currentPassword" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm" placeholder="Enter your current password" required>
+<div class="relative">
+<input type="password" id="currentPassword" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly');" class="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm" placeholder="Enter your current password" required>
+<button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none" onclick="togglePasswordVisibility('currentPassword', this)">
+<i class="ri-eye-line text-lg"></i>
+</button>
+</div>
 </div>
 <div>
 <label class="block text-sm font-medium text-gray-700 mb-2">New Password</label>
-<input type="password" id="newPassword" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm" placeholder="Enter new password (min. 8 characters)" required>
+<div class="relative">
+<input type="password" id="newPassword" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly');" class="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm" placeholder="Enter new password (min. 8 characters)" required>
+<button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none" onclick="togglePasswordVisibility('newPassword', this)">
+<i class="ri-eye-line text-lg"></i>
+</button>
+</div>
 </div>
 <div>
 <label class="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
-<input type="password" id="confirmPassword" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm" placeholder="Re-enter new password" required>
+<div class="relative">
+<input type="password" id="confirmPassword" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly');" class="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm" placeholder="Re-enter new password" required>
+<button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none" onclick="togglePasswordVisibility('confirmPassword', this)">
+<i class="ri-eye-line text-lg"></i>
+</button>
 </div>
-<div class="flex items-center gap-3">
+</div>
+<div class="flex items-center gap-3 pt-2">
 <button type="button" id="updatePasswordBtn" class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium !rounded-button">
 <i class="ri-lock-password-line mr-2"></i>Update Password
 </button>
 <button type="button" id="cancelPasswordBtn" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium !rounded-button">
 Cancel
 </button>
+</div>
+</div>
 </div>
 </div>
 </div>
@@ -848,6 +1067,26 @@ document.addEventListener('DOMContentLoaded', function() {
         clickedButton.classList.remove('border-transparent', 'text-gray-500');
         clickedButton.classList.add('border-primary', 'text-primary');
       }
+      
+      // Clear password fields when switching to Account Settings tab
+      if (targetTabId === 'settings') {
+        const currentPassword = document.getElementById('currentPassword');
+        const newPassword = document.getElementById('newPassword');
+        const confirmPassword = document.getElementById('confirmPassword');
+        
+        if (currentPassword) {
+          currentPassword.value = '';
+          currentPassword.setAttribute('readonly', 'readonly');
+        }
+        if (newPassword) {
+          newPassword.value = '';
+          newPassword.setAttribute('readonly', 'readonly');
+        }
+        if (confirmPassword) {
+          confirmPassword.value = '';
+          confirmPassword.setAttribute('readonly', 'readonly');
+        }
+      }
     }
 
     // Add click event listeners to tab buttons
@@ -863,12 +1102,18 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     });
 
-    // Initialize - make sure education tab is active by default
+    // Initialize - restore last active tab from localStorage or default to education
     if (tabButtons.length > 0) {
-      const educationTab = document.querySelector('[data-tab="education"]');
-      if (educationTab) {
-        switchTab('education', educationTab);
+      const lastActiveTab = localStorage.getItem('activeProfileTab');
+      const defaultTab = lastActiveTab || 'education';
+      
+      const tabButton = document.querySelector(`[data-tab="${defaultTab}"]`);
+      if (tabButton) {
+        switchTab(defaultTab, tabButton);
       }
+      
+      // Clear the stored tab so it doesn't persist on next normal visit
+      localStorage.removeItem('activeProfileTab');
     }
   }, 100);
 });
@@ -895,6 +1140,45 @@ function updateAllProfilePictures(profilePictureUrl) {
     }
   });
 }
+</script>
+
+<script id="passwordFieldClear">
+// Clear password fields on page load and prevent browser autofill
+document.addEventListener('DOMContentLoaded', function() {
+  // Clear immediately and re-add readonly protection
+  function clearPasswordFields() {
+    const currentPassword = document.getElementById('currentPassword');
+    const newPassword = document.getElementById('newPassword');
+    const confirmPassword = document.getElementById('confirmPassword');
+    
+    if (currentPassword) {
+      currentPassword.value = '';
+      currentPassword.setAttribute('readonly', 'readonly');
+    }
+    if (newPassword) {
+      newPassword.value = '';
+      newPassword.setAttribute('readonly', 'readonly');
+    }
+    if (confirmPassword) {
+      confirmPassword.value = '';
+      confirmPassword.setAttribute('readonly', 'readonly');
+    }
+  }
+  
+  // Clear on load
+  clearPasswordFields();
+  
+  // Clear again after a short delay to override browser autofill
+  setTimeout(clearPasswordFields, 100);
+  setTimeout(clearPasswordFields, 500);
+  setTimeout(clearPasswordFields, 1000);
+  
+  // Also clear when Cancel button is clicked
+  const cancelPasswordBtn = document.getElementById('cancelPasswordBtn');
+  if (cancelPasswordBtn) {
+    cancelPasswordBtn.addEventListener('click', clearPasswordFields);
+  }
+});
 </script>
 
 <script id="photoUpload">
@@ -976,6 +1260,209 @@ if (uploadPhotoBtn && photoUpload) {
   });
 }
 });
+</script>
+
+<script id="reloadFunctions">
+// Only define these functions if we're on the profile page (not dashboard)
+if (document.getElementById('profileMainContent')) {
+  
+  // Helper function to escape HTML with null safety
+  function escapeHtml(text) {
+    if (text === null || text === undefined) {
+      return '';
+    }
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+  }
+
+  // Function to reload education list
+  window.reloadEducationList = async function() {
+    console.log('reloadEducationList function called');
+    try {
+      // Add cache-busting parameter to ensure fresh data
+      const timestamp = new Date().getTime();
+      const response = await fetch(`get_profile_lists.php?type=education&_=${timestamp}`);
+    const result = await response.json();
+    console.log('Education data received:', result);
+    if (result.success) {
+      const educationList = document.getElementById('educationList');
+      console.log('Education list element found:', educationList);
+      if (!educationList) {
+        console.error('Education list element not found!');
+        return;
+      }
+      if (result.data && result.data.length > 0) {
+        console.log('Updating education list with', result.data.length, 'items');
+        const html = result.data.map(edu => `
+          <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+            <div class="flex items-start justify-between">
+              <div class="flex-1">
+                <h4 class="font-semibold text-gray-900 text-base">${escapeHtml(edu.degree)}</h4>
+                <p class="text-gray-600 mt-1 text-sm">${escapeHtml(edu.institution)}</p>
+                <p class="text-gray-500 text-sm mt-1">
+                  ${escapeHtml(edu.start_year + ' - ' + edu.end_year)}
+                  ${edu.gpa ? ' | GPA: ' + escapeHtml(edu.gpa) : ''}
+                </p>
+              </div>
+              <div class="flex space-x-1 ml-4">
+                <button onclick="editEducation(${edu.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
+                  <i class="ri-edit-line text-sm"></i>
+                </button>
+                <button onclick="deleteEducation(${edu.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors" title="Delete">
+                  <i class="ri-delete-bin-line text-sm"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        `).join('');
+        console.log('Generated HTML length:', html.length);
+        educationList.innerHTML = html;
+        console.log('Education list updated successfully!');
+      } else {
+        console.log('No education data, showing empty state');
+        educationList.innerHTML = `
+          <div class="text-center py-12 text-gray-500">
+            <i class="ri-graduation-cap-line text-4xl mb-4 text-gray-300"></i>
+            <p class="text-gray-600">No education records found.</p>
+            <p class="text-sm text-gray-500 mt-1">Click "Add Education" to get started.</p>
+          </div>
+        `;
+      }
+    }
+  } catch (error) {
+    console.error('Error reloading education list:', error);
+  }
+  };
+
+  // Function to reload experience list
+  window.reloadExperienceList = async function() {
+    console.log('reloadExperienceList function called');
+    try {
+    // Add cache-busting parameter to ensure fresh data
+    const timestamp = new Date().getTime();
+    const response = await fetch(`get_profile_lists.php?type=experience&_=${timestamp}`);
+    const result = await response.json();
+    console.log('Experience data received:', result);
+    if (result.success) {
+      const experienceList = document.getElementById('experienceList');
+      console.log('Experience list element found:', experienceList);
+      if (!experienceList) {
+        console.error('Experience list element not found!');
+        return;
+      }
+      if (result.data && result.data.length > 0) {
+        console.log('Updating experience list with', result.data.length, 'items');
+        const html = result.data.map(exp => {
+          const startDate = new Date(exp.start_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+          const endDate = exp.end_date ? new Date(exp.end_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Present';
+          return `
+            <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+              <div class="flex items-start justify-between">
+                <div class="flex-1">
+                  <h4 class="font-semibold text-gray-900 text-base">${escapeHtml(exp.job_title)}</h4>
+                  <p class="text-gray-600 mt-1 text-sm">${escapeHtml(exp.company)}</p>
+                  <p class="text-gray-500 text-sm mt-1">
+                    ${startDate} - ${endDate}
+                    ${exp.location ? ' | ' + escapeHtml(exp.location) : ''}
+                  </p>
+                </div>
+                <div class="flex space-x-1 ml-4">
+                  <button onclick="editExperience(${exp.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
+                    <i class="ri-edit-line text-sm"></i>
+                  </button>
+                  <button onclick="deleteExperience(${exp.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors" title="Delete">
+                    <i class="ri-delete-bin-line text-sm"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+        console.log('Generated HTML length:', html.length);
+        experienceList.innerHTML = html;
+        console.log('Experience list updated successfully!');
+      } else {
+        console.log('No experience data, showing empty state');
+        experienceList.innerHTML = `
+          <div class="text-center py-12 text-gray-500">
+            <i class="ri-briefcase-line text-4xl mb-4 text-gray-300"></i>
+            <p class="text-gray-600">No work experience records found.</p>
+            <p class="text-sm text-gray-500 mt-1">Click "Add Experience" to get started.</p>
+          </div>
+        `;
+      }
+    }
+  } catch (error) {
+    console.error('Error reloading experience list:', error);
+  }
+  };
+
+  // Function to reload skills list
+  window.reloadSkillsList = async function() {
+    console.log('reloadSkillsList function called');
+    try {
+    // Add cache-busting parameter to ensure fresh data
+    const timestamp = new Date().getTime();
+    const response = await fetch(`get_profile_lists.php?type=skills&_=${timestamp}`);
+    const result = await response.json();
+    console.log('Skills data received:', result);
+    if (result.success) {
+      const skillsList = document.getElementById('skillsList');
+      console.log('Skills list element found:', skillsList);
+      if (!skillsList) {
+        console.error('Skills list element not found!');
+        return;
+      }
+      if (result.data && result.data.length > 0) {
+        console.log('Updating skills list with', result.data.length, 'items');
+        const levels = ['', 'Beginner', 'Novice', 'Intermediate', 'Advanced', 'Expert'];
+        const html = result.data.map(skill => {
+          const dots = Array.from({length: 5}, (_, i) => 
+            `<div class="w-2.5 h-2.5 rounded-full mr-1 ${i < skill.skill_level ? 'bg-blue-500' : 'bg-gray-200'}"></div>`
+          ).join('');
+          return `
+            <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+              <div class="flex items-start justify-between">
+                <div class="flex-1">
+                  <h4 class="font-semibold text-gray-900 text-base">${escapeHtml(skill.skill_name)}</h4>
+                  <div class="flex items-center mt-2">
+                    ${dots}
+                    <span class="text-sm text-gray-500 ml-2">${levels[skill.skill_level]}</span>
+                  </div>
+                </div>
+                <div class="flex space-x-1 ml-4">
+                  <button onclick="editSkill(${skill.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
+                    <i class="ri-edit-line text-sm"></i>
+                  </button>
+                  <button onclick="deleteSkill(${skill.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors" title="Delete">
+                    <i class="ri-delete-bin-line text-sm"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+        console.log('Generated HTML length:', html.length);
+        skillsList.innerHTML = html;
+        console.log('Skills list updated successfully!');
+      } else {
+        console.log('No skills data, showing empty state');
+        skillsList.innerHTML = `
+          <div class="text-center py-12 text-gray-500">
+            <i class="ri-tools-line text-4xl mb-4 text-gray-300"></i>
+            <p class="text-gray-600">No skills records found.</p>
+            <p class="text-sm text-gray-500 mt-1">Click "Add Skill" to get started.</p>
+          </div>
+        `;
+      }
+    }
+  } catch (error) {
+    console.error('Error reloading skills list:', error);
+  }
+  };
+  
+} // End of profileMainContent check
 </script>
 
 <script id="modalHandlers">
@@ -1074,6 +1561,159 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
+  // Functions to reload sections dynamically
+  function reloadEducationList() {
+    fetch('get_profile_data.php?type=education')
+      .then(response => response.json())
+      .then(result => {
+        if (result.success) {
+          const educationList = document.getElementById('educationList');
+          if (result.data.length === 0) {
+            educationList.innerHTML = `
+              <div class="text-center py-12 text-gray-500">
+                <i class="ri-graduation-cap-line text-4xl mb-4 text-gray-300"></i>
+                <p class="text-gray-600">No education records found.</p>
+                <p class="text-sm text-gray-500 mt-1">Click "Add Education" to get started.</p>
+              </div>
+            `;
+          } else {
+            let html = '';
+            result.data.forEach(education => {
+              html += `
+                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <h4 class="font-semibold text-gray-900 text-base">${escapeHtml(education.degree)}</h4>
+                      <p class="text-gray-600 mt-1 text-sm">${escapeHtml(education.institution)}</p>
+                      <p class="text-gray-500 text-sm mt-1">
+                        ${escapeHtml(education.start_year + ' - ' + education.end_year)}
+                        ${education.gpa ? ' | GPA: ' + escapeHtml(education.gpa) : ''}
+                      </p>
+                    </div>
+                    <div class="flex space-x-1 ml-4">
+                      <button onclick="editEducation(${education.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
+                        <i class="ri-edit-line text-sm"></i>
+                      </button>
+                      <button onclick="deleteEducation(${education.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors" title="Delete">
+                        <i class="ri-delete-bin-line text-sm"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              `;
+            });
+            educationList.innerHTML = html;
+          }
+        }
+      })
+      .catch(error => console.error('Error reloading education:', error));
+  }
+
+  function reloadExperienceList() {
+    fetch('get_profile_data.php?type=experience')
+      .then(response => response.json())
+      .then(result => {
+        if (result.success) {
+          const experienceList = document.getElementById('experienceList');
+          if (result.data.length === 0) {
+            experienceList.innerHTML = `
+              <div class="text-center py-12 text-gray-500">
+                <i class="ri-briefcase-line text-4xl mb-4 text-gray-300"></i>
+                <p class="text-gray-600">No work experience records found.</p>
+                <p class="text-sm text-gray-500 mt-1">Click "Add Experience" to get started.</p>
+              </div>
+            `;
+          } else {
+            let html = '';
+            result.data.forEach(experience => {
+              const startDate = new Date(experience.start_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+              const endDate = experience.end_date ? new Date(experience.end_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : 'Present';
+              const location = experience.location ? ' | ' + escapeHtml(experience.location) : '';
+              
+              html += `
+                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <h4 class="font-semibold text-gray-900 text-base">${escapeHtml(experience.job_title)}</h4>
+                      <p class="text-gray-600 mt-1 text-sm">${escapeHtml(experience.company)}</p>
+                      <p class="text-gray-500 text-sm mt-1">${startDate} - ${endDate}${location}</p>
+                    </div>
+                    <div class="flex space-x-1 ml-4">
+                      <button onclick="editExperience(${experience.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
+                        <i class="ri-edit-line text-sm"></i>
+                      </button>
+                      <button onclick="deleteExperience(${experience.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors" title="Delete">
+                        <i class="ri-delete-bin-line text-sm"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              `;
+            });
+            experienceList.innerHTML = html;
+          }
+        }
+      })
+      .catch(error => console.error('Error reloading experience:', error));
+  }
+
+  function reloadSkillsList() {
+    fetch('get_profile_data.php?type=skills')
+      .then(response => response.json())
+      .then(result => {
+        if (result.success) {
+          const skillsList = document.getElementById('skillsList');
+          if (result.data.length === 0) {
+            skillsList.innerHTML = `
+              <div class="text-center py-12 text-gray-500">
+                <i class="ri-lightbulb-line text-4xl mb-4 text-gray-300"></i>
+                <p class="text-gray-600">No skills added yet.</p>
+                <p class="text-sm text-gray-500 mt-1">Click "Add Skill" to get started.</p>
+              </div>
+            `;
+          } else {
+            let html = '';
+            result.data.forEach(skill => {
+              const stars = '★'.repeat(skill.skill_level) + '☆'.repeat(5 - skill.skill_level);
+              
+              html += `
+                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <h4 class="font-semibold text-gray-900 text-base">${escapeHtml(skill.skill_name)}</h4>
+                      <p class="text-secondary text-sm mt-1">${stars}</p>
+                    </div>
+                    <div class="flex space-x-1 ml-4">
+                      <button onclick="editSkill(${skill.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
+                        <i class="ri-edit-line text-sm"></i>
+                      </button>
+                      <button onclick="deleteSkill(${skill.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors" title="Delete">
+                        <i class="ri-delete-bin-line text-sm"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              `;
+            });
+            skillsList.innerHTML = html;
+          }
+        }
+      })
+      .catch(error => console.error('Error reloading skills:', error));
+  }
+
+  // Helper function to escape HTML
+  function escapeHtml(text) {
+    const map = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    };
+    return String(text).replace(/[&<>"']/g, m => map[m]);
+  }
+
   // Handle form submissions with AJAX
   const educationForm = document.getElementById('educationForm');
   const experienceForm = document.getElementById('experienceForm');
@@ -1084,30 +1724,59 @@ document.addEventListener('DOMContentLoaded', function() {
       e.preventDefault();
       const formData = new FormData(this);
       
+      console.log('Submitting education form...');
+      for (let [key, value] of formData.entries()) {
+        console.log(key + ': ' + value);
+      }
+      
       fetch('save_profile_data.php', {
         method: 'POST',
         body: formData
       })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          closeModal(educationModal);
-          this.reset();
-          if (typeof showNotification === 'function') {
-            showNotification(data.message, 'success');
+      .then(response => {
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+          throw new Error('HTTP error! status: ' + response.status);
+        }
+        return response.text();
+      })
+      .then(text => {
+        console.log('Raw response:', text);
+        try {
+          const data = JSON.parse(text);
+          if (data.success) {
+            // Close the modal first
+            const educationModal = document.getElementById('educationModal');
+            if (educationModal) {
+              educationModal.classList.add('hidden');
+            }
+            
+            // Show success notification
+            if (typeof showNotification === 'function') {
+              showNotification(data.message || 'Education saved successfully', 'success');
+            }
+            
+            // Reload the education list to show the new item immediately
+            reloadEducationList();
+            
+            // Reset the form
+            educationForm.reset();
+          } else {
+            if (typeof showNotification === 'function') {
+              showNotification(data.message || 'Error saving education', 'error');
+            }
           }
-          // Reload page to show new data
-          setTimeout(() => location.reload(), 1000);
-        } else {
+        } catch (e) {
+          console.error('JSON parse error:', e);
           if (typeof showNotification === 'function') {
-            showNotification('Error: ' + data.message, 'error');
+            showNotification('Server error: Invalid response format', 'error');
           }
         }
       })
       .catch(error => {
-        console.error('Error:', error);
+        console.error('Fetch error:', error);
         if (typeof showNotification === 'function') {
-          showNotification('Error saving education data', 'error');
+          showNotification('Network error: ' + error.message, 'error');
         }
       });
     });
@@ -1118,30 +1787,59 @@ document.addEventListener('DOMContentLoaded', function() {
       e.preventDefault();
       const formData = new FormData(this);
       
+      console.log('Submitting experience form...');
+      for (let [key, value] of formData.entries()) {
+        console.log(key + ': ' + value);
+      }
+      
       fetch('save_profile_data.php', {
         method: 'POST',
         body: formData
       })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          closeModal(experienceModal);
-          this.reset();
-          if (typeof showNotification === 'function') {
-            showNotification(data.message, 'success');
+      .then(response => {
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+          throw new Error('HTTP error! status: ' + response.status);
+        }
+        return response.text();
+      })
+      .then(text => {
+        console.log('Raw response:', text);
+        try {
+          const data = JSON.parse(text);
+          if (data.success) {
+            // Close the modal first
+            const experienceModal = document.getElementById('experienceModal');
+            if (experienceModal) {
+              experienceModal.classList.add('hidden');
+            }
+            
+            // Show success notification
+            if (typeof showNotification === 'function') {
+              showNotification(data.message || 'Work experience saved successfully', 'success');
+            }
+            
+            // Reload the experience list to show the new item immediately
+            reloadExperienceList();
+            
+            // Reset the form
+            experienceForm.reset();
+          } else {
+            if (typeof showNotification === 'function') {
+              showNotification(data.message || 'Error saving experience', 'error');
+            }
           }
-          // Reload page to show new data
-          setTimeout(() => location.reload(), 1000);
-        } else {
+        } catch (e) {
+          console.error('JSON parse error:', e);
           if (typeof showNotification === 'function') {
-            showNotification('Error: ' + data.message, 'error');
+            showNotification('Server error: Invalid response format', 'error');
           }
         }
       })
       .catch(error => {
-        console.error('Error:', error);
+        console.error('Fetch error:', error);
         if (typeof showNotification === 'function') {
-          showNotification('Error saving experience data', 'error');
+          showNotification('Network error: ' + error.message, 'error');
         }
       });
     });
@@ -1152,36 +1850,59 @@ document.addEventListener('DOMContentLoaded', function() {
       e.preventDefault();
       const formData = new FormData(this);
       
+      console.log('Submitting skill form...');
+      for (let [key, value] of formData.entries()) {
+        console.log(key + ': ' + value);
+      }
+      
       fetch('save_profile_data.php', {
         method: 'POST',
         body: formData
       })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          closeModal(skillModal);
-          this.reset();
-          // Reset skill level buttons
-          skillLevelButtons.forEach(btn => {
-            btn.classList.remove('bg-primary');
-            btn.classList.add('bg-gray-300');
-          });
-          skillLevelInput.value = '0';
-          if (typeof showNotification === 'function') {
-            showNotification(data.message, 'success');
+      .then(response => {
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+          throw new Error('HTTP error! status: ' + response.status);
+        }
+        return response.text();
+      })
+      .then(text => {
+        console.log('Raw response:', text);
+        try {
+          const data = JSON.parse(text);
+          if (data.success) {
+            // Close the modal first
+            const skillModal = document.getElementById('skillModal');
+            if (skillModal) {
+              skillModal.classList.add('hidden');
+            }
+            
+            // Show success notification
+            if (typeof showNotification === 'function') {
+              showNotification(data.message || 'Skill saved successfully', 'success');
+            }
+            
+            // Reload the skills list to show the new item immediately
+            reloadSkillsList();
+            
+            // Reset the form
+            skillForm.reset();
+          } else {
+            if (typeof showNotification === 'function') {
+              showNotification(data.message || 'Error saving skill', 'error');
+            }
           }
-          // Reload page to show new data
-          setTimeout(() => location.reload(), 1000);
-        } else {
+        } catch (e) {
+          console.error('JSON parse error:', e);
           if (typeof showNotification === 'function') {
-            showNotification('Error: ' + data.message, 'error');
+            showNotification('Server error: Invalid response format', 'error');
           }
         }
       })
       .catch(error => {
-        console.error('Error:', error);
+        console.error('Fetch error:', error);
         if (typeof showNotification === 'function') {
-          showNotification('Error saving skill data', 'error');
+          showNotification('Network error: ' + error.message, 'error');
         }
       });
     });
@@ -1276,6 +1997,7 @@ window.showNotification = showNotification;
 <div id="educationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
   <div class="bg-white rounded-xl max-w-md w-full mx-4">
     <form method="POST" action="" class="p-6 space-y-4" id="educationForm">
+      <input type="hidden" name="saveEducation" value="1">
       <input type="hidden" name="edit_id" id="edit_education_id" value="">
       <div class="border-b border-gray-200 flex justify-between items-center pb-4">
         <h3 class="text-lg font-semibold text-gray-900" id="educationModalTitle">Add Education</h3>
@@ -1321,6 +2043,7 @@ window.showNotification = showNotification;
 <div id="experienceModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
   <div class="bg-white rounded-xl max-w-md w-full mx-4">
     <form method="POST" action="" class="p-6 space-y-4" id="experienceForm">
+      <input type="hidden" name="saveExperience" value="1">
       <input type="hidden" name="edit_id" id="edit_experience_id" value="">
       <div class="border-b border-gray-200 flex justify-between items-center pb-4">
         <h3 class="text-lg font-semibold text-gray-900" id="experienceModalTitle">Add Work Experience</h3>
@@ -1362,6 +2085,7 @@ window.showNotification = showNotification;
 <div id="skillModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
   <div class="bg-white rounded-xl max-w-md w-full mx-4">
     <form method="POST" action="" class="p-6 space-y-4" id="skillForm">
+      <input type="hidden" name="saveSkill" value="1">
       <input type="hidden" name="edit_id" id="edit_skill_id" value="">
       <div class="border-b border-gray-200 flex justify-between items-center pb-4">
         <h3 class="text-lg font-semibold text-gray-900" id="skillModalTitle">Add Skill</h3>
@@ -1370,18 +2094,8 @@ window.showNotification = showNotification;
         </button>
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2" for="skill_name">Skill Name</label>
+        <label class="block text-sm font-medium text-gray-700 mb-2" for="skill_name">Skill</label>
         <input type="text" name="skill_name" id="skill_name" placeholder="e.g., JavaScript" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2" for="skill_category">Category</label>
-        <select name="skill_category" id="skill_category" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
-          <option value="">Select category</option>
-          <option value="programming">Programming Languages</option>
-          <option value="frameworks">Frameworks & Technologies</option>
-          <option value="tools">Tools & Software</option>
-          <option value="soft">Soft Skills</option>
-        </select>
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-2">Proficiency Level</label>
@@ -1453,7 +2167,7 @@ function deleteEducation(id) {
   .then(data => {
     if (data.success) {
       showNotification(data.message, 'success');
-      setTimeout(() => location.reload(), 1000);
+      reloadEducationList();
     } else {
       showNotification('Error: ' + data.message, 'error');
     }
@@ -1517,7 +2231,7 @@ function deleteExperience(id) {
   .then(data => {
     if (data.success) {
       showNotification(data.message, 'success');
-      setTimeout(() => location.reload(), 1000);
+      reloadExperienceList();
     } else {
       showNotification('Error: ' + data.message, 'error');
     }
@@ -1541,7 +2255,6 @@ function editSkill(id) {
   // Populate form fields
   document.getElementById('edit_skill_id').value = skill.id;
   document.getElementById('skill_name').value = skill.skill_name;
-  document.getElementById('skill_category').value = skill.skill_category;
   document.getElementById('skill_level').value = skill.skill_level;
   
   // Update skill level buttons
@@ -1582,7 +2295,7 @@ function deleteSkill(id) {
   .then(data => {
     if (data.success) {
       showNotification(data.message, 'success');
-      setTimeout(() => location.reload(), 1000);
+      reloadSkillsList();
     } else {
       showNotification('Error: ' + data.message, 'error');
     }
@@ -1634,6 +2347,162 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 });
+</script>
+
+<script id="passwordVisibilityToggle">
+// Toggle password visibility function
+function togglePasswordVisibility(inputId, button) {
+  const input = document.getElementById(inputId);
+  const icon = button.querySelector('i');
+  
+  if (input.type === 'password') {
+    input.type = 'text';
+    icon.classList.remove('ri-eye-line');
+    icon.classList.add('ri-eye-off-line');
+  } else {
+    input.type = 'password';
+    icon.classList.remove('ri-eye-off-line');
+    icon.classList.add('ri-eye-line');
+  }
+}
+</script>
+
+<script id="passwordUpdate">
+// Handle password update functionality
+// Run immediately since page is loaded via AJAX and DOMContentLoaded may have already fired
+(function() {
+  console.log('Password update script loaded');
+  
+  // Use setTimeout to ensure DOM elements are available
+  setTimeout(function() {
+    const updatePasswordBtn = document.getElementById('updatePasswordBtn');
+    const cancelPasswordBtn = document.getElementById('cancelPasswordBtn');
+    const currentPassword = document.getElementById('currentPassword');
+    const newPassword = document.getElementById('newPassword');
+    const confirmPassword = document.getElementById('confirmPassword');
+    
+    console.log('Update button found:', updatePasswordBtn);
+    console.log('Password fields:', {currentPassword, newPassword, confirmPassword});
+  
+  if (updatePasswordBtn) {
+    updatePasswordBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      console.log('Update password button clicked');
+      
+      // Get field values
+      const currentPwd = currentPassword.value.trim();
+      const newPwd = newPassword.value.trim();
+      const confirmPwd = confirmPassword.value.trim();
+      
+      console.log('Password lengths:', {
+        current: currentPwd.length,
+        new: newPwd.length,
+        confirm: confirmPwd.length
+      });
+      
+      // Validate fields
+      if (!currentPwd || !newPwd || !confirmPwd) {
+        console.log('Validation failed: Empty fields');
+        showToast('Please fill in all password fields', 'error');
+        return;
+      }
+      
+      // Validate password length
+      if (newPwd.length < 8) {
+        console.log('Validation failed: Password too short');
+        showToast('New password must be at least 8 characters long', 'error');
+        return;
+      }
+      
+      // Check if passwords match
+      if (newPwd !== confirmPwd) {
+        console.log('Validation failed: Passwords do not match');
+        showToast('New passwords do not match', 'error');
+        return;
+      }
+      
+      // Check if new password is different from current
+      if (currentPwd === newPwd) {
+        console.log('Validation failed: Same as current password');
+        showToast('New password must be different from current password', 'warning');
+        return;
+      }
+      
+      console.log('All validations passed, sending request...');
+      
+      // Disable button and show loading
+      updatePasswordBtn.disabled = true;
+      updatePasswordBtn.innerHTML = '<i class="ri-loader-4-line mr-2 animate-spin"></i>Updating...';
+      
+      // Send password update request
+      const formData = new FormData();
+      formData.append('updatePassword', '1');
+      formData.append('current_password', currentPwd);
+      formData.append('new_password', newPwd);
+      
+      console.log('Sending request to save_profile_data.php');
+      
+      fetch('save_profile_data.php', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => {
+        console.log('Response received:', response);
+        return response.json();
+      })
+      .then(data => {
+        console.log('Response data:', data);
+        if (data.success) {
+          showToast(data.message, 'success');
+          // Clear all password fields
+          currentPassword.value = '';
+          newPassword.value = '';
+          confirmPassword.value = '';
+          // Re-add readonly to prevent autofill
+          currentPassword.setAttribute('readonly', 'readonly');
+          newPassword.setAttribute('readonly', 'readonly');
+          confirmPassword.setAttribute('readonly', 'readonly');
+        } else {
+          showToast(data.message || 'Error updating password', 'error');
+        }
+      })
+      .catch(error => {
+        console.error('Fetch error:', error);
+        showToast('An error occurred while updating password', 'error');
+      })
+      .finally(() => {
+        console.log('Request completed');
+        // Re-enable button
+        updatePasswordBtn.disabled = false;
+        updatePasswordBtn.innerHTML = '<i class="ri-lock-password-line mr-2"></i>Update Password';
+      });
+    });
+  } else {
+    console.error('Update password button not found!');
+  }
+  
+  // Cancel button handler
+  if (cancelPasswordBtn) {
+    cancelPasswordBtn.addEventListener('click', function() {
+      console.log('Cancel button clicked');
+      // Clear all password fields
+      if (currentPassword) {
+        currentPassword.value = '';
+        currentPassword.setAttribute('readonly', 'readonly');
+      }
+      if (newPassword) {
+        newPassword.value = '';
+        newPassword.setAttribute('readonly', 'readonly');
+      }
+      if (confirmPassword) {
+        confirmPassword.value = '';
+        confirmPassword.setAttribute('readonly', 'readonly');
+      }
+      showToast('Password update cancelled', 'warning');
+    });
+  }
+  }, 100); // End setTimeout - wait 100ms for DOM to be ready
+})(); // End IIFE - run immediately
 </script>
 
 </body>

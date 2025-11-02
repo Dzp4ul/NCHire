@@ -106,6 +106,12 @@ async function loadJobs() {
                         <button onclick="editJob(${job.id})" class="text-gray-400 hover:text-blue-600" title="Edit">
                             <i class="fas fa-edit"></i>
                         </button>
+                        <button class="share-job-btn text-gray-400 hover:text-green-600" 
+                                data-job-id="${job.id}" 
+                                data-job-title="${job.job_title.replace(/"/g, '&quot;')}" 
+                                title="Copy Link to Share">
+                            <i class="fas fa-share-alt"></i>
+                        </button>
                         <button onclick="deleteJob(${job.id})" class="text-gray-400 hover:text-red-600" title="Delete">
                             <i class="fas fa-trash"></i>
                         </button>
@@ -114,15 +120,64 @@ async function loadJobs() {
             `;
             tbody.appendChild(row);
         });
+        
+        // Add event delegation for share buttons (remove old listener first to prevent duplicates)
+        const oldListener = tbody._shareClickListener;
+        if (oldListener) {
+            tbody.removeEventListener('click', oldListener);
+        }
+        
+        const shareClickListener = function(e) {
+            const shareBtn = e.target.closest('.share-job-btn');
+            if (shareBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const jobId = shareBtn.dataset.jobId;
+                const jobTitle = shareBtn.dataset.jobTitle;
+                copyJobLink(jobId, jobTitle);
+            }
+        };
+        
+        tbody.addEventListener('click', shareClickListener);
+        tbody._shareClickListener = shareClickListener;
+        
     } catch (error) {
         tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-red-500">Failed to load jobs.</td></tr>';
         console.error(error);
     }
 }
 
-
-
-
+// Copy job link for sharing
+function copyJobLink(jobId, jobTitle) {
+    console.log('Copying job link for:', jobId, jobTitle);
+    
+    // Generate the shareable link using current location path
+    // Get the base path from current URL (e.g., /FinalResearch - Copy or /FinalResearch%20-%20Copy)
+    const currentPath = window.location.pathname;
+    const basePath = currentPath.substring(0, currentPath.lastIndexOf('/admin'));
+    const baseUrl = window.location.origin + basePath;
+    const jobLink = `${baseUrl}/user/user.php?job_id=${jobId}`;
+    
+    console.log('Current path:', currentPath);
+    console.log('Base path:', basePath);
+    console.log('Generated link:', jobLink);
+    
+    // Copy to clipboard
+    navigator.clipboard.writeText(jobLink).then(() => {
+        console.log('Link copied successfully');
+        showToast(`Link copied! Share "${jobTitle}" on social media`, 'success');
+    }).catch(err => {
+        console.log('Clipboard API failed, using fallback:', err);
+        // Fallback for older browsers
+        const tempInput = document.createElement('input');
+        tempInput.value = jobLink;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+        showToast(`Link copied! Share "${jobTitle}" on social media`, 'success');
+    });
+}
 
 // Users array - will be loaded from database
 let users = [];
@@ -230,7 +285,7 @@ function showSection(sectionName) {
 // Load Applicants
 async function loadApplicants() {
     const tbody = document.getElementById('applicantsTableBody');
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4">Loading...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4">Loading...</td></tr>';
 
     try {
         const response = await fetch('gets_applicants.php');
@@ -244,11 +299,11 @@ async function loadApplicants() {
         // Update status counts
         updateStatusCounts();
         
-        // Display applicants based on current filter
-        displayFilteredApplicants(currentStatusFilter);
+        // Display applicants with current filters
+        displayFilteredApplicants();
         
     } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-red-500">Failed to load applicants.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-red-500">Failed to load applicants.</td></tr>';
         console.error('Error loading applicants:', error);
     }
 }
@@ -468,7 +523,40 @@ function openCreateUserModal() {
         preview.innerHTML = '<i class="fas fa-user text-gray-400 text-4xl"></i>';
     }
     
+    // Hide department field by default
+    toggleDepartmentField('create', '');
+    
     modal.classList.remove('hidden');
+}
+
+// Toggle department field visibility based on role
+function toggleDepartmentField(formType, role) {
+    const container = document.getElementById(formType + 'DepartmentContainer');
+    const departmentSelect = document.getElementById(formType + 'UserDepartment');
+    const requiredSpan = document.getElementById(formType + 'DeptRequired');
+    
+    if (!container) return;
+    
+    if (role === 'Department Head') {
+        // Show department field for Department Head
+        container.style.display = 'block';
+        if (departmentSelect) {
+            departmentSelect.required = true;
+        }
+        if (requiredSpan) {
+            requiredSpan.style.display = 'inline';
+        }
+    } else {
+        // Hide department field for Admin and Secretary
+        container.style.display = 'none';
+        if (departmentSelect) {
+            departmentSelect.required = false;
+            departmentSelect.value = 'General'; // Set default value for non-department roles
+        }
+        if (requiredSpan) {
+            requiredSpan.style.display = 'none';
+        }
+    }
 }
 
 function closeCreateUserModal() {
@@ -572,12 +660,25 @@ async function createUser(event) {
     const formData = new FormData(event.target);
     
     // Validate required fields on client side
-    if (!formData.get('name') || !formData.get('email') || 
-        !formData.get('role') || !formData.get('department')) {
+    const role = formData.get('role');
+    if (!formData.get('name') || !formData.get('email') || !role) {
         showToast('Please fill in all required fields', 'error');
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
         return;
+    }
+    
+    // Only require department for Department Head role
+    if (role === 'Department Head' && !formData.get('department')) {
+        showToast('Please select a department for Department Head role', 'error');
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+        return;
+    }
+    
+    // Set default department for Admin and Secretary
+    if (role !== 'Department Head') {
+        formData.set('department', 'General');
     }
     
     // Add dummy password (API will generate its own temporary password)
@@ -706,6 +807,21 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    
+    // Role change listeners for department field visibility
+    const createRoleSelect = document.getElementById('createUserRole');
+    if (createRoleSelect) {
+        createRoleSelect.addEventListener('change', function(e) {
+            toggleDepartmentField('create', e.target.value);
+        });
+    }
+    
+    const editRoleSelect = document.getElementById('editUserRole');
+    if (editRoleSelect) {
+        editRoleSelect.addEventListener('change', function(e) {
+            toggleDepartmentField('edit', e.target.value);
+        });
+    }
 });
 
 // Utility functions
@@ -740,6 +856,7 @@ function getRoleColor(role) {
         case 'Admin': return 'bg-red-100 text-red-800';
         case 'HR Manager': return 'bg-purple-100 text-purple-800';
         case 'Department Head': return 'bg-blue-100 text-blue-800';
+        case 'Secretary': return 'bg-green-100 text-green-800';
         default: return 'bg-gray-100 text-gray-800';
     }
 }
@@ -749,6 +866,7 @@ function getRoleIcon(role) {
         case 'Admin': return '<i class="fas fa-shield-alt text-red-500"></i>';
         case 'HR Manager': return '<i class="fas fa-shield text-purple-500"></i>';
         case 'Department Head': return '<i class="fas fa-shield text-blue-500"></i>';
+        case 'Secretary': return '<i class="fas fa-user-tie text-green-500"></i>';
         default: return '<i class="fas fa-user text-gray-500"></i>';
     }
 }
@@ -1094,6 +1212,9 @@ async function editUser(id) {
         deptSelect.value = user.department;
         statusSelect.value = user.status;
         
+        // Toggle department field visibility based on role
+        toggleDepartmentField('edit', user.role);
+        
         // Show profile picture
         const preview = document.getElementById('editProfilePreview');
         if (user.profile_picture) {
@@ -1179,8 +1300,9 @@ async function updateUser(event) {
     const password = document.getElementById('editUserPassword').value;
     const phone = document.getElementById('editUserPhone').value;
     const role = document.getElementById('editUserRole').value;
-    const department = document.getElementById('editUserDepartment').value;
+    let department = document.getElementById('editUserDepartment').value;
     const status = document.getElementById('editUserStatus').value;
+    const fileInput = document.getElementById('editProfilePictureInput');
     
     console.log('UPDATE USER - User ID:', userId);
     console.log('Global backup ID:', currentEditingUserId);
@@ -1192,74 +1314,98 @@ async function updateUser(event) {
         return;
     }
     
-    if (!name || !email || !role || !department) {
+    if (!name || !email || !role) {
         showToast('Please fill in all required fields', 'error');
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
         return;
     }
     
-    // Create JSON data object
-    const userData = {
-        id: userId,
-        name: name,
-        email: email,
-        role: role,
-        department: department,
-        status: status
-    };
+    // Only require department for Department Head role
+    if (role === 'Department Head' && !department) {
+        showToast('Please select a department for Department Head role', 'error');
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+        return;
+    }
     
-    if (password) userData.password = password;
-    if (phone) userData.phone = phone;
-    
-    console.log('Sending update data:', userData);
+    // Set default department for Admin and Secretary
+    if (role !== 'Department Head') {
+        department = 'General';
+    }
     
     try {
-        const response = await fetch('api/users.php', {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(userData)
-        });
+        // Check if profile picture is included
+        const hasProfilePicture = fileInput.files.length > 0;
         
-        const result = await response.json();
-        
-        console.log('Update result:', result);
-        
-        if (result.success) {
-            // Check if there's a new profile picture to upload
-            const fileInput = document.getElementById('editProfilePictureInput');
-            if (fileInput.files.length > 0) {
-                console.log('Uploading profile picture...');
-                
-                // Upload profile picture separately
-                const picFormData = new FormData();
-                picFormData.append('user_id', userId);
-                picFormData.append('profile_picture', fileInput.files[0]);
-                
-                const picResponse = await fetch('api/update_profile_picture.php', {
-                    method: 'POST',
-                    body: picFormData
-                });
-                
-                const picResult = await picResponse.json();
-                if (picResult.success) {
-                    console.log('Profile picture uploaded successfully');
-                } else {
-                    console.error('Profile picture upload failed:', picResult.message);
-                }
-            }
+        if (hasProfilePicture) {
+            // Use FormData when profile picture is included
+            const formData = new FormData();
+            formData.append('user_id', userId);
+            formData.append('name', name);
+            formData.append('email', email);
+            formData.append('role', role);
+            formData.append('department', department);
+            formData.append('status', status);
+            if (password) formData.append('password', password);
+            if (phone) formData.append('phone', phone);
+            formData.append('profile_picture', fileInput.files[0]);
             
-            if (result.affected_rows === 0 && fileInput.files.length === 0) {
-                showToast('No changes detected (data was the same)', 'warning');
+            console.log('Sending update with FormData (includes profile picture)');
+            
+            const response = await fetch('api/users.php', {
+                method: 'PUT',
+                body: formData
+            });
+            
+            const result = await response.json();
+            console.log('Update result:', result);
+            
+            if (result.success) {
+                showToast(result.message || 'User updated successfully!', 'success');
+                closeEditUserModal();
+                loadUsers();
             } else {
-                showToast('User updated successfully!', 'success');
+                showToast(result.message || 'Failed to update user', 'error');
             }
-            closeEditUserModal();
-            loadUsers();
         } else {
-            showToast(result.message || 'Failed to update user', 'error');
+            // Use JSON when no profile picture
+            const userData = {
+                id: userId,
+                name: name,
+                email: email,
+                role: role,
+                department: department,
+                status: status
+            };
+            
+            if (password) userData.password = password;
+            if (phone) userData.phone = phone;
+            
+            console.log('Sending update with JSON (no profile picture)');
+            
+            const response = await fetch('api/users.php', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(userData)
+            });
+            
+            const result = await response.json();
+            console.log('Update result:', result);
+            
+            if (result.success) {
+                if (result.affected_rows === 0) {
+                    showToast('No changes detected (data was the same)', 'warning');
+                } else {
+                    showToast('User updated successfully!', 'success');
+                }
+                closeEditUserModal();
+                loadUsers();
+            } else {
+                showToast(result.message || 'Failed to update user', 'error');
+            }
         }
     } catch (error) {
         console.error('Error:', error);
@@ -1319,9 +1465,11 @@ function closeJobTypeSelectionModal() {
 }
 
 function openCreateJobModal(jobType) {
-    // Set the job type in the job creation modal
-    document.querySelector('input[name="title"]').value = jobType; // Set the job title to the selected job type
-    closeJobTypeSelectionModal(); // Close the job type selection modal
+    // Job title is now set to "Instructor" by default in the HTML (readonly)
+    // Location is set to "Norzagaray College" by default in the HTML (readonly)
+    if (jobType) {
+        closeJobTypeSelectionModal(); // Close the job type selection modal if it was open
+    }
     document.getElementById('createJobModal').classList.remove('hidden'); // Open the job creation modal
 }
 
@@ -1932,6 +2080,7 @@ function getStatusBadge(status) {
 // Update action buttons visibility based on applicant status
 function updateActionButtons(status, applicant = null) {
     const scheduleBtn = document.getElementById('scheduleBtn');
+    const transferBtn = document.getElementById('transferToDeptHeadBtn');
     const approveInterviewBtn = document.getElementById('approveInterviewBtn');
     const rescheduleInterviewBtn = document.getElementById('rescheduleInterviewBtn');
     const scheduleDemoBtn = document.getElementById('scheduleDemoBtn');
@@ -1947,25 +2096,156 @@ function updateActionButtons(status, applicant = null) {
         applicant = currentApplicantData;
     }
     
+    // Get workflow stage from applicant data
+    const workflowStage = applicant ? applicant.workflow_stage : null;
+    
     // Hide all buttons first
     if (scheduleBtn) scheduleBtn.classList.add('hidden');
+    if (transferBtn) transferBtn.classList.add('hidden');
     if (approveInterviewBtn) approveInterviewBtn.classList.add('hidden');
     if (rescheduleInterviewBtn) rescheduleInterviewBtn.classList.add('hidden');
     if (scheduleDemoBtn) scheduleDemoBtn.classList.add('hidden');
     if (approveDemoBtn) approveDemoBtn.classList.add('hidden');
     if (rescheduleDemoBtn) rescheduleDemoBtn.classList.add('hidden');
     if (hireBtn) hireBtn.classList.add('hidden');
-    if (permanentHireBtn) permanentHireBtn.classList.add('hidden');
     if (resubmitBtn) resubmitBtn.classList.add('hidden');
     if (rejectBtn) rejectBtn.classList.add('hidden');
+    
+    // Remove any existing transfer info message and psych indicator
+    const existingTransferInfo = document.querySelector('.transfer-info');
+    if (existingTransferInfo) {
+        existingTransferInfo.remove();
+    }
+    const existingPsychIndicator = document.querySelector('.psych-indicator');
+    if (existingPsychIndicator) {
+        existingPsychIndicator.remove();
+    }
     
     // Check if psychological exam receipt has been uploaded
     const hasPsychReceipt = applicant && applicant.psych_exam_receipt;
     
+    // SECRETARY ACTIONS: Transfer, Request Resubmission, Reject
+    if (workflowStage === 'secretary_review') {
+        if (transferBtn) transferBtn.classList.remove('hidden');
+        if (resubmitBtn) resubmitBtn.classList.remove('hidden');
+        if (rejectBtn) rejectBtn.classList.remove('hidden');
+        return; // Exit early for secretary
+    }
+    
+    // SECRETARY VIEW-ONLY: Application already transferred
+    // Secretary can see it but cannot take actions
+    if (typeof CURRENT_ADMIN_ROLE !== 'undefined' && CURRENT_ADMIN_ROLE === 'Secretary') {
+        if (workflowStage && (workflowStage.startsWith('department_head') || 
+            workflowStage === 'interview_scheduled' || workflowStage === 'interview_completed' ||
+            workflowStage === 'demo_scheduled' || workflowStage === 'demo_completed' ||
+            workflowStage === 'hired' || workflowStage === 'initially_hired')) {
+            // Show info message for Secretary viewing transferred application
+            const actionButtonsContainer = document.getElementById('actionButtons');
+            if (actionButtonsContainer && !actionButtonsContainer.querySelector('.transfer-info')) {
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'transfer-info bg-blue-50 border border-blue-200 rounded-lg p-4';
+                infoDiv.innerHTML = `
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                        <div>
+                            <h4 class="font-semibold text-blue-900 text-sm">Application Transferred</h4>
+                            <p class="text-xs text-blue-700 mt-1">
+                                This application has been transferred to the Department Head. 
+                                You can view the progress but cannot make changes.
+                            </p>
+                        </div>
+                    </div>
+                `;
+                actionButtonsContainer.prepend(infoDiv);
+            }
+            return; // Exit - no action buttons for transferred applications
+        }
+    }
+    
+    // DEPARTMENT HEAD ACTIONS: Schedule Interview (NO Request Resubmission)
+    if (workflowStage === 'department_head_review') {
+        if (scheduleBtn) scheduleBtn.classList.remove('hidden');
+        if (rejectBtn) rejectBtn.classList.remove('hidden');
+        // Note: NO resubmitBtn for Department Head
+        return; // Exit early
+    }
+    
+    // INTERVIEW SCHEDULED: Approve or Reschedule
+    if (workflowStage === 'interview_scheduled') {
+        if (approveInterviewBtn) approveInterviewBtn.classList.remove('hidden');
+        if (rescheduleInterviewBtn) rescheduleInterviewBtn.classList.remove('hidden');
+        if (rejectBtn) rejectBtn.classList.remove('hidden');
+        return;
+    }
+    
+    // INTERVIEW COMPLETED: Schedule Demo
+    if (workflowStage === 'interview_completed') {
+        if (scheduleDemoBtn) scheduleDemoBtn.classList.remove('hidden');
+        if (rejectBtn) rejectBtn.classList.remove('hidden');
+        return;
+    }
+    
+    // DEMO SCHEDULED: Approve or Reschedule Demo
+    if (workflowStage === 'demo_scheduled') {
+        if (approveDemoBtn) approveDemoBtn.classList.remove('hidden');
+        if (rescheduleDemoBtn) rescheduleDemoBtn.classList.remove('hidden');
+        if (rejectBtn) rejectBtn.classList.remove('hidden');
+        return;
+    }
+    
+    // DEMO COMPLETED: Show hire button and psych exam indicator
+    if (workflowStage === 'demo_completed') {
+        const actionButtonsContainer = document.getElementById('actionButtons');
+        
+        // Show hire button (may be disabled if no psych receipt)
+        if (hireBtn) {
+            hireBtn.classList.remove('hidden');
+            
+            // If no psych receipt, disable and show warning
+            if (!hasPsychReceipt) {
+                hireBtn.disabled = true;
+                hireBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                hireBtn.title = 'Waiting for psychological exam receipt';
+                
+                // Add yellow indicator message
+                if (actionButtonsContainer && !actionButtonsContainer.querySelector('.psych-indicator')) {
+                    const indicatorDiv = document.createElement('div');
+                    indicatorDiv.className = 'psych-indicator bg-yellow-50 border border-yellow-300 rounded-lg p-4 mb-3';
+                    indicatorDiv.innerHTML = `
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-hourglass-half text-yellow-600 mt-1"></i>
+                            <div>
+                                <h4 class="font-semibold text-yellow-900 text-sm">Waiting for Psychological Exam Receipt</h4>
+                                <p class="text-xs text-yellow-700 mt-1">
+                                    The applicant needs to take the psychological examination and upload the receipt before you can proceed with hiring.
+                                </p>
+                            </div>
+                        </div>
+                    `;
+                    actionButtonsContainer.prepend(indicatorDiv);
+                }
+            } else {
+                // Has receipt, enable button
+                hireBtn.disabled = false;
+                hireBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                hireBtn.title = '';
+            }
+        }
+        
+        if (rejectBtn) rejectBtn.classList.remove('hidden');
+        return;
+    }
+    
+    // HIRED: No more actions needed
+    if (workflowStage === 'hired') {
+        return; // No buttons for completed applications
+    }
+    
+    // Continue with status-based logic for backward compatibility
     switch(status) {
         case 'Pending':
         case 'Resubmission Required':
-            // Show all buttons except hire
+            // For backward compatibility if workflow_stage not set
             if (scheduleBtn) scheduleBtn.classList.remove('hidden');
             if (resubmitBtn) resubmitBtn.classList.remove('hidden');
             if (rejectBtn) rejectBtn.classList.remove('hidden');
@@ -2109,6 +2389,18 @@ function closeRejectModal() {
     document.getElementById('rejectModal').classList.add('hidden');
     document.getElementById('rejectModal').classList.remove('flex');
     document.getElementById('rejectForm').reset();
+}
+
+// Transfer to Department Head Modal Functions
+function openTransferModal() {
+    document.getElementById('transferModal').classList.remove('hidden');
+    document.getElementById('transferModal').classList.add('flex');
+}
+
+function closeTransferModal() {
+    document.getElementById('transferModal').classList.add('hidden');
+    document.getElementById('transferModal').classList.remove('flex');
+    document.getElementById('transferForm').reset();
 }
 
 function openHireModal() {
@@ -2276,6 +2568,8 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('applicant_id', currentApplicantId);
             formData.append('interview_date', dateValue);
             formData.append('interview_time', timeValue);
+            formData.append('interview_location', document.getElementById('interviewLocation').value);
+            formData.append('interview_room', document.getElementById('interviewRoom').value);
             formData.append('interview_notes', document.getElementById('interviewNotes').value);
             
             // Map actions to status names
@@ -2444,6 +2738,45 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error rejecting application:', error);
             showToast('Failed to reject application', 'error');
         }
+        });
+    });
+    
+    // Transfer to Department Head Form
+    document.getElementById('transferForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // Prevent duplicate submissions
+        preventDuplicateSubmission(async () => {
+            const formData = new FormData();
+            formData.append('action', 'transfer_to_dept_head');
+            formData.append('application_id', currentApplicantId);
+            formData.append('notes', document.getElementById('transferNotes').value);
+            
+            try {
+                const response = await fetch('api/secretary_actions.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    closeTransferModal();
+                    showToast('Application transferred to Department Head successfully!', 'success');
+                    
+                    // Refresh the current applicant details to show new status
+                    // and update the applicants list
+                    setTimeout(() => {
+                        viewApplicantDetails(currentApplicantId);
+                        loadApplicants(); // Update the list in background
+                    }, 500);
+                } else {
+                    showToast('Error transferring application: ' + result.message, 'error');
+                }
+            } catch (error) {
+                console.error('Error transferring application:', error);
+                showToast('Failed to transfer application', 'error');
+            }
         });
     });
     
@@ -2819,6 +3152,8 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('applicant_id', currentApplicantId);
             formData.append('interview_date', dateValue);
             formData.append('interview_time', timeValue);
+            formData.append('interview_location', document.getElementById('rescheduleInterviewLocation').value);
+            formData.append('interview_room', document.getElementById('rescheduleInterviewRoom').value);
             formData.append('interview_notes', reasonValue);
             
             try {
@@ -2907,6 +3242,8 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('applicant_id', currentApplicantId);
             formData.append('demo_date', dateValue);
             formData.append('demo_time', timeValue);
+            formData.append('demo_location', document.getElementById('rescheduleDemoLocation').value);
+            formData.append('demo_room', document.getElementById('rescheduleDemoRoom').value);
             formData.append('demo_notes', reasonValue);
             
             try {
@@ -3051,9 +3388,53 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Global variables for applicant filtering
 let currentStatusFilter = 'all';
+let currentNameSearch = '';
+let currentFromDate = '';
+let currentToDate = '';
 let allApplicantsData = [];
 
-// Filter applicants by status
+// Apply all filters combined
+function applyAllFilters() {
+    // Get filter values
+    const nameSearch = document.getElementById('nameSearch')?.value || '';
+    const statusFilter = document.getElementById('statusFilter')?.value || 'all';
+    const fromDate = document.getElementById('fromDate')?.value || '';
+    const toDate = document.getElementById('toDate')?.value || '';
+    
+    // Update current filter values
+    currentNameSearch = nameSearch.toLowerCase();
+    currentStatusFilter = statusFilter;
+    currentFromDate = fromDate;
+    currentToDate = toDate;
+    
+    // Apply filters
+    displayFilteredApplicants();
+}
+
+// Clear all filters
+function clearAllFilters() {
+    // Reset input values
+    const nameSearch = document.getElementById('nameSearch');
+    const statusFilter = document.getElementById('statusFilter');
+    const fromDate = document.getElementById('fromDate');
+    const toDate = document.getElementById('toDate');
+    
+    if (nameSearch) nameSearch.value = '';
+    if (statusFilter) statusFilter.value = 'all';
+    if (fromDate) fromDate.value = '';
+    if (toDate) toDate.value = '';
+    
+    // Reset filter variables
+    currentNameSearch = '';
+    currentStatusFilter = 'all';
+    currentFromDate = '';
+    currentToDate = '';
+    
+    // Refresh display
+    displayFilteredApplicants();
+}
+
+// Filter applicants by status (legacy function, now calls applyAllFilters)
 function filterApplicantsByStatus(status) {
     currentStatusFilter = status;
     
@@ -3063,27 +3444,57 @@ function filterApplicantsByStatus(status) {
         statusFilter.value = status;
     }
     
-    // Filter and display applicants
-    displayFilteredApplicants(status);
+    // Apply all filters
+    applyAllFilters();
 }
 
-// Display filtered applicants
-function displayFilteredApplicants(status) {
+// Display filtered applicants with all filters applied
+function displayFilteredApplicants() {
     const tbody = document.getElementById('applicantsTableBody');
     
     if (!allApplicantsData || allApplicantsData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">No applicants found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">No applicants found</td></tr>';
         return;
     }
     
     let filteredApplicants = allApplicantsData;
     
-    if (status !== 'all') {
-        filteredApplicants = allApplicantsData.filter(applicant => applicant.status === status);
+    // Apply status filter
+    if (currentStatusFilter !== 'all') {
+        filteredApplicants = filteredApplicants.filter(applicant => applicant.status === currentStatusFilter);
+    }
+    
+    // Apply name search filter
+    if (currentNameSearch) {
+        filteredApplicants = filteredApplicants.filter(applicant => 
+            applicant.full_name.toLowerCase().includes(currentNameSearch)
+        );
+    }
+    
+    // Apply date range filter
+    if (currentFromDate || currentToDate) {
+        filteredApplicants = filteredApplicants.filter(applicant => {
+            const appliedDate = new Date(applicant.applied_date);
+            let matchesDateRange = true;
+            
+            if (currentFromDate) {
+                const fromDate = new Date(currentFromDate);
+                matchesDateRange = matchesDateRange && appliedDate >= fromDate;
+            }
+            
+            if (currentToDate) {
+                const toDate = new Date(currentToDate);
+                // Set toDate to end of day to include the entire day
+                toDate.setHours(23, 59, 59, 999);
+                matchesDateRange = matchesDateRange && appliedDate <= toDate;
+            }
+            
+            return matchesDateRange;
+        });
     }
     
     if (filteredApplicants.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-gray-500">No ${status === 'all' ? '' : status.toLowerCase()} applicants found</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-gray-500">No applicants found matching your filters</td></tr>`;
         return;
     }
     
@@ -3093,6 +3504,22 @@ function displayFilteredApplicants(status) {
             : `<div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
                  <span class="text-blue-600 font-semibold text-sm">${getInitials(applicant.full_name)}</span>
                </div>`;
+        
+        // Department badge with color coding
+        let departmentBadge = '';
+        if (applicant.assigned_to_department) {
+            let deptColor = 'bg-gray-100 text-gray-800';
+            if (applicant.assigned_to_department === 'Computer Science') {
+                deptColor = 'bg-blue-100 text-blue-800';
+            } else if (applicant.assigned_to_department === 'Education') {
+                deptColor = 'bg-green-100 text-green-800';
+            } else if (applicant.assigned_to_department === 'Hospitality Management') {
+                deptColor = 'bg-purple-100 text-purple-800';
+            }
+            departmentBadge = `<span class="px-2 py-1 text-xs font-semibold rounded-full ${deptColor}">${applicant.assigned_to_department}</span>`;
+        } else {
+            departmentBadge = '<span class="text-gray-400 text-sm italic">Not assigned</span>';
+        }
         
         return `
         <tr class="hover:bg-gray-50 cursor-pointer" onclick="viewApplicantDetails(${applicant.id})">
@@ -3106,6 +3533,7 @@ function displayFilteredApplicants(status) {
                 </div>
             </td>
             <td class="px-6 py-4 text-gray-900">${applicant.position}</td>
+            <td class="px-6 py-4">${departmentBadge}</td>
             <td class="px-6 py-4 text-gray-500">${formatDate(applicant.applied_date)}</td>
             <td class="px-6 py-4">
                 <span class="px-2 py-1 text-xs font-semibold rounded-full ${getApplicantStatusColor(applicant.status)}">

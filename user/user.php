@@ -7,6 +7,10 @@ if (!isset($_SESSION['user_id']) && !isset($_SESSION['user_email'])) {
     if (isset($_GET['view'])) {
         $_SESSION['redirect_after_login'] = 'user.php?view=' . $_GET['view'];
     }
+    // Save job_id if coming from shared link
+    if (isset($_GET['job_id'])) {
+        $_SESSION['redirect_after_login'] = 'user.php?job_id=' . intval($_GET['job_id']);
+    }
     // Redirect to homepage with login prompt
     header('Location: ../index.php');
     exit();
@@ -61,13 +65,14 @@ $user_work_experience = [];
 $user_skills = [];
 $user_address = '';
 
-if (!$is_ajax_request) {
-    echo "<!-- Debug Session: " . print_r($_SESSION, true) . " -->";
-}
+// Debug output disabled to prevent JSON parse errors
+// if (!$is_ajax_request) {
+//     echo "<!-- Debug Session: " . print_r($_SESSION, true) . " -->";
+// }
 
 if (isset($_SESSION['user_id'])) {
     $profile_user_id = $_SESSION['user_id'];
-    if (!$is_ajax_request) echo "<!-- Debug: Looking for user ID: " . $profile_user_id . " -->";
+    // if (!$is_ajax_request) echo "<!-- Debug: Looking for user ID: " . $profile_user_id . " -->";
     
     // First try users table
     $profile_stmt = $conn->prepare("SELECT first_name, last_name, email, phone FROM users WHERE id = ?");
@@ -75,25 +80,25 @@ if (isset($_SESSION['user_id'])) {
     $profile_stmt->execute();
     $profile_result = $profile_stmt->get_result();
     
-    if (!$is_ajax_request) echo "<!-- Debug: Found " . $profile_result->num_rows . " rows in users table -->";
+    // if (!$is_ajax_request) echo "<!-- Debug: Found " . $profile_result->num_rows . " rows in users table -->";
     
     if ($profile_result->num_rows === 1) {
         $user_profile_data = $profile_result->fetch_assoc();
-        if (!$is_ajax_request) echo "<!-- Debug User Data from users table: " . print_r($user_profile_data, true) . " -->";
+        // if (!$is_ajax_request) echo "<!-- Debug User Data from users table: " . print_r($user_profile_data, true) . " -->";
     } else {
-        if (!$is_ajax_request) echo "<!-- Debug: No user found in users table, trying applicants table -->";
+        // if (!$is_ajax_request) echo "<!-- Debug: No user found in users table, trying applicants table -->";
         // Try applicants table as fallback
         $profile_stmt2 = $conn->prepare("SELECT first_name, last_name, applicant_email as email, contact_number as phone, profile_picture, address FROM applicants WHERE id = ?");
         $profile_stmt2->bind_param("i", $profile_user_id);
         $profile_stmt2->execute();
         $profile_result2 = $profile_stmt2->get_result();
         
-        if (!$is_ajax_request) echo "<!-- Debug: Found " . $profile_result2->num_rows . " rows in applicants table -->";
+        // if (!$is_ajax_request) echo "<!-- Debug: Found " . $profile_result2->num_rows . " rows in applicants table -->";
         
         if ($profile_result2->num_rows === 1) {
             $user_profile_data = $profile_result2->fetch_assoc();
             $user_address = $user_profile_data['address'] ?? '';
-            if (!$is_ajax_request) echo "<!-- Debug User Data from applicants table: " . print_r($user_profile_data, true) . " -->";
+            // if (!$is_ajax_request) echo "<!-- Debug User Data from applicants table: " . print_r($user_profile_data, true) . " -->";
         }
         $profile_stmt2->close();
     }
@@ -108,9 +113,9 @@ if (isset($_SESSION['user_id'])) {
     while ($exp = $exp_result->fetch_assoc()) {
         $user_work_experience[] = $exp;
     }
-    if (!$is_ajax_request && !empty($user_work_experience)) {
-        echo "<!-- Debug Work Experience: " . print_r($user_work_experience, true) . " -->";
-    }
+    // if (!$is_ajax_request && !empty($user_work_experience)) {
+    //     echo "<!-- Debug Work Experience: " . print_r($user_work_experience, true) . " -->";
+    // }
     $exp_stmt->close();
     
     // Fetch ALL education entries
@@ -122,9 +127,9 @@ if (isset($_SESSION['user_id'])) {
     while ($edu = $edu_result->fetch_assoc()) {
         $user_education[] = $edu;
     }
-    if (!$is_ajax_request && !empty($user_education)) {
-        echo "<!-- Debug Education: " . print_r($user_education, true) . " -->";
-    }
+    // if (!$is_ajax_request && !empty($user_education)) {
+    //     echo "<!-- Debug Education: " . print_r($user_education, true) . " -->";
+    // }
     $edu_stmt->close();
     
     // Fetch skills
@@ -138,11 +143,11 @@ if (isset($_SESSION['user_id'])) {
     }
     if (!empty($skills_array)) {
         $user_skills = implode(", ", $skills_array);
-        if (!$is_ajax_request) echo "<!-- Debug Skills: " . $user_skills . " -->";
+        // if (!$is_ajax_request) echo "<!-- Debug Skills: " . $user_skills . " -->";
     }
     $skills_stmt->close();
 } else {
-    if (!$is_ajax_request) echo "<!-- Debug: No user_id in session -->";
+    // if (!$is_ajax_request) echo "<!-- Debug: No user_id in session -->";
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])) {
@@ -159,13 +164,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         }
         ob_start();
         
+        // Set error handler for AJAX to return JSON
+        set_error_handler(function($errno, $errstr, $errfile, $errline) {
+            while (ob_get_level()) ob_end_clean();
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => "PHP Error: $errstr in $errfile on line $errline"]);
+            exit();
+        });
+        
+        // Set exception handler for AJAX
+        set_exception_handler(function($exception) {
+            while (ob_get_level()) ob_end_clean();
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => 'Exception: ' . $exception->getMessage()]);
+            exit();
+        });
+        
         error_log("AJAX SUBMIT DETECTED - Output buffering started");
     }
 
     $uploadDir = __DIR__ . "/uploads/";
     if (!is_dir($uploadDir)) {
         if (!mkdir($uploadDir, 0777, true)) {
-            $_SESSION['application_error'] = "Failed to create upload directory. Please contact administrator.";
+            $error_msg = "Failed to create upload directory. Please contact administrator.";
+            
+            if ($is_ajax_submit) {
+                while (ob_get_level()) ob_end_clean();
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => $error_msg]);
+                exit();
+            }
+            
+            $_SESSION['application_error'] = $error_msg;
             header("Location: " . $_SERVER['PHP_SELF']);
             exit();
         }
@@ -176,10 +206,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
     
     // Validate that user is logged in
     if (!$user_id) {
-        $_SESSION['application_error'] = 'User not logged in properly. Please log in again.';
+        $error_msg = 'User not logged in properly. Please log in again.';
+        
+        if ($is_ajax_submit) {
+            while (ob_get_level()) ob_end_clean();
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => $error_msg]);
+            exit();
+        }
+        
+        $_SESSION['application_error'] = $error_msg;
         header("Location: " . $_SERVER['PHP_SELF']);
         exit();
     }
+    
+    // Check if user is banned from applying
+    $ban_check_stmt = $conn->prepare("SELECT rejection_ban_until, ban_reason, banned_by 
+                                      FROM applicants 
+                                      WHERE id = ? AND rejection_ban_until IS NOT NULL");
+    $ban_check_stmt->bind_param("i", $user_id);
+    $ban_check_stmt->execute();
+    $ban_result = $ban_check_stmt->get_result();
+    
+    if ($ban_result->num_rows > 0) {
+        $ban_data = $ban_result->fetch_assoc();
+        $ban_until = $ban_data['rejection_ban_until'];
+        $ban_reason = $ban_data['ban_reason'];
+        $banned_by = $ban_data['banned_by'];
+        
+        // Check if ban is still active
+        $ban_expiry_timestamp = strtotime($ban_until);
+        $current_timestamp = time();
+        
+        if ($current_timestamp < $ban_expiry_timestamp) {
+            // Ban is still active
+            $ban_expires_formatted = date('F j, Y \\a\\t g:i A', $ban_expiry_timestamp);
+            $days_remaining = ceil(($ban_expiry_timestamp - $current_timestamp) / (60 * 60 * 24));
+            
+            $error_msg = "You are currently unable to submit new applications. Your application ban expires on $ban_expires_formatted ($days_remaining days remaining). Reason: $ban_reason";
+            
+            if ($is_ajax_submit) {
+                while (ob_get_level()) ob_end_clean();
+                header('Content-Type: application/json');
+                echo json_encode([
+                    'success' => false, 
+                    'error' => $error_msg,
+                    'banned' => true,
+                    'ban_until' => $ban_expires_formatted,
+                    'days_remaining' => $days_remaining
+                ]);
+                exit();
+            }
+            
+            $_SESSION['application_error'] = $error_msg;
+            header("Location: " . $_SERVER['PHP_SELF']);
+            exit();
+        } else {
+            // Ban has expired, clear it
+            $clear_ban_stmt = $conn->prepare("UPDATE applicants 
+                                              SET rejection_ban_until = NULL, 
+                                                  ban_reason = NULL, 
+                                                  banned_by = NULL 
+                                              WHERE id = ?");
+            $clear_ban_stmt->bind_param("i", $user_id);
+            $clear_ban_stmt->execute();
+            $clear_ban_stmt->close();
+        }
+    }
+    $ban_check_stmt->close();
     
     // Get user data from users table for form population
     $user_stmt = $conn->prepare("SELECT first_name, last_name, email, phone FROM users WHERE id = ?");
@@ -276,9 +370,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
     $application_letter = uploadFile('applicationLetter', $uploadDir);
     error_log("Application Letter upload result: " . ($application_letter ?? 'NULL'));
     if (!$application_letter) {
-        if ($draft_docs && $draft_docs['application_letter']) {
+        // Only use draft if explicitly loaded (existing_ hidden input present)
+        if (isset($_POST['existing_applicationLetter']) && !empty($_POST['existing_applicationLetter']) && $draft_docs && $draft_docs['application_letter']) {
             $application_letter = copyDraftFile($draft_docs['application_letter'], $user_id, $uploadDir);
-            error_log("Application Letter from draft: " . ($application_letter ?? 'NULL'));
+            error_log("Application Letter from explicitly loaded draft: " . ($application_letter ?? 'NULL'));
         }
         if (!$application_letter && isset($_FILES['applicationLetter']) && !empty($_FILES['applicationLetter']['name'])) {
             $upload_errors[] = 'Application Letter upload failed';
@@ -289,9 +384,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
     $resume = uploadFile('resume_file', $uploadDir);
     error_log("Resume upload result: " . ($resume ?? 'NULL'));
     if (!$resume) {
-        if ($draft_docs && $draft_docs['resume']) {
+        // Only use draft if explicitly loaded (existing_ hidden input present)
+        if (isset($_POST['existing_resume_file']) && !empty($_POST['existing_resume_file']) && $draft_docs && $draft_docs['resume']) {
             $resume = copyDraftFile($draft_docs['resume'], $user_id, $uploadDir);
-            error_log("Resume from draft: " . ($resume ?? 'NULL'));
+            error_log("Resume from explicitly loaded draft: " . ($resume ?? 'NULL'));
         }
         if (!$resume && isset($_FILES['resume_file']) && !empty($_FILES['resume_file']['name'])) {
             $upload_errors[] = 'Resume upload failed';
@@ -300,27 +396,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
     }
     
     $tor = uploadFile('transcript', $uploadDir);
-    if (!$tor && $draft_docs && $draft_docs['tor']) {
+    // Only use draft if explicitly loaded
+    if (!$tor && isset($_POST['existing_transcript']) && !empty($_POST['existing_transcript']) && $draft_docs && $draft_docs['tor']) {
         $tor = copyDraftFile($draft_docs['tor'], $user_id, $uploadDir);
     }
     
     $diploma = uploadFile('diploma', $uploadDir);
-    if (!$diploma && $draft_docs && $draft_docs['diploma']) {
+    // Only use draft if explicitly loaded
+    if (!$diploma && isset($_POST['existing_diploma']) && !empty($_POST['existing_diploma']) && $draft_docs && $draft_docs['diploma']) {
         $diploma = copyDraftFile($draft_docs['diploma'], $user_id, $uploadDir);
     }
     
+    // Professional License is OPTIONAL
     $professional_license = uploadFile('license', $uploadDir);
-    if (!$professional_license && $draft_docs && $draft_docs['professional_license']) {
+    // Only use draft if explicitly loaded
+    if (!$professional_license && isset($_POST['existing_license']) && !empty($_POST['existing_license']) && $draft_docs && $draft_docs['professional_license']) {
         $professional_license = copyDraftFile($draft_docs['professional_license'], $user_id, $uploadDir);
     }
     
     $coe = uploadFile('coe', $uploadDir);
-    if (!$coe && $draft_docs && $draft_docs['coe']) {
+    // Only use draft if explicitly loaded
+    if (!$coe && isset($_POST['existing_coe']) && !empty($_POST['existing_coe']) && $draft_docs && $draft_docs['coe']) {
         $coe = copyDraftFile($draft_docs['coe'], $user_id, $uploadDir);
     }
     
     $seminars_trainings = uploadFile('certificates', $uploadDir, true);
-    if (!$seminars_trainings && $draft_docs && $draft_docs['seminars_trainings']) {
+    // Only use draft if explicitly loaded (note: checking 'existing_certificates' without brackets)
+    if (!$seminars_trainings && isset($_POST['existing_certificates']) && !empty($_POST['existing_certificates']) && $draft_docs && $draft_docs['seminars_trainings']) {
         // Handle multiple certificates from draft
         $draftCerts = explode(',', $draft_docs['seminars_trainings']);
         $copiedCerts = [];
@@ -333,51 +435,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         }
     }
     
+    // Masteral Certificate is OPTIONAL
     $masteral_cert = uploadFile('masteral_cert', $uploadDir);
-    if (!$masteral_cert && $draft_docs && $draft_docs['masteral_cert']) {
+    // Only use draft if explicitly loaded
+    if (!$masteral_cert && isset($_POST['existing_masteral_cert']) && !empty($_POST['existing_masteral_cert']) && $draft_docs && $draft_docs['masteral_cert']) {
         $masteral_cert = copyDraftFile($draft_docs['masteral_cert'], $user_id, $uploadDir);
     }
     
     $letter_of_intent = uploadFile('letter_of_intent', $uploadDir);
     error_log("Letter of Intent upload result: " . ($letter_of_intent ?? 'NULL'));
-    if (!$letter_of_intent && $draft_docs && isset($draft_docs['letter_of_intent'])) {
-        error_log("Trying to copy letter_of_intent from draft: " . $draft_docs['letter_of_intent']);
+    // Only use draft if explicitly loaded
+    if (!$letter_of_intent && isset($_POST['existing_letter_of_intent']) && !empty($_POST['existing_letter_of_intent']) && $draft_docs && isset($draft_docs['letter_of_intent'])) {
+        error_log("Trying to copy letter_of_intent from explicitly loaded draft: " . $draft_docs['letter_of_intent']);
         $letter_of_intent = copyDraftFile($draft_docs['letter_of_intent'], $user_id, $uploadDir);
         error_log("Letter of Intent from draft copy result: " . ($letter_of_intent ?? 'NULL'));
-    } else {
-        error_log("Letter of Intent - draft_docs exists: " . ($draft_docs ? 'YES' : 'NO'));
-        if ($draft_docs && isset($draft_docs['letter_of_intent'])) {
-            error_log("  letter_of_intent value in draft: " . $draft_docs['letter_of_intent']);
+    }
+    
+    // Check if this is a resubmission BEFORE validating
+    $is_resubmission = isset($_POST['is_resubmission']) && $_POST['is_resubmission'] == '1';
+    
+    // Skip validation for resubmission - we'll validate after merging with existing files
+    if (!$is_resubmission) {
+        // Check if required files were uploaded or available from draft (NEW APPLICATION ONLY)
+        if (!$application_letter) {
+            $upload_errors[] = 'Application Letter is required';
+        }
+        if (!$resume) {
+            $upload_errors[] = 'Resume is required';
+        }
+        if (!$tor) {
+            $upload_errors[] = 'Transcript of Records is required';
+        }
+        if (!$diploma) {
+            $upload_errors[] = 'Diploma is required';
+        }
+        if (!$coe) {
+            $upload_errors[] = 'Certificate of Employment is required';
+        }
+        if (!$seminars_trainings) {
+            $upload_errors[] = 'Seminar/Training Certificates are required';
+        }
+        if (!$letter_of_intent) {
+            $upload_errors[] = 'Letter of Intent is required';
         }
     }
     
-    // Check if required files were uploaded or available from draft
-    if (!$application_letter) {
-        $upload_errors[] = 'Application Letter is required';
-    }
-    if (!$resume) {
-        $upload_errors[] = 'Resume is required';
-    }
-    if (!$tor) {
-        $upload_errors[] = 'Transcript of Records is required';
-    }
-    if (!$diploma) {
-        $upload_errors[] = 'Diploma is required';
-    }
-    if (!$coe) {
-        $upload_errors[] = 'Certificate of Employment is required';
-    }
-    if (!$seminars_trainings) {
-        $upload_errors[] = 'Seminar/Training Certificates are required';
-    }
-    if (!$letter_of_intent) {
-        $upload_errors[] = 'Letter of Intent is required';
-    }
-    
-    if (!empty($upload_errors)) {
-        $_SESSION['application_error'] = implode('. ', $upload_errors) . '. Please upload all required documents or save them as draft first.';
-        header("Location: " . $_SERVER['PHP_SELF']);
-        exit();
+    if (!empty($upload_errors) && !$is_resubmission) {
+        $error_message = implode('. ', $upload_errors) . '. Please upload all required documents or save them as draft first.';
+        
+        // Check if this is an AJAX request
+        $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+                   strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
+        $is_ajax = $is_ajax || (isset($_POST['ajax_submit']) && $_POST['ajax_submit'] == '1');
+        
+        if ($is_ajax) {
+            // Clear output buffers
+            while (ob_get_level()) {
+                ob_end_clean();
+            }
+            
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => false,
+                'error' => $error_message,
+                'message' => $error_message
+            ]);
+            exit();
+        } else {
+            // Regular form - set session and redirect
+            $_SESSION['application_error'] = $error_message;
+            header("Location: " . $_SERVER['PHP_SELF']);
+            exit();
+        }
     }
     
     // Get applicant data
@@ -406,6 +535,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         header("Location: " . $_SERVER['PHP_SELF']);
         exit();
     }
+    
+    // Fetch job department for application routing
+    $job_department = null;
+    $job_dept_stmt = $conn->prepare("SELECT department_role FROM job WHERE id = ?");
+    if ($job_dept_stmt) {
+        $job_dept_stmt->bind_param("i", $job_id);
+        $job_dept_stmt->execute();
+        $job_dept_result = $job_dept_stmt->get_result();
+        if ($job_dept_row = $job_dept_result->fetch_assoc()) {
+            $job_department = $job_dept_row['department_role'];
+        }
+        $job_dept_stmt->close();
+    }
+    
+    // Debug logging for department assignment
+    error_log("=== DEPARTMENT ASSIGNMENT DEBUG ===");
+    error_log("Job ID: " . $job_id);
+    error_log("Job Department Retrieved: " . ($job_department ?? "NULL"));
+    error_log("===================================");
 
     // New form values with validation
     $full_name = $_POST['full_name'] ?? $applicant_name;
@@ -589,16 +737,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         
     } else {
         // NEW APPLICATION - Insert into job_applicants table
+        // Applications now go to Secretary first for document review
+        $workflow_stage = 'secretary_review';
         $stmt = $conn->prepare("INSERT INTO job_applicants 
-            (applicant_name, position, applied_date, status, full_name, applicant_email, contact_num, user_id, job_id, 
+            (applicant_name, position, applied_date, status, workflow_stage, full_name, applicant_email, contact_num, user_id, job_id, assigned_to_department,
              application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, letter_of_intent) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         
         // Files are already filenames (not full paths) from uploadFile function
-        // Types: s=string, i=integer
-        $stmt->bind_param("sssssssissssssssss", 
-            $applicant_name, $position, $applied_date, $status, $full_name, $applicant_email, $contact_num, 
-            $user_id, $job_id, $application_letter, $resume, $tor, $diploma, 
+        // Types: s=string, i=integer (20 params: 8s + 2i + 1s + 9s = 18s + 2i)
+        // FIXED: assigned_to_department is STRING not integer!
+        $stmt->bind_param("ssssssssiissssssssss", 
+            $applicant_name, $position, $applied_date, $status, $workflow_stage, $full_name, $applicant_email, $contact_num, 
+            $user_id, $job_id, $job_department, $application_letter, $resume, $tor, $diploma, 
             $professional_license, $coe, $seminars_trainings, $masteral_cert, $letter_of_intent);
 
         if ($stmt->execute()) {
@@ -680,14 +831,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
 }
 ?>
 
-
-<html lang="en">
 <head><script src="https://static.readdy.ai/static/e.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NCHire - Job Opportunities</title>
-<link rel="icon" type="image/png" href="../assets/images/image-removebg-preview (1).png">
-<link rel="shortcut icon" type="image/png" href="../assets/images/image-removebg-preview (1).png">
+<link rel="icon" type="image/png" href="../public/assets/images/image-removebg-preview (1).png">
+<link rel="shortcut icon" type="image/png" href="../public/assets/images/image-removebg-preview (1).png">
 <script src="https://cdn.tailwindcss.com/3.4.16"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -789,7 +938,209 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 <?php endif; ?>
-<header class="bg-primary text-white">
+
+<!-- Ban Status Checker -->
+<script>
+// Global ban data for access across functions
+window.userBanData = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if user is banned from applying
+    fetch('check_ban_status.php')
+        .then(response => response.json())
+        .then(data => {
+            if (data.banned) {
+                // Store ban data globally
+                window.userBanData = data;
+                // User is banned - DON'T show banner, only show modal on button click
+                // showBanWarning(data); // REMOVED - no banner shown
+                // Intercept Apply button clicks (keep buttons enabled)
+                interceptApplyButtons(data);
+            }
+        })
+        .catch(error => {
+            console.error('Error checking ban status:', error);
+        });
+});
+
+function showBanWarning(banData) {
+    const banBanner = document.createElement('div');
+    banBanner.id = 'banWarningBanner';
+    banBanner.className = 'bg-red-50 border-l-4 border-red-500 p-6 mb-6 shadow-md';
+    banBanner.innerHTML = `
+        <div class='flex items-start'>
+            <div class='flex-shrink-0'>
+                <i class='ri-error-warning-fill text-red-500 text-3xl'></i>
+            </div>
+            <div class='ml-4 flex-1'>
+                <h3 class='text-lg font-bold text-red-800 mb-2'>Application Temporarily Restricted</h3>
+                <div class='text-red-700 space-y-2'>
+                    <p><strong>You are currently unable to submit new job applications.</strong></p>
+                    <p>Your restriction expires on <strong>${banData.ban_until_formatted}</strong></p>
+                    <p class='text-sm'>
+                        <i class='ri-time-line'></i> Time remaining: <strong>${banData.days_remaining} days</strong> (approximately ${banData.hours_remaining} hours)
+                    </p>
+                    <div class='mt-3 p-3 bg-white rounded border border-red-200'>
+                        <p class='text-sm'><strong>Reason:</strong> ${banData.ban_reason || 'No reason provided'}</p>
+                        ${banData.banned_by ? `<p class='text-sm mt-1'><strong>Issued by:</strong> ${banData.banned_by}</p>` : ''}
+                    </div>
+                    <p class='text-sm mt-3 text-red-600'>
+                        <i class='ri-information-line'></i> After the restriction expires, you will be able to apply for positions again.
+                    </p>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Insert after header
+    const header = document.querySelector('header');
+    if (header && header.nextSibling) {
+        header.parentNode.insertBefore(banBanner, header.nextSibling);
+    } else if (header) {
+        header.parentNode.appendChild(banBanner);
+    }
+}
+
+function interceptApplyButtons(banData) {
+    // Keep buttons enabled but intercept clicks
+    const applyButtons = document.querySelectorAll('.apply-btn, button[data-job-id]');
+    applyButtons.forEach(button => {
+        if (button.textContent.includes('Apply Now') || button.textContent.includes('Apply')) {
+            // Remove any existing click handlers and add our interceptor
+            const newButton = button.cloneNode(true);
+            button.parentNode.replaceChild(newButton, button);
+            
+            newButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                showRejectionModal(banData);
+                return false;
+            }, true);
+        }
+    });
+    
+    // Also check for dynamically loaded buttons
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            mutation.addedNodes.forEach(function(node) {
+                if (node.nodeType === 1) { // Element node
+                    const buttons = node.querySelectorAll ? node.querySelectorAll('.apply-btn, button[data-job-id]') : [];
+                    buttons.forEach(button => {
+                        if (button.textContent.includes('Apply Now') || button.textContent.includes('Apply')) {
+                            const newButton = button.cloneNode(true);
+                            button.parentNode.replaceChild(newButton, button);
+                            
+                            newButton.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                showRejectionModal(banData);
+                                return false;
+                            }, true);
+                        }
+                    });
+                }
+            });
+        });
+    });
+    
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+}
+
+function showRejectionModal(banData) {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('rejectionModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'rejectionModal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden';
+        modal.innerHTML = `
+            <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 transform transition-all">
+                <div class="p-6">
+                    <!-- Icon -->
+                    <div class="flex justify-center mb-4">
+                        <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                            <i class="ri-error-warning-line text-red-600 text-4xl"></i>
+                        </div>
+                    </div>
+                    
+                    <!-- Title -->
+                    <h3 class="text-2xl font-bold text-center text-gray-900 mb-2">
+                        Application Restricted
+                    </h3>
+                    
+                    <!-- Message -->
+                    <div class="text-center mb-6">
+                        <p class="text-gray-700 mb-4">
+                            You are temporarily restricted from submitting new applications.
+                        </p>
+                        
+                        <!-- Details Box -->
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-left space-y-3">
+                            <div>
+                                <p class="text-sm font-semibold text-red-900">Restriction Expires:</p>
+                                <p class="text-sm text-red-700" id="modalBanExpiry"></p>
+                            </div>
+                            
+                            <div>
+                                <p class="text-sm font-semibold text-red-900">Time Remaining:</p>
+                                <p class="text-sm text-red-700" id="modalTimeRemaining"></p>
+                            </div>
+                            
+                            <div>
+                                <p class="text-sm font-semibold text-red-900">Reason:</p>
+                                <p class="text-sm text-red-700" id="modalBanReason"></p>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                            <p class="text-sm text-blue-800">
+                                <i class="ri-information-line"></i>
+                                You will be able to apply for new positions after the restriction period expires.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Close Button -->
+                    <button onclick="closeRejectionModal()" 
+                            class="w-full px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold">
+                        I Understand
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+    
+    // Update modal content with ban data
+    document.getElementById('modalBanExpiry').textContent = banData.ban_until_formatted;
+    document.getElementById('modalTimeRemaining').textContent = `${banData.days_remaining} days (approximately ${banData.hours_remaining} hours)`;
+    document.getElementById('modalBanReason').textContent = banData.ban_reason || 'No specific reason provided';
+    
+    // Show modal with animation
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        modal.querySelector('.bg-white').classList.add('scale-100');
+    }, 10);
+    
+    // Close on background click
+    modal.onclick = function(e) {
+        if (e.target === modal) {
+            closeRejectionModal();
+        }
+    };
+}
+
+function closeRejectionModal() {
+    const modal = document.getElementById('rejectionModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+</script>
+<header class="bg-primary text-white sticky top-0 z-50 shadow-md">
 <div class="px-6 py-4">
 <div class="flex items-center justify-between">
 <div class="flex items-center space-x-8">
@@ -1148,11 +1499,11 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                             <div class="grid md:grid-cols-2 gap-4">
                                 <div>
                                     <label class="block text-sm text-gray-700 mb-1">First Name <span class="text-red-500">*</span></label>
-                                    <input type="text" id="pf_first_name" class="w-full border border-gray-300 rounded-lg p-3" required>
+                                    <input type="text" id="pf_first_name" class="w-full border border-gray-300 rounded-lg p-3" pattern="[A-Za-z\s\-']+" title="Please enter only letters, spaces, hyphens, and apostrophes" required>
                                 </div>
                                 <div>
                                     <label class="block text-sm text-gray-700 mb-1">Last Name <span class="text-red-500">*</span></label>
-                                    <input type="text" id="pf_last_name" class="w-full border border-gray-300 rounded-lg p-3" required>
+                                    <input type="text" id="pf_last_name" class="w-full border border-gray-300 rounded-lg p-3" pattern="[A-Za-z\s\-']+" title="Please enter only letters, spaces, hyphens, and apostrophes" required>
                                 </div>
                             </div>
                             <div class="grid md:grid-cols-2 gap-4">
@@ -1250,7 +1601,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                     <h2 class="text-lg font-bold text-gray-900 mb-2">Submit Requirements</h2>
                     <p class="text-gray-600 mb-4">Upload your required documents. Accepted formats: PDF, DOC, DOCX, JPG, PNG. Maximum size: 5MB per file.</p>
                     
-                    <form id="requirementsForm" class="space-y-4" method="POST" enctype="multipart/form-data">
+                    <form id="requirementsForm" class="space-y-4" method="POST" enctype="multipart/form-data" novalidate>
                         <input type="hidden" name="submit_application" value="1">
                         <input type="hidden" name="ajax_submit" value="1">
                         <input type="hidden" name="job_id" id="rf_job_id">
@@ -1258,6 +1609,23 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                         <input type="hidden" name="full_name" id="rf_full_name">
                         <input type="hidden" name="email" id="rf_email">
                         <input type="hidden" name="cellphone" id="rf_cellphone">
+
+                        <!-- Load Draft Button -->
+                        <div id="loadDraftSection" class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-lg p-4 mb-4">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <i class="ri-file-list-3-line text-blue-600 text-2xl"></i>
+                                    <div>
+                                        <h4 class="font-semibold text-gray-900">Have saved documents?</h4>
+                                        <p class="text-sm text-gray-600">Load your previously saved documents to save time</p>
+                                    </div>
+                                </div>
+                                <button type="button" id="loadDraftBtn" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2 shadow-md">
+                                    <i class="ri-download-cloud-line"></i>
+                                    Load Saved Documents
+                                </button>
+                            </div>
+                        </div>
 
                         <!-- Document Requirements -->
                         <div class="bg-white rounded-lg border border-gray-200 shadow-sm">
@@ -1272,6 +1640,22 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                             </div>
                             
                             <div class="p-4 space-y-4">
+                                <!-- File Requirements Notice -->
+                                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                    <div class="flex items-start">
+                                        <i class="ri-information-line text-amber-600 text-base mr-2 mt-0.5"></i>
+                                        <div class="text-sm text-amber-800">
+                                            <p class="font-semibold mb-1">File Requirements:</p>
+                                            <ul class="list-disc list-inside space-y-0.5 text-xs">
+                                                <li>Accepted formats: PDF, DOC, DOCX, JPG, PNG</li>
+                                                <li>Maximum file size: 5MB per file</li>
+                                                <li>Files marked with <span class="text-red-500">*</span> are required</li>
+                                                <li>Ensure documents are clear and readable</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                                
                                 <!-- Primary Documents -->
                                 <div class="grid md:grid-cols-2 gap-6">
                                     <div class="space-y-2">
@@ -1381,22 +1765,6 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                                                    class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
                                         </div>
                                         <p class="text-xs text-gray-500 mt-1">If you have a master's degree, upload your certificate here.</p>
-                                    </div>
-                                </div>
-
-                                <!-- File Requirements Notice -->
-                                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-3">
-                                    <div class="flex items-start">
-                                        <i class="ri-information-line text-amber-600 text-base mr-2 mt-0.5"></i>
-                                        <div class="text-sm text-amber-800">
-                                            <p class="font-semibold mb-1">File Requirements:</p>
-                                            <ul class="list-disc list-inside space-y-0.5 text-xs">
-                                                <li>Accepted formats: PDF, DOC, DOCX, JPG, PNG</li>
-                                                <li>Maximum file size: 5MB per file</li>
-                                                <li>Files marked with <span class="text-red-500">*</span> are required</li>
-                                                <li>Ensure documents are clear and readable</li>
-                                            </ul>
-                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1773,6 +2141,38 @@ document.addEventListener('DOMContentLoaded', function() {
   const pf_phone = document.getElementById('pf_phone');
   const pf_address = document.getElementById('pf_address');
 
+  // Prevent numbers from being entered in first name and last name fields
+  function preventNumbersInNameFields(event) {
+    const char = event.key;
+    // Allow navigation keys, backspace, delete, tab
+    if (event.ctrlKey || event.metaKey || 
+        ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(char)) {
+        return;
+    }
+    // Block if character is a number
+    if (/[0-9]/.test(char)) {
+        event.preventDefault();
+        showToast('Numbers are not allowed in name fields', 'warning', 2000);
+    }
+  }
+  
+  // Add real-time validation for name fields in personal information
+  if (pf_first) {
+    pf_first.addEventListener('keydown', preventNumbersInNameFields);
+    // Also prevent pasted numbers
+    pf_first.addEventListener('input', function(e) {
+      this.value = this.value.replace(/[0-9]/g, '');
+    });
+  }
+  
+  if (pf_last) {
+    pf_last.addEventListener('keydown', preventNumbersInNameFields);
+    // Also prevent pasted numbers
+    pf_last.addEventListener('input', function(e) {
+      this.value = this.value.replace(/[0-9]/g, '');
+    });
+  }
+
   const wx_job = document.getElementById('wx_job_title');
   const wx_comp = document.getElementById('wx_company');
   const wx_loc = document.getElementById('wx_location');
@@ -1879,10 +2279,29 @@ document.addEventListener('DOMContentLoaded', function() {
       console.error(`✗ Step ${n} element not found!`);
     }
     
-    // When navigating to Step 2, restore file indicators if application data exists OR load draft
+    // When navigating to Step 2, restore file indicators if application data exists
+    // Draft loading is now manual via "Load Saved Documents" button
     if (n === 2) {
-      // Check if we should load draft (no current application data)
-      if (!window.currentApplicationData && !window._draftLoadAttempted) {
+      // Check if any files are already uploaded and hide the Load Saved Documents button
+      setTimeout(() => {
+        const fileInputs = document.querySelectorAll('#step2 input[type="file"]');
+        let hasUploadedFiles = false;
+        fileInputs.forEach(input => {
+          if (input.files && input.files.length > 0) {
+            hasUploadedFiles = true;
+          }
+        });
+        
+        if (hasUploadedFiles) {
+          const loadDraftSection = document.getElementById('loadDraftSection');
+          if (loadDraftSection) {
+            loadDraftSection.style.display = 'none';
+          }
+        }
+      }, 100);
+      
+      // Check if we should load draft (DISABLED - now manual via button)
+      if (false && !window.currentApplicationData && !window._draftLoadAttempted) {
         console.log('📥 No application data - attempting to load saved draft...');
         window._draftLoadAttempted = true;
         
@@ -1932,14 +2351,28 @@ document.addEventListener('DOMContentLoaded', function() {
                         filenames = [filenames];
                       }
                       
-                      // Hide original file input
+                      // Remove any existing file upload indicator (showing uploaded file)
+                      const existingIndicator = container.querySelector('.file-upload-indicator');
+                      if (existingIndicator) {
+                        existingIndicator.remove();
+                      }
+                      
+                      // Clear any currently selected file and hide the input
+                      input.value = ''; // Clear the file input
                       input.style.display = 'none';
                       input.removeAttribute('required');
+                      
+                      // Hide the container's border and padding to remove upload box appearance
+                      container.style.border = 'none';
+                      container.style.padding = '0';
+                      container.style.background = 'transparent';
                       
                       // Create a hidden input to preserve draft filename for future saves
                       const hiddenInput = document.createElement('input');
                       hiddenInput.type = 'hidden';
-                      hiddenInput.name = `existing_${inputInfo.name}`;
+                      // Remove brackets from name for proper POST handling
+                      const fieldName3 = inputInfo.name.replace('[]', '');
+                      hiddenInput.name = `existing_${fieldName3}`;
                       hiddenInput.value = data.draft[dbField];
                       hiddenInput.className = 'existing-draft-input';
                       container.appendChild(hiddenInput);
@@ -1950,14 +2383,14 @@ document.addEventListener('DOMContentLoaded', function() {
                       draftDisplay.innerHTML = `
                         <div class="bg-green-50 border-2 border-green-400 rounded-lg p-3">
                           <div class="flex items-start gap-3">
-                            <i class="ri-checkbox-circle-fill text-green-600 text-2xl"></i>
-                            <div class="flex-1">
+                            <i class="ri-checkbox-circle-fill text-green-600 text-2xl flex-shrink-0"></i>
+                            <div class="flex-1 min-w-0">
                               <div class="font-semibold text-green-900 text-sm">Saved Draft - Ready to Use</div>
                               ${filenames.map(filename => {
                                 const displayName = filename.replace(/^draft_\d+_\d+_/, '');
                                 return `<div class="text-sm text-green-700 mt-1 flex items-center gap-1">
-                                  <i class="ri-file-text-fill"></i>
-                                  <span>${displayName}</span>
+                                  <i class="ri-file-text-fill flex-shrink-0"></i>
+                                  <span class="break-all">${displayName}</span>
                                 </div>`;
                               }).join('')}
                               <div class="mt-2 text-xs text-green-600">
@@ -1966,7 +2399,7 @@ document.addEventListener('DOMContentLoaded', function() {
                               </div>
                             </div>
                             <button type="button" 
-                                    class="remove-draft-btn text-red-500 hover:text-red-700 hover:bg-red-50 rounded p-1 transition-colors"
+                                    class="remove-draft-btn text-red-500 hover:text-red-700 hover:bg-red-50 rounded p-1 transition-colors flex-shrink-0"
                                     data-field="${dbField}"
                                     title="Remove and upload new file">
                               <i class="ri-close-circle-fill text-2xl"></i>
@@ -2001,6 +2434,13 @@ document.addEventListener('DOMContentLoaded', function() {
                   const hiddenInput = container.querySelector('.existing-draft-input');
                   if (hiddenInput) {
                     hiddenInput.remove();
+                  }
+                  
+                  // Restore container styling
+                  if (container) {
+                    container.style.border = '';
+                    container.style.padding = '';
+                    container.style.background = '';
                   }
                   
                   // Show file input again
@@ -2095,6 +2535,8 @@ document.addEventListener('DOMContentLoaded', function() {
               ${interviewDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               at ${interviewDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
             </p>
+            ${app.interview_location ? `<p class="text-sm text-gray-700 mt-1"><i class="ri-map-pin-line mr-1"></i>${app.interview_location}</p>` : ''}
+            ${app.interview_room ? `<p class="text-sm text-gray-700 mt-1"><i class="ri-door-open-line mr-1"></i>${app.interview_room}</p>` : ''}
             ${app.interview_notes ? `<p class="text-sm text-gray-600 mt-2">${app.interview_notes}</p>` : ''}
           `;
           const detailsElement = document.getElementById('interview_details');
@@ -2258,6 +2700,8 @@ document.addEventListener('DOMContentLoaded', function() {
               ${demoDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               at ${demoDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
             </p>
+            ${app.demo_location ? `<p class="text-sm text-gray-700 mt-1"><i class="ri-map-pin-line mr-1"></i>${app.demo_location}</p>` : ''}
+            ${app.demo_room ? `<p class="text-sm text-gray-700 mt-1"><i class="ri-door-open-line mr-1"></i>${app.demo_room}</p>` : ''}
             ${app.demo_notes ? `<p class="text-sm text-gray-600 mt-2">${app.demo_notes}</p>` : ''}
           `;
           if (detailsElement) {
@@ -2790,54 +3234,145 @@ document.addEventListener('DOMContentLoaded', function() {
       if (pf_phone) pf_phone.value = app.contact_num || '';
       if (pf_address) pf_address.value = app.address || '';
       
-      console.log('✅ Step 1 personal info populated:', {
-        first_name: app.first_name,
-        last_name: app.last_name,
-        email: app.applicant_email,
-        phone: app.contact_num,
-        address: app.address
-      });
+      console.log('✅ Step 1 personal info populated');
       
-      // Show wizard in view mode FIRST
+      // Parse resubmission documents if status is "Resubmission Required"
+      let resubmissionDocs = [];
+      if (app.status === 'Resubmission Required' && app.resubmission_documents) {
+        console.log('📋 Resubmission required - parsing documents:', app.resubmission_documents);
+        try {
+          if (Array.isArray(app.resubmission_documents)) {
+            resubmissionDocs = app.resubmission_documents;
+          } else {
+            resubmissionDocs = JSON.parse(app.resubmission_documents);
+          }
+        } catch (e) {
+          console.log('⚠️ JSON parse failed, trying CSV format...');
+          resubmissionDocs = app.resubmission_documents.split(',').map(doc => doc.trim());
+        }
+        console.log('✅ Parsed resubmission docs:', resubmissionDocs);
+        globalResubmissionDocs = resubmissionDocs;
+        window.globalResubmissionDocs = resubmissionDocs;
+        window.currentResubmissionDocs = resubmissionDocs;
+      }
+      
+      // Show wizard in view mode
       showWizard(true);
       setStep(workflowStep);
       
-      // THEN display work experience, skills, and education after wizard is visible
-      // Use setTimeout to ensure DOM is ready
+      // ✅ POPULATE STEP 2 form fields (for resubmission or viewing)
+      console.log('📝 Populating Step 2 with job info...');
       setTimeout(() => {
-        // Display data from API response
-        console.log('📝 Displaying application data from API...');
+        const rf_job_id = document.getElementById('rf_job_id');
+        const rf_job_title = document.getElementById('rf_job_title');
+        const rf_full_name = document.getElementById('rf_full_name');
+        const rf_email = document.getElementById('rf_email');
+        const rf_cellphone = document.getElementById('rf_cellphone');
+        
+        if (rf_job_id) rf_job_id.value = app.job_id || '';
+        if (rf_job_title) rf_job_title.value = app.position || '';
+        if (rf_full_name) rf_full_name.value = app.full_name || '';
+        if (rf_email) rf_email.value = app.applicant_email || '';
+        if (rf_cellphone) rf_cellphone.value = app.contact_num || '';
+        
+        console.log('✅ Step 2 job info populated - job_id:', app.job_id);
+      }, 200);
+      
+      // Display work experience, skills, and education
+      setTimeout(() => {
         displayWorkExperienceFromData(data.work_experience || []);
         displaySkillsFromData(data.skills || []);
         displayEducationFromData(data.education || []);
       }, 300);
       
-      // ✅ POPULATE STEP 2 form fields (for resubmission or viewing)
-      console.log('📝 Populating Step 2 with job info...');
-      const rf_job_id = document.getElementById('rf_job_id');
-      const rf_job_title = document.getElementById('rf_job_title');
-      const rf_full_name = document.getElementById('rf_full_name');
-      const rf_email = document.getElementById('rf_email');
-      const rf_cellphone = document.getElementById('rf_cellphone');
+      // Show resubmission notice and enable file inputs if applicable
+      if (app.status === 'Resubmission Required' && resubmissionDocs.length > 0) {
+        setTimeout(() => {
+          const step2 = document.getElementById('step2');
+          if (step2 && !step2.querySelector('.resubmission-notice')) {
+            const docLabels = {
+              'application_letter': 'Application Letter',
+              'resume': 'Resume',
+              'letter_of_intent': 'Letter of Intent',
+              'tor': 'Transcript of Records (TOR)',
+              'diploma': 'Diploma',
+              'professional_license': 'Professional License',
+              'coe': 'Certificate of Employment',
+              'seminars_trainings': 'Seminars/Training Certificates',
+              'masteral_cert': 'Masteral Certificate'
+            };
+            
+            const requestedDocsList = resubmissionDocs.map(doc => 
+              `<li class="flex items-center"><i class="ri-file-text-line mr-2 text-orange-600"></i>${docLabels[doc] || doc}</li>`
+            ).join('');
+            
+            const notice = document.createElement('div');
+            notice.className = 'resubmission-notice mb-6 p-5 bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-400 rounded-xl shadow-md';
+            notice.innerHTML = `
+              <div class="flex items-start">
+                <i class="ri-alert-line text-orange-600 text-2xl mr-4 mt-0.5"></i>
+                <div class="flex-1">
+                  <h3 class="font-bold text-orange-900 mb-2 text-lg">📋 Document Resubmission Required</h3>
+                  <p class="text-sm text-orange-800 mb-3">The admin has requested you to resubmit the following ${resubmissionDocs.length} document(s):</p>
+                  <ul class="space-y-1 text-sm text-orange-900 font-medium mb-3">
+                    ${requestedDocsList}
+                  </ul>
+                  ${app.resubmission_notes ? `
+                    <div class="mt-3 p-3 bg-white bg-opacity-60 rounded-lg border border-orange-300">
+                      <p class="text-xs text-orange-700 font-semibold mb-1">📝 Reason from Admin:</p>
+                      <p class="text-sm text-orange-800 italic">${app.resubmission_notes}</p>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            `;
+            const firstChild = step2.querySelector('h2');
+            if (firstChild) {
+              firstChild.parentNode.insertBefore(notice, firstChild.nextSibling);
+            }
+          }
+          
+          // Enable the submit button for resubmission
+          const submitBtn = step2.querySelector('button[type="submit"]');
+          if (submitBtn) {
+            submitBtn.style.display = 'flex';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Resubmit Files';
+            console.log('✅ Enabled submit button for resubmission');
+          }
+          
+          // Add resubmission hidden fields
+          const form = document.getElementById('requirementsForm');
+          if (form) {
+            let resubmitInput = form.querySelector('input[name="is_resubmission"]');
+            if (!resubmitInput) {
+              resubmitInput = document.createElement('input');
+              resubmitInput.type = 'hidden';
+              resubmitInput.name = 'is_resubmission';
+              resubmitInput.value = '1';
+              form.appendChild(resubmitInput);
+            }
+            
+            let appIdInput = form.querySelector('input[name="resubmit_application_id"]');
+            if (!appIdInput) {
+              appIdInput = document.createElement('input');
+              appIdInput.type = 'hidden';
+              appIdInput.name = 'resubmit_application_id';
+              appIdInput.value = app.application_id || app.id;
+              form.appendChild(appIdInput);
+            }
+            
+            console.log('✅ Added resubmission hidden fields');
+          }
+        }, 500);
+      }
       
-      if (rf_job_id) rf_job_id.value = app.job_id || '';
-      if (rf_job_title) rf_job_title.value = app.position || '';
-      if (rf_full_name) rf_full_name.value = app.full_name || '';
-      if (rf_email) rf_email.value = app.applicant_email || '';
-      if (rf_cellphone) rf_cellphone.value = app.contact_num || '';
-      
-      console.log('✅ Step 2 job info populated');
-      
-      // Add file indicators for uploaded documents
+      // Add file indicators (but skip resubmission documents)
       setTimeout(() => {
         if (typeof window.addFileIndicatorsForApplication === 'function') {
-          window.addFileIndicatorsForApplication(app);
-          console.log('✅ File indicators added');
+          window.addFileIndicatorsForApplication(app, resubmissionDocs);
         }
-      }, 400);
-      
-      // Clear retry counter on successful open
-      sessionStorage.removeItem('wizardOpenRetry');
+      }, 600);
       
       console.log('✅ Wizard opened successfully at step', workflowStep);
     } catch (error) {
@@ -3041,6 +3576,13 @@ document.addEventListener('DOMContentLoaded', function() {
   // Apply view mode restrictions (make everything readonly)
   function applyViewModeRestrictions() {
     console.log('Applying view mode restrictions...');
+    
+    // Hide the Load Saved Documents button in view mode
+    const loadDraftSection = document.getElementById('loadDraftSection');
+    if (loadDraftSection) {
+      loadDraftSection.style.display = 'none';
+      console.log('Load Saved Documents button hidden in view mode');
+    }
     
     // Make all form inputs readonly/disabled
     const wizard = document.getElementById('applicationWizard');
@@ -3952,6 +4494,210 @@ document.addEventListener('DOMContentLoaded', function() {
   // Step 2 actions - handle form submission with AJAX (no page reload)
   document.getElementById('backToStep1').addEventListener('click', () => setStep(1));
   
+  // Load Saved Documents button handler
+  document.getElementById('loadDraftBtn').addEventListener('click', async function() {
+    console.log('📥 Loading saved documents...');
+    
+    const btn = this;
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ri-loader-4-line animate-spin mr-2"></i>Loading...';
+    
+    try {
+      const response = await fetch('get_draft.php');
+      const data = await response.json();
+      
+      if (data.success && data.has_draft) {
+        console.log('✅ Draft found!', data.draft);
+        console.log('📋 Current user_id:', data.user_id);
+        
+        // Validate that all filenames belong to the current user
+        const validateFilename = (filename, userId) => {
+          if (!filename) return true; // Empty filenames are OK
+          // Check if filename contains the user_id pattern: draft_{user_id}_
+          const pattern = new RegExp(`^draft_${userId}_\\d+_`);
+          const isValid = pattern.test(filename);
+          if (!isValid) {
+            console.warn(`⚠️ Filename validation failed for: ${filename} (expected user_id: ${userId})`);
+          }
+          return isValid;
+        };
+        
+        // Validate all filenames before processing
+        let hasInvalidFiles = false;
+        for (const [field, value] of Object.entries(data.draft)) {
+          if (field !== 'updated_at' && value) {
+            // Handle comma-separated filenames for multiple files
+            const filenames = value.includes(',') ? value.split(',') : [value];
+            for (const filename of filenames) {
+              if (!validateFilename(filename, data.user_id)) {
+                hasInvalidFiles = true;
+                console.error(`❌ SECURITY ALERT: File "${filename}" does not belong to user ${data.user_id}`);
+              }
+            }
+          }
+        }
+        
+        // If any files fail validation, don't load the draft
+        if (hasInvalidFiles) {
+          showToast('Draft data validation failed. Please re-upload your documents for security.', 'error');
+          console.error('❌ Draft loading aborted due to filename validation failure');
+          return;
+        }
+        
+        // Hide the load draft section
+        document.getElementById('loadDraftSection').style.display = 'none';
+        
+        // Show notification that draft was loaded
+        const draftNotif = document.createElement('div');
+        draftNotif.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded shadow-md animate-fade-in z-[10001]';
+        draftNotif.innerHTML = `
+          <div class='flex items-center'>
+            <i class='ri-check-circle-line mr-2'></i>
+            <span>Saved documents loaded successfully! You can reuse them or upload new ones.</span>
+          </div>
+        `;
+        document.body.appendChild(draftNotif);
+        setTimeout(() => draftNotif.remove(), 5000);
+        
+        // Add visual indicators for saved documents
+        const docMap = {
+          'application_letter': { name: 'applicationLetter', label: 'Application Letter' },
+          'resume': { name: 'resume_file', label: 'Resume' },
+          'letter_of_intent': { name: 'letter_of_intent', label: 'Letter of Intent' },
+          'tor': { name: 'transcript', label: 'Transcript of Records' },
+          'diploma': { name: 'diploma', label: 'Diploma' },
+          'professional_license': { name: 'license', label: 'Professional License' },
+          'coe': { name: 'coe', label: 'Certificate of Employment' },
+          'seminars_trainings': { name: 'certificates[]', label: 'Seminars/Trainings' },
+          'masteral_cert': { name: 'masteral_cert', label: 'Masteral Certificate' }
+        };
+        
+        Object.keys(docMap).forEach(dbField => {
+          if (data.draft[dbField]) {
+            const inputInfo = docMap[dbField];
+            const input = document.querySelector(`input[name="${inputInfo.name}"], input[name="${inputInfo.name}[]"]`);
+            if (input) {
+              const container = input.closest('.border-dashed');
+              if (container) {
+                // Get filename from draft
+                let filenames = data.draft[dbField];
+                if (dbField === 'seminars_trainings') {
+                  filenames = filenames.split(',');
+                } else {
+                  filenames = [filenames];
+                }
+                
+                // Remove any existing file upload indicator (showing uploaded file)
+                const existingIndicator = container.querySelector('.file-upload-indicator');
+                if (existingIndicator) {
+                  existingIndicator.remove();
+                }
+                
+                // Clear any currently selected file and hide the input
+                input.value = ''; // Clear the file input
+                input.style.display = 'none';
+                input.removeAttribute('required');
+                
+                // Hide the container's border and padding to remove upload box appearance
+                container.style.border = 'none';
+                container.style.padding = '0';
+                container.style.background = 'transparent';
+                
+                // Create a hidden input to preserve draft filename
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                // Remove brackets from name for proper POST handling
+                const fieldName = inputInfo.name.replace('[]', '');
+                hiddenInput.name = `existing_${fieldName}`;
+                hiddenInput.value = data.draft[dbField];
+                hiddenInput.className = 'existing-draft-input';
+                container.appendChild(hiddenInput);
+                
+                // Create draft display
+                const draftDisplay = document.createElement('div');
+                draftDisplay.className = 'draft-file-display';
+                draftDisplay.innerHTML = `
+                  <div class="bg-green-50 border-2 border-green-400 rounded-lg p-3">
+                    <div class="flex items-start gap-3">
+                      <i class="ri-checkbox-circle-fill text-green-600 text-2xl flex-shrink-0"></i>
+                      <div class="flex-1 min-w-0">
+                        <div class="font-semibold text-green-900 text-sm">Saved Draft - Ready to Use</div>
+                        ${filenames.map(filename => {
+                          const displayName = filename.replace(/^draft_\d+_\d+_/, '');
+                          return `<div class="text-sm text-green-700 mt-1 flex items-center gap-1">
+                            <i class="ri-file-text-fill flex-shrink-0"></i>
+                            <span class="break-all">${displayName}</span>
+                          </div>`;
+                        }).join('')}
+                        <div class="mt-2 text-xs text-green-600">
+                          <i class="ri-information-line mr-1"></i>
+                          This file will be used automatically, or click X to upload a new one
+                        </div>
+                      </div>
+                      <button type="button" 
+                              class="remove-draft-btn text-red-500 hover:text-red-700 hover:bg-red-50 rounded p-1 transition-colors flex-shrink-0"
+                              data-field="${dbField}"
+                              title="Remove and upload new file">
+                        <i class="ri-close-circle-fill text-2xl"></i>
+                      </button>
+                    </div>
+                  </div>
+                `;
+                
+                container.insertBefore(draftDisplay, input);
+                input.setAttribute('data-draft-available', 'true');
+                input.setAttribute('data-draft-files', data.draft[dbField]);
+              }
+            }
+          }
+        });
+        
+        // Add event listeners for remove buttons
+        document.querySelectorAll('.remove-draft-btn').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const field = this.getAttribute('data-field');
+            const inputInfo = docMap[field];
+            const input = document.querySelector(`input[name="${inputInfo.name}"], input[name="${inputInfo.name}[]"]`);
+            const container = this.closest('.border-dashed');
+            
+            this.closest('.draft-file-display').remove();
+            const hiddenInput = container.querySelector('.existing-draft-input');
+            if (hiddenInput) hiddenInput.remove();
+            
+            // Restore container styling
+            if (container) {
+              container.style.border = '';
+              container.style.padding = '';
+              container.style.background = '';
+            }
+            
+            if (input) {
+              input.style.display = 'block';
+              // Only add required for non-optional fields
+              if (!['license', 'masteral_cert'].includes(field)) {
+                input.setAttribute('required', 'required');
+              }
+              input.removeAttribute('data-draft-available');
+              input.removeAttribute('data-draft-files');
+            }
+            
+            showToast('Draft removed. Please upload a new file.', 'warning');
+          });
+        });
+        
+      } else {
+        showToast('No saved documents found. Please upload your documents.', 'info');
+      }
+    } catch (error) {
+      console.error('❌ Error loading draft:', error);
+      showToast('Failed to load saved documents', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  });
+  
   // Save Draft button handler
   document.getElementById('saveDraftBtn').addEventListener('click', async function(e) {
     e.preventDefault();
@@ -4071,14 +4817,28 @@ document.addEventListener('DOMContentLoaded', function() {
                   filenames = [filenames];
                 }
                 
-                // Hide original file input
+                // Remove any existing file upload indicator (showing uploaded file)
+                const existingIndicator = container.querySelector('.file-upload-indicator');
+                if (existingIndicator) {
+                  existingIndicator.remove();
+                }
+                
+                // Clear any currently selected file and hide the input
+                input.value = ''; // Clear the file input
                 input.style.display = 'none';
                 input.removeAttribute('required');
+                
+                // Hide the container's border and padding to remove upload box appearance
+                container.style.border = 'none';
+                container.style.padding = '0';
+                container.style.background = 'transparent';
                 
                 // Create hidden input to preserve draft filename
                 const hiddenInput = document.createElement('input');
                 hiddenInput.type = 'hidden';
-                hiddenInput.name = `existing_${inputInfo.name}`;
+                // Remove brackets from name for proper POST handling
+                const fieldName2 = inputInfo.name.replace('[]', '');
+                hiddenInput.name = `existing_${fieldName2}`;
                 hiddenInput.value = data.draft[dbField];
                 hiddenInput.className = 'existing-draft-input';
                 container.appendChild(hiddenInput);
@@ -4089,14 +4849,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 draftDisplay.innerHTML = `
                   <div class="bg-green-50 border-2 border-green-400 rounded-lg p-3">
                     <div class="flex items-start gap-3">
-                      <i class="ri-checkbox-circle-fill text-green-600 text-2xl"></i>
-                      <div class="flex-1">
+                      <i class="ri-checkbox-circle-fill text-green-600 text-2xl flex-shrink-0"></i>
+                      <div class="flex-1 min-w-0">
                         <div class="font-semibold text-green-900 text-sm">Saved Draft - Ready to Use</div>
                         ${filenames.map(filename => {
                           const displayName = filename.replace(/^draft_\d+_\d+_/, '');
                           return `<div class="text-sm text-green-700 mt-1 flex items-center gap-1">
-                            <i class="ri-file-text-fill"></i>
-                            <span>${displayName}</span>
+                            <i class="ri-file-text-fill flex-shrink-0"></i>
+                            <span class="break-all">${displayName}</span>
                           </div>`;
                         }).join('')}
                         <div class="mt-2 text-xs text-green-600">
@@ -4105,7 +4865,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                       </div>
                       <button type="button" 
-                              class="remove-draft-btn-new text-red-500 hover:text-red-700 hover:bg-red-50 rounded p-1 transition-colors"
+                              class="remove-draft-btn-new text-red-500 hover:text-red-700 hover:bg-red-50 rounded p-1 transition-colors flex-shrink-0"
                               data-field="${dbField}"
                               data-input-name="${inputInfo.name}"
                               title="Remove and upload new file">
@@ -4123,6 +4883,12 @@ document.addEventListener('DOMContentLoaded', function() {
                   draftDisplay.remove();
                   const hiddenInput = container.querySelector('.existing-draft-input');
                   if (hiddenInput) hiddenInput.remove();
+                  
+                  // Restore container styling
+                  container.style.border = '';
+                  container.style.padding = '';
+                  container.style.background = '';
+                  
                   input.style.display = 'block';
                   input.setAttribute('required', 'required');
                   
@@ -4178,93 +4944,59 @@ document.addEventListener('DOMContentLoaded', function() {
       const submitBtn = this.querySelector('button[type="submit"]');
       const originalBtnHtml = submitBtn.innerHTML;
       
-      // ✅ VALIDATION: Check if this is resubmission mode and validate ALL required documents
+      // ✅ CLIENT-SIDE VALIDATION: Check required files BEFORE submission
+      // Check if this is resubmission mode first
       const isResubmission = this.querySelector('input[name="is_resubmission"]');
-      if (isResubmission && isResubmission.value === '1') {
-        console.log('🔍 Resubmission mode detected - validating all required documents...');
+      const isResubmissionMode = isResubmission && isResubmission.value === '1';
+      
+      console.log('📋 Validation mode:', isResubmissionMode ? 'RESUBMISSION' : 'NEW APPLICATION');
+      
+      const requiredFields = [
+        { name: 'applicationLetter', label: 'Application Letter', dbField: 'application_letter' },
+        { name: 'resume_file', label: 'Resume', dbField: 'resume' },
+        { name: 'letter_of_intent', label: 'Letter of Intent', dbField: 'letter_of_intent' },
+        { name: 'transcript', label: 'Transcript of Records (TOR)', dbField: 'tor' },
+        { name: 'diploma', label: 'Diploma', dbField: 'diploma' },
+        { name: 'coe', label: 'Certificate of Employment', dbField: 'coe' },
+        { name: 'certificates[]', label: 'Seminars/Training Certificates', dbField: 'seminars_trainings' }
+      ];
+      
+      const missingFiles = [];
+      
+      for (const field of requiredFields) {
+        // In resubmission mode, only validate requested documents
+        if (isResubmissionMode && window.currentResubmissionDocs) {
+          if (!window.currentResubmissionDocs.includes(field.dbField)) {
+            console.log(`⏩ Skipping ${field.label} - not requested for resubmission`);
+            continue; // Skip this field, it's not requested for resubmission
+          }
+        }
         
-        // Get the list of required documents from the global variable
-        if (window.currentResubmissionDocs && window.currentResubmissionDocs.length > 0) {
-          console.log('📋 Required documents:', window.currentResubmissionDocs);
+        const fileInput = this.querySelector(`input[name="${field.name}"]`);
+        
+        // Check for draft input - remove brackets for proper name matching
+        const fieldNameWithoutBrackets = field.name.replace('[]', '');
+        const draftInput = this.querySelector(`input[name="existing_${fieldNameWithoutBrackets}"]`);
+        
+        if (fileInput) {
+          const hasFile = fileInput.files && fileInput.files.length > 0;
+          const hasDraft = draftInput && draftInput.value;
           
-          // Document field name mapping
-          const docFieldMap = {
-            'application_letter': 'applicationLetter',
-            'resume': 'resume_file',
-            'letter_of_intent': 'letter_of_intent',
-            'tor': 'transcript',
-            'diploma': 'diploma',
-            'professional_license': 'license',
-            'coe': 'coe',
-            'seminars_trainings': 'certificates[]',
-            'masteral_cert': 'masteral_cert'
-          };
+          console.log(`Checking ${field.label}: hasFile=${hasFile}, hasDraft=${hasDraft}`);
           
-          const missingDocs = [];
-          
-          // Check each required document
-          for (const docKey of window.currentResubmissionDocs) {
-            const fieldName = docFieldMap[docKey];
-            if (!fieldName) {
-              console.warn('⚠️ Unknown document key:', docKey);
-              continue;
-            }
-            
-            // Check if file is uploaded for this document
-            const fileInput = this.querySelector(`input[name="${fieldName}"]`);
-            if (!fileInput) {
-              console.warn('⚠️ File input not found for:', fieldName);
-              continue;
-            }
-            
-            const hasFile = fileInput.files && fileInput.files.length > 0;
-            console.log(`  ${docKey} (${fieldName}): ${hasFile ? '✅ Uploaded' : '❌ Missing'}`);
-            
-            if (!hasFile) {
-              // Get document label for user-friendly message
-              const docLabels = {
-                'application_letter': 'Application Letter',
-                'resume': 'Resume',
-                'letter_of_intent': 'Letter of Intent',
-                'tor': 'Transcript of Records (TOR)',
-                'diploma': 'Diploma',
-                'professional_license': 'Professional License',
-                'coe': 'Certificate of Employment',
-                'seminars_trainings': 'Seminars/Training Certificates',
-                'masteral_cert': 'Masteral Certificate'
-              };
-              missingDocs.push(docLabels[docKey] || docKey);
-            }
+          if (!hasFile && !hasDraft) {
+            missingFiles.push(field.label);
           }
-          
-          // If any documents are missing, show error and prevent submission
-          if (missingDocs.length > 0) {
-            console.error('❌ Missing required documents:', missingDocs);
-            
-            const errorNotif = document.createElement('div');
-            errorNotif.className = 'fixed top-4 right-4 bg-red-100 border-2 border-red-400 text-red-700 px-5 py-4 rounded-lg shadow-lg z-[10001] max-w-md';
-            errorNotif.innerHTML = `
-              <div class='flex flex-col'>
-                <div class='flex items-center mb-2'>
-                  <i class='ri-error-warning-line text-2xl mr-2'></i>
-                  <span class="font-bold text-lg">Missing Required Documents</span>
-                </div>
-                <p class="text-sm mb-2">You must upload ALL ${window.currentResubmissionDocs.length} requested documents before submitting:</p>
-                <ul class="text-sm space-y-1 ml-4 list-disc">
-                  ${missingDocs.map(doc => `<li class="font-semibold">${doc}</li>`).join('')}
-                </ul>
-              </div>
-            `;
-            document.body.appendChild(errorNotif);
-            setTimeout(() => errorNotif.remove(), 8000);
-            
-            // Don't proceed with submission
-            return;
-          }
-          
-          console.log('✅ All required documents validated successfully!');
         }
       }
+      
+      if (missingFiles.length > 0) {
+        const messagePrefix = isResubmissionMode ? 'Please upload the following requested files: ' : 'Please upload the following required files: ';
+        showToast(messagePrefix + missingFiles.join(', '), 'warning', 6000);
+        return; // Stop submission
+      }
+      
+      console.log('✅ All required files validated successfully!');
       
       submitBtn.disabled = true;
       submitBtn.innerHTML = '<i class="ri-loader-4-line animate-spin mr-2"></i>Uploading...';
@@ -4331,6 +5063,13 @@ document.addEventListener('DOMContentLoaded', function() {
           `;
           document.body.appendChild(successNotif);
           setTimeout(() => successNotif.remove(), 5000);
+          
+          // Hide the Load Saved Documents section after successful submission
+          const loadDraftSection = document.getElementById('loadDraftSection');
+          if (loadDraftSection) {
+            loadDraftSection.style.display = 'none';
+            console.log('Load Saved Documents section hidden');
+          }
           
           // Wait a moment for the data to be saved, then fetch it
           await new Promise(resolve => setTimeout(resolve, 500));
@@ -4510,11 +5249,11 @@ document.addEventListener('DOMContentLoaded', function() {
       if (!indicator) {
         // Create uploaded indicator (hidden by default)
         indicator = document.createElement('div');
-        indicator.className = 'file-upload-indicator hidden w-full flex items-center justify-between';
+        indicator.className = 'file-upload-indicator hidden w-full flex items-start justify-between';
         indicator.innerHTML = `
-          <div class="flex items-center text-green-700 flex-1 min-w-0">
+          <div class="flex items-start text-green-700 flex-1 min-w-0">
             <i class="ri-checkbox-circle-fill mr-2 text-lg flex-shrink-0"></i>
-            <span class="text-sm font-medium truncate filename"></span>
+            <span class="text-sm font-medium break-all filename"></span>
           </div>
           <button type="button" class="remove-file text-red-600 hover:text-red-800 ml-2 flex-shrink-0">
             <i class="ri-close-circle-fill text-xl"></i>
@@ -4539,6 +5278,25 @@ document.addEventListener('DOMContentLoaded', function() {
           // Show file input again
           input.style.display = '';
           input.classList.remove('hidden');
+          
+          // Check if there are any remaining uploaded files
+          setTimeout(() => {
+            const allFileInputs = document.querySelectorAll('#step2 input[type="file"]');
+            let hasAnyFiles = false;
+            allFileInputs.forEach(inp => {
+              if (inp.files && inp.files.length > 0) {
+                hasAnyFiles = true;
+              }
+            });
+            
+            // Show the Load Saved Documents button if no files are uploaded
+            if (!hasAnyFiles) {
+              const loadDraftSection = document.getElementById('loadDraftSection');
+              if (loadDraftSection) {
+                loadDraftSection.style.display = '';
+              }
+            }
+          }, 50);
         });
       }
       
@@ -4563,6 +5321,12 @@ document.addEventListener('DOMContentLoaded', function() {
           // Hide the file input
           this.style.display = 'none';
           this.classList.add('hidden');
+          
+          // Hide the "Load Saved Documents" button when any file is uploaded
+          const loadDraftSection = document.getElementById('loadDraftSection');
+          if (loadDraftSection) {
+            loadDraftSection.style.display = 'none';
+          }
         }
       });
     });
@@ -4823,9 +5587,9 @@ document.addEventListener('DOMContentLoaded', function() {
           const resubmitNotice = document.createElement('div');
           resubmitNotice.className = 'mt-2 p-2 bg-orange-100 border border-orange-300 rounded text-xs';
           resubmitNotice.innerHTML = `
-            <div class="flex items-center text-orange-800">
-              <i class="ri-information-line mr-2"></i>
-              <span class="font-medium">Previous file: ${fileName}</span>
+            <div class="flex items-start text-orange-800">
+              <i class="ri-information-line mr-2 flex-shrink-0"></i>
+              <span class="font-medium break-all">Previous file: ${fileName}</span>
             </div>
           `;
           container.appendChild(resubmitNotice);
@@ -4844,11 +5608,11 @@ document.addEventListener('DOMContentLoaded', function() {
           
           // Create green uploaded file indicator
           const indicator = document.createElement('div');
-          indicator.className = 'flex items-center p-2 approved-file';
+          indicator.className = 'flex items-start p-2 approved-file';
           indicator.style.setProperty('opacity', '1', 'important');
           indicator.innerHTML = `
-            <i class="ri-checkbox-circle-fill text-green-600 text-lg mr-2"></i>
-            <span class="text-green-700 text-sm font-medium">Uploaded: ${fileName}</span>
+            <i class="ri-checkbox-circle-fill text-green-600 text-lg mr-2 flex-shrink-0"></i>
+            <span class="text-green-700 text-sm font-medium break-all">Uploaded: ${fileName}</span>
           `;
           container.appendChild(indicator);
           
@@ -4868,10 +5632,28 @@ document.addEventListener('DOMContentLoaded', function() {
         if (app.letter_of_intent) addUploadedIndicator('letter_of_intent', app.letter_of_intent, 'letter_of_intent');
         if (app.tor) addUploadedIndicator('transcript', app.tor, 'tor');
         if (app.diploma) addUploadedIndicator('diploma', app.diploma, 'diploma');
-        if (app.professional_license) addUploadedIndicator('license', app.professional_license, 'professional_license');
+        if (app.professional_license) {
+          addUploadedIndicator('license', app.professional_license, 'professional_license');
+        } else {
+          // Hide optional field that wasn't uploaded
+          const licenseContainer = document.querySelector('input[name="license"]')?.closest('.space-y-2');
+          if (licenseContainer) {
+            licenseContainer.style.display = 'none';
+            console.log('✓ Hidden Professional License (not uploaded)');
+          }
+        }
         if (app.coe) addUploadedIndicator('coe', app.coe, 'coe');
         if (app.seminars_trainings) addUploadedIndicator('certificates[]', app.seminars_trainings, 'seminars_trainings');
-        if (app.masteral_cert) addUploadedIndicator('masteral_cert', app.masteral_cert, 'masteral_cert');
+        if (app.masteral_cert) {
+          addUploadedIndicator('masteral_cert', app.masteral_cert, 'masteral_cert');
+        } else {
+          // Hide optional field that wasn't uploaded
+          const masteralContainer = document.querySelector('input[name="masteral_cert"]')?.closest('.space-y-2');
+          if (masteralContainer) {
+            masteralContainer.style.display = 'none';
+            console.log('✓ Hidden Masteral Certificate (not uploaded)');
+          }
+        }
         
         console.log('✓ File indicators added successfully');
         
@@ -4983,7 +5765,7 @@ function showNotification(message, type) {
 const notification = document.createElement('div');
 notification.className = `fixed top-4 right-4 ${type === 'success' ? 'bg-green-100 border-green-400 text-green-700' : 'bg-blue-100 border-blue-400 text-blue-700'} px-4 py-3 rounded border`;
 notification.innerHTML = `
-<div class="flex items-center">
+<div class='flex items-center'>
 <i class="${type === 'success' ? 'ri-check-line' : 'ri-information-line'} mr-2"></i>
 <span>${message}</span>
 </div>
@@ -5356,20 +6138,17 @@ return `
 <span class="flex items-center">
 <div class="w-4 h-4 flex items-center justify-center mr-1">
 <i class="${job.icon}"></i>
-</div>
-${job.department}
+</div>${job.department}
 </span>
 <span class="flex items-center">
 <div class="w-4 h-4 flex items-center justify-center mr-1">
 <i class="ri-time-line"></i>
-</div>
-${job.type}
+</div>${job.type}
 </span>
 <span class="flex items-center">
 <div class="w-4 h-4 flex items-center justify-center mr-1">
 <i class="ri-map-pin-line"></i>
-</div>
-${job.location}
+</div>${job.location}
 </span>
 </div>
 </div>
@@ -5841,6 +6620,20 @@ document.addEventListener('DOMContentLoaded', function () {
   // Auto-refresh notifications every 30 seconds
   setInterval(loadNotifications, 30000);
 
+  // Auto-open job details if coming from shared link (reuse urlParams from above)
+  const sharedJobId = urlParams.get('job_id');
+  if (sharedJobId) {
+    console.log('📎 Shared link detected, opening job details for ID:', sharedJobId);
+    // Wait a moment for page to fully load
+    setTimeout(function() {
+      if (typeof showJobDetails === 'function') {
+        showJobDetails(parseInt(sharedJobId));
+      } else {
+        console.error('showJobDetails function not available yet');
+      }
+    }, 500);
+  }
+
   // Note: Event listeners for My Applications are now handled in user_application.php
   // This old function has been removed to prevent conflicts with the new progress modal
 
@@ -6218,6 +7011,12 @@ document.addEventListener('DOMContentLoaded', function () {
       const educationList = document.getElementById('educationList');
       if (!educationList) return;
       
+      // Validate education object
+      if (!education || !education.degree) {
+        console.warn('Invalid education object:', education);
+        return;
+      }
+      
       // Remove "no records" message if it exists
       const noRecordsMsg = educationList.querySelector('.text-center');
       if (noRecordsMsg) {
@@ -6229,10 +7028,11 @@ document.addEventListener('DOMContentLoaded', function () {
       educationCard.innerHTML = `
         <div class="flex items-start justify-between">
           <div class="flex-1">
-            <h4 class="font-semibold text-gray-900 text-base">${education.degree}</h4>
-            <p class="text-gray-600 mt-1 text-sm">${education.institution}</p>
+            <h4 class="font-semibold text-gray-900 text-base">${education.degree || 'N/A'}</h4>
+            <p class="text-gray-600 mt-1 text-sm">${education.field_of_study || ''}</p>
+            <p class="text-gray-600 mt-1 text-sm">${education.institution || 'N/A'}</p>
             <p class="text-gray-500 text-sm mt-1">
-              ${education.start_year} - ${education.end_year}
+              ${education.start_year || 'N/A'} - ${education.end_year || 'N/A'}
               ${education.gpa ? ` | GPA: ${education.gpa}` : ''}
             </p>
           </div>
@@ -6253,13 +7053,19 @@ document.addEventListener('DOMContentLoaded', function () {
       const experienceList = document.getElementById('experienceList');
       if (!experienceList) return;
       
+      // Validate experience object
+      if (!experience || !experience.job_title || !experience.company) {
+        console.warn('Invalid experience object:', experience);
+        return;
+      }
+      
       // Remove "no records" message if it exists
       const noRecordsMsg = experienceList.querySelector('.text-center');
       if (noRecordsMsg) {
         noRecordsMsg.remove();
       }
       
-      const startDate = new Date(experience.start_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      const startDate = experience.start_date ? new Date(experience.start_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'N/A';
       const endDate = experience.end_date ? new Date(experience.end_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Present';
       
       const experienceCard = document.createElement('div');
@@ -6292,6 +7098,12 @@ document.addEventListener('DOMContentLoaded', function () {
       const skillsList = document.getElementById('skillsList');
       if (!skillsList) return;
       
+      // Validate skill object
+      if (!skill || !skill.skill_name || skill.skill_level === undefined) {
+        console.warn('Invalid skill object:', skill);
+        return;
+      }
+      
       // Remove "no records" message if it exists
       const noRecordsMsg = skillsList.querySelector('.text-center');
       if (noRecordsMsg) {
@@ -6300,8 +7112,9 @@ document.addEventListener('DOMContentLoaded', function () {
       
       const levels = ['', 'Beginner', 'Novice', 'Intermediate', 'Advanced', 'Expert'];
       let dots = '';
+      const skillLevel = parseInt(skill.skill_level) || 0;
       for (let i = 1; i <= 5; i++) {
-        dots += `<div class="w-2.5 h-2.5 rounded-full mr-1 ${i <= skill.skill_level ? 'bg-blue-500' : 'bg-gray-200'}"></div>`;
+        dots += `<div class="w-2.5 h-2.5 rounded-full mr-1 ${i <= skillLevel ? 'bg-blue-500' : 'bg-gray-200'}"></div>`;
       }
       
       const skillCard = document.createElement('div');
@@ -6547,13 +7360,13 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     
     if (!buttonFound) {
-      console.log('❌ No matching job button found for ID:', appliedJobId);
+      console.log('No matching job button found for ID:', appliedJobId);
     }
   }, 100);
   <?php endif; ?>
 
   // Check for existing applications and update button states on page load
-  <?php if (isset($_SESSION['user_id'])): ?>
+  <?php if (isset($_SESSION['user_id']) || isset($_SESSION['user_email'])): ?>
   fetch('get_user_applications.php')
     .then(response => response.json())
     .then(data => {
@@ -6631,11 +7444,22 @@ function loadJobs(page = 1, filters = {}) {
   currentPage = page;
   currentFilters = { ...currentFilters, ...filters };
   
+  // Check if elements exist (user might be on different section)
+  const jobsLoading = document.getElementById('jobsLoading');
+  const jobsContainer = document.getElementById('jobsContainer');
+  const noJobsMessage = document.getElementById('noJobsMessage');
+  const paginationContainer = document.getElementById('paginationContainer');
+  
+  if (!jobsLoading || !jobsContainer) {
+    console.warn('Job elements not found. User may be on different section.');
+    return;
+  }
+  
   // Show loading state
-  document.getElementById('jobsLoading').style.display = 'flex';
-  document.getElementById('jobsContainer').innerHTML = '';
-  document.getElementById('noJobsMessage').classList.add('hidden');
-  document.getElementById('paginationContainer').style.display = 'none';
+  jobsLoading.style.display = 'flex';
+  jobsContainer.innerHTML = '';
+  if (noJobsMessage) noJobsMessage.classList.add('hidden');
+  if (paginationContainer) paginationContainer.style.display = 'none';
   
   // Build API URL
   const url = new URL('get_jobs_paginated.php', window.location.origin + window.location.pathname.replace('user.php', ''));
@@ -6660,7 +7484,7 @@ function loadJobs(page = 1, filters = {}) {
     .then(response => response.json())
     .then(data => {
       // Hide loading state
-      document.getElementById('jobsLoading').style.display = 'none';
+      if (jobsLoading) jobsLoading.style.display = 'none';
       
       if (data.success && data.jobs.length > 0) {
         displayJobs(data.jobs);
@@ -6669,20 +7493,25 @@ function loadJobs(page = 1, filters = {}) {
         // Update existing application states immediately
         updateExistingApplicationStates();
       } else {
-        document.getElementById('noJobsMessage').classList.remove('hidden');
-        document.getElementById('paginationContainer').style.display = 'none';
+        if (noJobsMessage) noJobsMessage.classList.remove('hidden');
+        if (paginationContainer) paginationContainer.style.display = 'none';
       }
     })
     .catch(error => {
       console.error('Error loading jobs:', error);
-      document.getElementById('jobsLoading').style.display = 'none';
-      document.getElementById('noJobsMessage').classList.remove('hidden');
+      if (jobsLoading) jobsLoading.style.display = 'none';
+      if (noJobsMessage) noJobsMessage.classList.remove('hidden');
     });
 }
 
 // Display jobs in the container
 function displayJobs(jobs) {
   const container = document.getElementById('jobsContainer');
+  if (!container) {
+    console.warn('Jobs container not found');
+    return;
+  }
+  
   container.innerHTML = '';
   
   jobs.forEach(job => {
@@ -6735,17 +7564,17 @@ function updatePagination(pagination) {
   
   // Update pagination info
   const paginationInfo = document.getElementById('paginationInfo');
-  paginationInfo.textContent = `Showing ${pagination.showing_from}-${pagination.showing_to} of ${pagination.total_jobs} jobs`;
-  
-  // Remove the search summary update since we're removing it
+  if (paginationInfo) {
+    paginationInfo.textContent = `Showing ${pagination.showing_from}-${pagination.showing_to} of ${pagination.total_jobs} jobs`;
+  }
   
   // Update previous button
   const prevBtn = document.getElementById('prevPageBtn');
-  prevBtn.disabled = !pagination.has_prev;
+  if (prevBtn) prevBtn.disabled = !pagination.has_prev;
   
   // Update next button
   const nextBtn = document.getElementById('nextPageBtn');
-  nextBtn.disabled = !pagination.has_next;
+  if (nextBtn) nextBtn.disabled = !pagination.has_next;
   
   // Update page numbers
   updatePageNumbers(pagination.current_page, pagination.total_pages);
@@ -6754,12 +7583,15 @@ function updatePagination(pagination) {
   updateActiveFilters();
   
   // Show pagination container
-  document.getElementById('paginationContainer').style.display = 'flex';
+  const paginationContainer = document.getElementById('paginationContainer');
+  if (paginationContainer) paginationContainer.style.display = 'flex';
 }
 
 // Update page numbers display
 function updatePageNumbers(currentPage, totalPages) {
   const pageNumbers = document.getElementById('pageNumbers');
+  if (!pageNumbers) return;
+  
   pageNumbers.innerHTML = '';
   
   // Calculate which pages to show
@@ -6799,6 +7631,8 @@ function updatePageNumbers(currentPage, totalPages) {
 // Add page button
 function addPageButton(pageNum, isActive = false) {
   const pageNumbers = document.getElementById('pageNumbers');
+  if (!pageNumbers) return;
+  
   const button = document.createElement('button');
   button.className = `px-3 py-2 text-sm rounded-lg transition-colors ${
     isActive 
@@ -6813,6 +7647,8 @@ function addPageButton(pageNum, isActive = false) {
 // Add ellipsis
 function addEllipsis() {
   const pageNumbers = document.getElementById('pageNumbers');
+  if (!pageNumbers) return;
+  
   const ellipsis = document.createElement('span');
   ellipsis.className = 'px-2 text-gray-500';
   ellipsis.textContent = '...';
@@ -7265,9 +8101,9 @@ function attachJobEventListeners() {
                 const resubmitNotice = document.createElement('div');
                 resubmitNotice.className = 'mt-2 p-2 bg-orange-100 border border-orange-300 rounded text-xs';
                 resubmitNotice.innerHTML = `
-                  <div class="flex items-center text-orange-800">
-                    <i class="ri-information-line mr-2"></i>
-                    <span class="font-medium">Previous file: ${fileName}</span>
+                  <div class="flex items-start text-orange-800">
+                    <i class="ri-information-line mr-2 flex-shrink-0"></i>
+                    <span class="font-medium break-all">Previous file: ${fileName}</span>
                   </div>
                 `;
                 container.appendChild(resubmitNotice);
@@ -7281,9 +8117,9 @@ function attachJobEventListeners() {
                 const indicator = document.createElement('div');
                 indicator.className = 'mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs approved-file';
                 indicator.innerHTML = `
-                  <div class="flex items-center text-green-700">
-                    <i class="ri-checkbox-circle-fill mr-2"></i>
-                    <span class="font-medium">Uploaded: ${fileName}</span>
+                  <div class="flex items-start text-green-700">
+                    <i class="ri-checkbox-circle-fill mr-2 flex-shrink-0"></i>
+                    <span class="font-medium break-all">Uploaded: ${fileName}</span>
                   </div>
                 `;
                 container.appendChild(indicator);
@@ -7581,20 +8417,20 @@ function populateJobDetails(job) {
   // Update job requirements - Show document requirements
   const requirementsContainer = document.getElementById('detailJobRequirements');
   const documentRequirements = [
-    'Application Letter',
-    'Updated and Comprehensive Resume',
-    'Transcript of Record (TOR)',
-    'Diploma',
-    'Professional License',
-    'Certificate of Employment (COE)',
-    'Seminar/Training Certificates',
-    'Masteral Certificate'
+    { text: 'Application Letter', required: true },
+    { text: 'Updated and Comprehensive Resume', required: true },
+    { text: 'Transcript of Record (TOR)', required: true },
+    { text: 'Diploma', required: true },
+    { text: 'Professional License', required: false },
+    { text: 'Certificate of Employment (COE)', required: true },
+    { text: 'Seminar/Training Certificates', required: true },
+    { text: 'Masteral Certificate', required: false }
   ];
   
   requirementsContainer.innerHTML = documentRequirements.map(req => `
     <div class="flex items-start">
       <i class="ri-file-text-line text-primary mr-2 mt-0.5"></i>
-      <p class="flex-1">${req}</p>
+      <p class="flex-1">${req.text}${req.required ? '' : ' <span class="text-green-600 text-sm">(Optional)</span>'}</p>
     </div>
   `).join('');
   
@@ -7900,6 +8736,8 @@ function updateExistingApplicationStates() {
 // Filter and search functionality
 function updateActiveFilters() {
   const activeFiltersContainer = document.getElementById('activeFilters');
+  if (!activeFiltersContainer) return; // Exit if element doesn't exist
+  
   activeFiltersContainer.innerHTML = '';
   
   const filters = [
@@ -7936,7 +8774,23 @@ function updateActiveFilters() {
 
 function removeFilter(filterKey) {
   currentFilters[filterKey] = '';
-  document.getElementById(filterKey === 'search' ? 'searchInput' : filterKey + 'Filter').value = '';
+  
+  // Map filter keys to element IDs
+  let elementId;
+  if (filterKey === 'search') {
+    elementId = 'searchInput';
+  } else if (filterKey === 'department') {
+    elementId = 'departmentFilter';
+  } else if (filterKey === 'job_type') {
+    elementId = 'jobTypeFilter';
+  }
+  
+  // Clear the filter element value
+  const element = document.getElementById(elementId);
+  if (element) {
+    element.value = '';
+  }
+  
   loadJobs(1, currentFilters);
   updateActiveFilters();
 }
@@ -8376,6 +9230,33 @@ function closeLogoutModal() {
 function proceedLogout() {
     window.location.href = '../index.php?logout=1';
 }
+</script>
+
+<!-- Auto-show job details if redirected from homepage -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Check URL for view_job parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const viewJobId = urlParams.get('view_job');
+    
+    if (viewJobId) {
+        console.log('🔗 Redirected from homepage to view job ID:', viewJobId);
+        
+        // Wait a moment for the page to fully load, then show job details
+        setTimeout(function() {
+            // Make sure showJobDetails function exists
+            if (typeof showJobDetails === 'function') {
+                console.log('✅ Calling showJobDetails for job ID:', viewJobId);
+                showJobDetails(parseInt(viewJobId));
+                
+                // Clean up URL (remove the parameter)
+                window.history.replaceState({}, document.title, window.location.pathname);
+            } else {
+                console.error('❌ showJobDetails function not found!');
+            }
+        }, 500); // Small delay to ensure all scripts are loaded
+    }
+});
 </script>
 
 </body>

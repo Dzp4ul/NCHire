@@ -58,9 +58,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $activity_stmt->bind_param("sss", $activity_type, $activity_desc, $_SESSION['admin_name']);
             $activity_stmt->execute();
             
-            // Clear session and redirect to homepage with modal open
-            session_unset();
-            session_destroy();
+            // Clear only admin session (keep applicant login if exists)
+            unset($_SESSION['admin_logged_in']);
+            unset($_SESSION['admin_id']);
+            unset($_SESSION['admin_name']);
+            unset($_SESSION['admin_email']);
+            unset($_SESSION['admin_role']);
+            unset($_SESSION['admin_department']);
+            unset($_SESSION['admin_profile_picture']);
+            unset($_SESSION['password_change_required']);
             
             // Redirect after 2 seconds to homepage with login modal parameter
             header("Refresh: 2; URL=../index.php?open_login=1");
@@ -79,7 +85,7 @@ $conn->close();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Change Password - NCHire Admin</title>
-    <link rel="icon" type="image/png" href="../assets/images/image-removebg-preview (1).png">
+    <link rel="icon" type="image/png" href="../public/assets/images/image-removebg-preview (1).png">
     <script src="https://cdn.tailwindcss.com/3.4.16"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script>

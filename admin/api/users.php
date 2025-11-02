@@ -155,15 +155,151 @@ switch ($method) {
         break;
         
     case 'PUT':
-        // Update admin user - expects JSON
-        $input = json_decode(file_get_contents('php://input'), true);
+        // Update admin user - supports both JSON and FormData with file uploads
         
-        if (empty($input['id'])) {
-            echo json_encode(['success' => false, 'message' => 'User ID is required']);
+        $input = [];
+        $user_id = 0;
+        $uploaded_files = [];
+        
+        // Check Content-Type to determine how to parse the request
+        $content_type = isset($_SERVER['CONTENT_TYPE']) ? $_SERVER['CONTENT_TYPE'] : '';
+        
+        if (strpos($content_type, 'multipart/form-data') !== false) {
+            // Parse multipart/form-data manually for PUT requests
+            $raw_data = file_get_contents('php://input');
+            
+            // Extract boundary from Content-Type
+            if (preg_match('/boundary=(.*)$/', $content_type, $matches)) {
+                $boundary = $matches[1];
+                
+                // Split the data by boundary
+                $parts = array_slice(explode("--$boundary", $raw_data), 1);
+                
+                foreach ($parts as $part) {
+                    if (empty(trim($part)) || strpos($part, '--') === 0) continue;
+                    
+                    // Split headers from content - handle both \r\n\r\n and \n\n
+                    $separator_pos = strpos($part, "\r\n\r\n");
+                    if ($separator_pos === false) {
+                        $separator_pos = strpos($part, "\n\n");
+                        if ($separator_pos === false) continue;
+                        $separator = "\n\n";
+                        $line_break = "\n";
+                    } else {
+                        $separator = "\r\n\r\n";
+                        $line_break = "\r\n";
+                    }
+                    
+                    $raw_headers = substr($part, 0, $separator_pos);
+                    $content = substr($part, $separator_pos + strlen($separator));
+                    
+                    // Parse headers
+                    $header_lines = explode($line_break, $raw_headers);
+                    $headers = [];
+                    foreach ($header_lines as $header) {
+                        if (strpos($header, ':') !== false) {
+                            list($name, $value) = explode(':', $header, 2);
+                            $headers[strtolower(trim($name))] = trim($value);
+                        }
+                    }
+                    
+                    // Get field name
+                    if (isset($headers['content-disposition'])) {
+                        if (preg_match('/name="([^"]*)"/', $headers['content-disposition'], $name_matches)) {
+                            $field_name = $name_matches[1];
+                            
+                            // Check if it's a file
+                            if (preg_match('/filename="([^"]*)"/', $headers['content-disposition'], $file_matches)) {
+                                $filename = $file_matches[1];
+                                // Remove trailing line breaks
+                                $content = rtrim($content, "\r\n");
+                                
+                                // Store file info
+                                $uploaded_files[$field_name] = [
+                                    'name' => $filename,
+                                    'content' => $content,
+                                    'type' => isset($headers['content-type']) ? $headers['content-type'] : 'application/octet-stream'
+                                ];
+                            } else {
+                                // Regular field - remove trailing line breaks
+                                $input[$field_name] = rtrim($content, "\r\n");
+                            }
+                        }
+                    }
+                }
+            }
+            
+            $user_id = isset($input['user_id']) ? intval($input['user_id']) : 0;
+            
+        } else {
+            // Try JSON format
+            $input = json_decode(file_get_contents('php://input'), true);
+            $user_id = isset($input['id']) ? intval($input['id']) : 0;
+        }
+        
+        // Debug logging
+        error_log("PUT Request - User ID: " . $user_id);
+        error_log("PUT Request - Input: " . json_encode($input));
+        error_log("PUT Request - Files: " . json_encode(array_keys($uploaded_files)));
+        
+        if (empty($user_id)) {
+            echo json_encode(['success' => false, 'message' => 'User ID is required', 'debug' => ['input' => $input, 'content_type' => $content_type]]);
             break;
         }
         
-        $user_id = $input['id'];
+        // Handle profile picture upload if present
+        $profile_picture_updated = false;
+        $new_profile_picture = null;
+        
+        if (isset($uploaded_files['profile_picture'])) {
+            $file = $uploaded_files['profile_picture'];
+            $allowed_types = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif'];
+            $max_size = 5 * 1024 * 1024; // 5MB
+            
+            // Validate file type
+            if (!in_array($file['type'], $allowed_types)) {
+                echo json_encode(['success' => false, 'message' => 'Invalid file type. Only JPG, PNG, and GIF are allowed']);
+                break;
+            }
+            
+            // Validate file size
+            $file_size = strlen($file['content']);
+            if ($file_size > $max_size) {
+                echo json_encode(['success' => false, 'message' => 'File size exceeds 5MB limit']);
+                break;
+            }
+            
+            // Create upload directory if it doesn't exist
+            $upload_dir = '../../uploads/profile_pictures/';
+            if (!is_dir($upload_dir)) {
+                mkdir($upload_dir, 0755, true);
+            }
+            
+            // Get old profile picture
+            $old_pic_query = $conn->query("SELECT profile_picture FROM admin_users WHERE id = $user_id");
+            $old_pic = null;
+            if ($old_pic_query && $old_pic_query->num_rows > 0) {
+                $old_pic = $old_pic_query->fetch_assoc()['profile_picture'];
+            }
+            
+            // Generate unique filename
+            $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+            $new_profile_picture = uniqid('admin_') . '_' . time() . '.' . $extension;
+            $upload_path = $upload_dir . $new_profile_picture;
+            
+            // Write file content to disk (since we already have it in memory from parsing)
+            if (file_put_contents($upload_path, $file['content']) !== false) {
+                $profile_picture_updated = true;
+                
+                // Delete old profile picture if exists
+                if ($old_pic && file_exists($upload_dir . $old_pic)) {
+                    unlink($upload_dir . $old_pic);
+                }
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Failed to upload profile picture']);
+                break;
+            }
+        }
         
         // Build update query dynamically
         $updates = [];
@@ -206,6 +342,13 @@ switch ($method) {
             $types .= "s";
         }
         
+        // Add profile picture to updates if uploaded
+        if ($profile_picture_updated && $new_profile_picture) {
+            $updates[] = "profile_picture = ?";
+            $params[] = $new_profile_picture;
+            $types .= "s";
+        }
+        
         if (empty($updates)) {
             echo json_encode(['success' => false, 'message' => 'No fields to update']);
             break;
@@ -233,12 +376,21 @@ switch ($method) {
             $affected = $stmt->affected_rows;
             error_log("Affected rows: " . $affected);
             
-            if ($affected > 0) {
-                echo json_encode(['success' => true, 'message' => 'User updated successfully', 'affected_rows' => $affected]);
+            $message = 'User updated successfully';
+            if ($profile_picture_updated) {
+                $message .= ' (profile picture updated)';
+            }
+            
+            if ($affected > 0 || $profile_picture_updated) {
+                echo json_encode(['success' => true, 'message' => $message, 'affected_rows' => $affected]);
             } else {
                 echo json_encode(['success' => true, 'message' => 'No changes made (data was the same)', 'affected_rows' => 0]);
             }
         } else {
+            // If database update fails and we uploaded a file, delete it
+            if ($profile_picture_updated && $new_profile_picture && file_exists($upload_dir . $new_profile_picture)) {
+                unlink($upload_dir . $new_profile_picture);
+            }
             echo json_encode(['success' => false, 'message' => 'Failed to update user: ' . $stmt->error]);
         }
         break;

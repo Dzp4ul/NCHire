@@ -1,5 +1,24 @@
 <?php
+// Clean any output buffers first
+while (ob_get_level()) {
+    ob_end_clean();
+}
+
 session_start();
+header('Content-Type: application/json');
+
+// Log all incoming POST data
+error_log("save_profile_data.php called");
+error_log("POST data: " . print_r($_POST, true));
+error_log("Session user_id: " . ($_SESSION['user_id'] ?? 'NOT SET'));
+error_log("Session user_email: " . ($_SESSION['user_email'] ?? 'NOT SET'));
+
+// Check if user is logged in
+if (!isset($_SESSION['user_id']) && !isset($_SESSION['user_email'])) {
+    error_log("ERROR: User not logged in");
+    echo json_encode(['success' => false, 'message' => 'User not logged in']);
+    exit();
+}
 
 // Database connection
 $servername = "localhost";
@@ -9,380 +28,397 @@ $dbname = "nchire";
 
 $conn = new mysqli($servername, $username, $password, $dbname);
 if ($conn->connect_error) {
-    die(json_encode(['success' => false, 'message' => 'Connection failed: ' . $conn->connect_error]));
-}
-
-// Set response header to JSON
-header('Content-Type: application/json');
-
-$response = ['success' => false, 'message' => ''];
-
-// Create tables if they don't exist
-$create_education_table = "CREATE TABLE IF NOT EXISTS user_education (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    degree VARCHAR(255) NOT NULL,
-    field_of_study VARCHAR(255) NOT NULL,
-    institution VARCHAR(255) NOT NULL,
-    start_year INT NOT NULL,
-    end_year INT NOT NULL,
-    gpa VARCHAR(10),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)";
-$conn->query($create_education_table);
-
-$create_experience_table = "CREATE TABLE IF NOT EXISTS user_experience (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    job_title VARCHAR(255) NOT NULL,
-    company VARCHAR(255) NOT NULL,
-    location VARCHAR(255),
-    start_date DATE NOT NULL,
-    end_date DATE,
-    description TEXT,
-    is_current BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)";
-$conn->query($create_experience_table);
-
-$create_skills_table = "CREATE TABLE IF NOT EXISTS user_skills (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    skill_name VARCHAR(255) NOT NULL,
-    skill_category VARCHAR(100),
-    skill_level INT NOT NULL CHECK (skill_level BETWEEN 1 AND 5),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)";
-$conn->query($create_skills_table);
-
-// Handle DELETE requests
-if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
-    parse_str(file_get_contents('php://input'), $_DELETE);
-    
-    $user_id = $_SESSION['user_id'] ?? null;
-    if (!$user_id) {
-        $response['message'] = 'User not logged in properly. Please log in again.';
-        echo json_encode($response);
-        exit();
-    }
-    
-    if (isset($_DELETE['delete_education'])) {
-        $id = (int)$_DELETE['id'];
-        $stmt = $conn->prepare("DELETE FROM user_education WHERE id = ? AND user_id = ?");
-        $stmt->bind_param("ii", $id, $user_id);
-        
-        if ($stmt->execute()) {
-            $response['success'] = true;
-            $response['message'] = 'Education record deleted successfully.';
-        } else {
-            $response['message'] = 'Error deleting education record.';
-        }
-        $stmt->close();
-    }
-    elseif (isset($_DELETE['delete_experience'])) {
-        $id = (int)$_DELETE['id'];
-        $stmt = $conn->prepare("DELETE FROM user_experience WHERE id = ? AND user_id = ?");
-        $stmt->bind_param("ii", $id, $user_id);
-        
-        if ($stmt->execute()) {
-            $response['success'] = true;
-            $response['message'] = 'Work experience deleted successfully.';
-        } else {
-            $response['message'] = 'Error deleting work experience.';
-        }
-        $stmt->close();
-    }
-    elseif (isset($_DELETE['delete_skill'])) {
-        $id = (int)$_DELETE['id'];
-        $stmt = $conn->prepare("DELETE FROM user_skills WHERE id = ? AND user_id = ?");
-        $stmt->bind_param("ii", $id, $user_id);
-        
-        if ($stmt->execute()) {
-            $response['success'] = true;
-            $response['message'] = 'Skill deleted successfully.';
-        } else {
-            $response['message'] = 'Error deleting skill.';
-        }
-        $stmt->close();
-    }
-    
-    echo json_encode($response);
+    echo json_encode(['success' => false, 'message' => 'Database connection failed']);
     exit();
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Get user ID from session
-    $user_id = $_SESSION['user_id'] ?? null;
-    if (!$user_id) {
-        $response['message'] = 'User not logged in properly. Please log in again.';
-        echo json_encode($response);
+// Get user ID from session with fallback
+$user_id = $_SESSION['user_id'] ?? null;
+
+if (!$user_id && isset($_SESSION['user_email'])) {
+    $email_stmt = $conn->prepare("SELECT id FROM applicants WHERE applicant_email = ?");
+    $email_stmt->bind_param("s", $_SESSION['user_email']);
+    $email_stmt->execute();
+    $email_result = $email_stmt->get_result();
+    if ($email_result->num_rows > 0) {
+        $user_row = $email_result->fetch_assoc();
+        $user_id = $user_row['id'];
+        $_SESSION['user_id'] = $user_id;
+    }
+    $email_stmt->close();
+}
+
+if (!$user_id) {
+    echo json_encode(['success' => false, 'message' => 'User ID not found']);
+    exit();
+}
+
+// Handle Education Save
+if (isset($_POST['saveEducation'])) {
+    error_log("=== EDUCATION SAVE START ===");
+    $edit_id = isset($_POST['edit_id']) && !empty($_POST['edit_id']) ? (int)$_POST['edit_id'] : 0;
+    $ed_degree = $conn->real_escape_string($_POST['ed_degree'] ?? '');
+    $ed_fs = $conn->real_escape_string($_POST['ed_fs'] ?? '');
+    $ed_ins = $conn->real_escape_string($_POST['ed_ins'] ?? '');
+    $ed_sy = (int)($_POST['ed_sy'] ?? 0);
+    $ed_ey = (int)($_POST['ed_ey'] ?? 0);
+    $ed_gpa = $conn->real_escape_string($_POST['ed_gpa'] ?? '');
+    
+    error_log("User ID: $user_id, Degree: $ed_degree");
+    
+    if (empty($ed_degree) || empty($ed_fs) || empty($ed_ins) || empty($ed_sy) || empty($ed_ey)) {
+        error_log("ERROR: Missing required fields");
+        echo json_encode(['success' => false, 'message' => 'Please fill in all required fields']);
         exit();
     }
     
-    // Debug: Log what POST data we received
-    error_log("POST data in save_profile_data.php: " . print_r($_POST, true));
-    
-    // Handle Profile Picture Upload
-    if (isset($_POST['upload_profile_picture']) && isset($_FILES['profile_picture'])) {
-        $uploadDir = 'uploads/profile_pictures/';
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0777, true);
-        }
+    if ($edit_id > 0) {
+        // UPDATE existing record
+        $sql = "UPDATE user_education SET degree = ?, field_of_study = ?, institution = ?, start_year = ?, end_year = ?, gpa = ? 
+                WHERE id = ? AND user_id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("ssssiiii", $ed_degree, $ed_fs, $ed_ins, $ed_sy, $ed_ey, $ed_gpa, $edit_id, $user_id);
         
-        $file = $_FILES['profile_picture'];
-        $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-        $maxSize = 5 * 1024 * 1024; // 5MB
-        
-        // Validate file
-        if ($file['error'] !== UPLOAD_ERR_OK) {
-            $response['message'] = 'File upload error.';
-        } elseif ($file['size'] > $maxSize) {
-            $response['message'] = 'File size must be less than 5MB.';
-        } elseif (!in_array($file['type'], $allowedTypes)) {
-            $response['message'] = 'Please select a valid image file (JPG, PNG, GIF).';
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true, 'message' => 'Education updated successfully']);
         } else {
-            // Generate unique filename
-            $fileExtension = pathinfo($file['name'], PATHINFO_EXTENSION);
-            $fileName = $user_id . '_' . time() . '.' . $fileExtension;
-            $targetPath = $uploadDir . $fileName;
-            
-            if (move_uploaded_file($file['tmp_name'], $targetPath)) {
-                // Update database with new profile picture
-                $stmt = $conn->prepare("UPDATE applicants SET profile_picture = ? WHERE id = ?");
-                $stmt->bind_param("si", $fileName, $user_id);
-                
-                if ($stmt->execute()) {
-                    $response['success'] = true;
-                    $response['message'] = 'Profile picture updated successfully!';
-                    $response['profile_picture_url'] = 'uploads/profile_pictures/' . $fileName;
-                } else {
-                    $response['message'] = 'Error updating profile picture in database.';
-                    // Clean up uploaded file on database error
-                    unlink($targetPath);
-                }
-                $stmt->close();
-            } else {
-                $response['message'] = 'Error uploading file.';
-            }
+            error_log("Education update error: " . $stmt->error);
+            echo json_encode(['success' => false, 'message' => 'Error updating education: ' . $stmt->error]);
+        }
+    } else {
+        // INSERT new record
+        $sql = "INSERT INTO user_education (user_id, degree, field_of_study, institution, start_year, end_year, gpa) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("isssiis", $user_id, $ed_degree, $ed_fs, $ed_ins, $ed_sy, $ed_ey, $ed_gpa);
+        
+        if ($stmt->execute()) {
+            error_log("SUCCESS: Education inserted with ID: " . $stmt->insert_id);
+            echo json_encode(['success' => true, 'message' => 'Education added successfully', 'id' => $stmt->insert_id]);
+        } else {
+            error_log("ERROR: Education insert failed: " . $stmt->error);
+            echo json_encode(['success' => false, 'message' => 'Error adding education: ' . $stmt->error]);
         }
     }
-    // Handle Personal Information form submission
-    elseif (isset($_POST['savePersonal'])) {
-        $applicant_fname = $conn->real_escape_string($_POST['applicant_fname'] ?? '');
-        $applicant_lname = $conn->real_escape_string($_POST['applicant_lname'] ?? '');
-        $applicant_email = $conn->real_escape_string($_POST['applicant_email'] ?? '');
-        $applicant_num = $conn->real_escape_string($_POST['applicant_num'] ?? '');
-        $applicant_address = $conn->real_escape_string($_POST['applicant_address'] ?? '');
+    $stmt->close();
+    error_log("=== EDUCATION SAVE END ===");
+    exit();
+}
+
+// Handle Work Experience Save
+if (isset($_POST['saveExperience'])) {
+    $edit_id = isset($_POST['edit_id']) && !empty($_POST['edit_id']) ? (int)$_POST['edit_id'] : 0;
+    $job_title = $conn->real_escape_string($_POST['job_title'] ?? '');
+    $work_comp = $conn->real_escape_string($_POST['work_comp'] ?? '');
+    $work_loc = $conn->real_escape_string($_POST['work_loc'] ?? '');
+    $start_date = $conn->real_escape_string($_POST['start_date'] ?? '');
+    $end_date = isset($_POST['is_current']) ? NULL : ($_POST['end_date'] ?? '');
+    $work_descript = $conn->real_escape_string($_POST['work_descript'] ?? '');
+    $is_current = isset($_POST['is_current']) ? 1 : 0;
+    
+    if (empty($job_title) || empty($work_comp) || empty($start_date)) {
+        echo json_encode(['success' => false, 'message' => 'Please fill in all required fields']);
+        exit();
+    }
+    
+    // Format dates
+    $start_date_formatted = $start_date . '-01';
+    $end_date_formatted = $end_date ? $end_date . '-01' : NULL;
+    
+    if ($edit_id > 0) {
+        // UPDATE existing record
+        $sql = "UPDATE user_experience SET job_title = ?, company = ?, location = ?, start_date = ?, end_date = ?, description = ?, is_current = ? 
+                WHERE id = ? AND user_id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("sssssssii", $job_title, $work_comp, $work_loc, $start_date_formatted, $end_date_formatted, $work_descript, $is_current, $edit_id, $user_id);
         
-        // Validate Philippine phone number format (09XXXXXXXXX)
-        if (!empty($applicant_num) && !preg_match('/^09[0-9]{9}$/', $applicant_num)) {
-            $response['success'] = false;
-            $response['message'] = 'Invalid phone number format. Please use Philippine mobile format (e.g., 09123456789)';
-            echo json_encode($response);
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true, 'message' => 'Work experience updated successfully']);
+        } else {
+            error_log("Experience update error: " . $stmt->error);
+            echo json_encode(['success' => false, 'message' => 'Error updating experience: ' . $stmt->error]);
+        }
+    } else {
+        // INSERT new record
+        $sql = "INSERT INTO user_experience (user_id, job_title, company, location, start_date, end_date, description, is_current) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("issssssi", $user_id, $job_title, $work_comp, $work_loc, $start_date_formatted, $end_date_formatted, $work_descript, $is_current);
+        
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true, 'message' => 'Work experience added successfully']);
+        } else {
+            error_log("Experience insert error: " . $stmt->error);
+            echo json_encode(['success' => false, 'message' => 'Error adding experience: ' . $stmt->error]);
+        }
+    }
+    $stmt->close();
+    exit();
+}
+
+// Handle Skill Save
+if (isset($_POST['saveSkill'])) {
+    $edit_id = isset($_POST['edit_id']) && !empty($_POST['edit_id']) ? (int)$_POST['edit_id'] : 0;
+    $skill_name = $conn->real_escape_string($_POST['skill_name'] ?? '');
+    $skill_category = 'general'; // Default category since field was removed
+    $skill_level = (int)($_POST['skill_level'] ?? 0);
+    
+    if (empty($skill_name) || $skill_level == 0) {
+        echo json_encode(['success' => false, 'message' => 'Please fill in skill name and select a skill level']);
+        exit();
+    }
+    
+    if ($skill_level < 1 || $skill_level > 5) {
+        echo json_encode(['success' => false, 'message' => 'Please select a valid skill level (1-5)']);
+        exit();
+    }
+    
+    if ($edit_id > 0) {
+        // UPDATE existing record
+        $sql = "UPDATE user_skills SET skill_name = ?, skill_category = ?, skill_level = ? 
+                WHERE id = ? AND user_id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("ssiii", $skill_name, $skill_category, $skill_level, $edit_id, $user_id);
+        
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true, 'message' => 'Skill updated successfully']);
+        } else {
+            error_log("Skill update error: " . $stmt->error);
+            echo json_encode(['success' => false, 'message' => 'Error updating skill: ' . $stmt->error]);
+        }
+    } else {
+        // INSERT new record
+        $sql = "INSERT INTO user_skills (user_id, skill_name, skill_category, skill_level) 
+                VALUES (?, ?, ?, ?)";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("issi", $user_id, $skill_name, $skill_category, $skill_level);
+        
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true, 'message' => 'Skill added successfully']);
+        } else {
+            error_log("Skill insert error: " . $stmt->error);
+            echo json_encode(['success' => false, 'message' => 'Error adding skill: ' . $stmt->error]);
+        }
+    }
+    $stmt->close();
+    exit();
+}
+
+// Handle DELETE requests (parse body manually since PHP doesn't populate $_POST for DELETE)
+if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+    parse_str(file_get_contents('php://input'), $delete_data);
+    
+    // Handle Delete Education
+    if (isset($delete_data['delete_education'])) {
+        $id = (int)($delete_data['id'] ?? 0);
+        
+        if ($id <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Invalid ID']);
             exit();
         }
         
-        // Update applicants table
-        $stmt = $conn->prepare("UPDATE applicants SET first_name = ?, last_name = ?, applicant_email = ?, contact_number = ?, address = ? WHERE id = ?");
-        $stmt->bind_param("sssssi", $applicant_fname, $applicant_lname, $applicant_email, $applicant_num, $applicant_address, $user_id);
+        $sql = "DELETE FROM user_education WHERE id = ? AND user_id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("ii", $id, $user_id);
         
         if ($stmt->execute()) {
-            $response['success'] = true;
-            $response['message'] = 'Personal information updated successfully!';
+            if ($stmt->affected_rows > 0) {
+                echo json_encode(['success' => true, 'message' => 'Education deleted successfully']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Education record not found']);
+            }
         } else {
-            $response['message'] = 'Error updating personal information: ' . $stmt->error;
+            error_log("Delete education error: " . $stmt->error);
+            echo json_encode(['success' => false, 'message' => 'Error deleting education']);
         }
         $stmt->close();
-    }
-    // Handle Education form submission (add or update)
-    elseif (isset($_POST['saveEducation']) || (isset($_POST['ed_degree']) && isset($_POST['ed_fs']))) {
-        if (empty($_POST['ed_degree']) || empty($_POST['ed_fs']) || empty($_POST['ed_ins']) || 
-            empty($_POST['ed_sy']) || empty($_POST['ed_ey'])) {
-            $response['message'] = 'Please fill in all required fields.';
-        } else {
-            $ed_degree = $conn->real_escape_string($_POST['ed_degree']);
-            $ed_fs = $conn->real_escape_string($_POST['ed_fs']);
-            $ed_ins = $conn->real_escape_string($_POST['ed_ins']);
-            $ed_sy = (int)$_POST['ed_sy'];
-            $ed_ey = (int)$_POST['ed_ey'];
-            $ed_gpa = isset($_POST['ed_gpa']) ? $conn->real_escape_string($_POST['ed_gpa']) : '';
-            
-            // Check if this is an update (edit_id present) or insert
-            if (isset($_POST['edit_id']) && !empty($_POST['edit_id'])) {
-                $edit_id = (int)$_POST['edit_id'];
-                $stmt = $conn->prepare("UPDATE user_education SET degree = ?, field_of_study = ?, institution = ?, start_year = ?, end_year = ?, gpa = ? WHERE id = ? AND user_id = ?");
-                $stmt->bind_param("sssiisii", $ed_degree, $ed_fs, $ed_ins, $ed_sy, $ed_ey, $ed_gpa, $edit_id, $user_id);
-                
-                if ($stmt->execute()) {
-                    $response['success'] = true;
-                    $response['message'] = 'Education updated successfully!';
-                    $response['data'] = [
-                        'id' => $edit_id,
-                        'degree' => $ed_degree,
-                        'field_of_study' => $ed_fs,
-                        'institution' => $ed_ins,
-                        'start_year' => $ed_sy,
-                        'end_year' => $ed_ey,
-                        'gpa' => $ed_gpa
-                    ];
-                } else {
-                    $response['message'] = 'Error updating education data: ' . $stmt->error;
-                }
-            } else {
-                // Insert new education
-                $stmt = $conn->prepare("INSERT INTO user_education (user_id, degree, field_of_study, institution, start_year, end_year, gpa) 
-                               VALUES (?, ?, ?, ?, ?, ?, ?)");
-                $stmt->bind_param("isssiss", $user_id, $ed_degree, $ed_fs, $ed_ins, $ed_sy, $ed_ey, $ed_gpa);
-
-                if ($stmt->execute()) {
-                    error_log("Education added successfully for user_id: " . $user_id);
-                    $educationData = [
-                        'id' => $conn->insert_id,
-                        'degree' => $ed_degree,
-                        'field_of_study' => $ed_fs,
-                        'institution' => $ed_ins,
-                        'start_year' => $ed_sy,
-                        'end_year' => $ed_ey,
-                        'gpa' => $ed_gpa
-                    ];
-                    $response['success'] = true;
-                    $response['message'] = 'Education added successfully!';
-                    $response['data'] = $educationData;
-                } else {
-                    error_log("Error executing education insert: " . $stmt->error);
-                    $response['message'] = 'Error saving education data: ' . $stmt->error;
-                }
-            }
-        }
+        exit();
     }
     
-    // Handle Experience form submission (add or update)
-    elseif (isset($_POST['saveExperience']) || (isset($_POST['job_title']) && isset($_POST['work_comp']))) {
-        if (empty($_POST['job_title']) || empty($_POST['work_comp']) || empty($_POST['start_date']) || empty($_POST['end_date'])) {
-            $response['message'] = 'Please fill in all required fields.';
-        } else {
-            $job_title = $conn->real_escape_string($_POST['job_title']);
-            $work_comp = $conn->real_escape_string($_POST['work_comp']);
-            $work_loc = isset($_POST['work_loc']) ? $conn->real_escape_string($_POST['work_loc']) : '';
-            $start_date = $conn->real_escape_string($_POST['start_date']);
-            $end_date = $conn->real_escape_string($_POST['end_date']);
-            $work_descript = ''; // Description removed from form
-            $is_current = 0; // Checkbox removed from form
-
-            // Convert date format from YYYY-MM to YYYY-MM-01 for MySQL DATE type
-            $start_date_formatted = $start_date . '-01';
-            $end_date_formatted = $end_date . '-01';
-            
-            // Check if this is an update (edit_id present) or insert
-            if (isset($_POST['edit_id']) && !empty($_POST['edit_id'])) {
-                $edit_id = (int)$_POST['edit_id'];
-                $stmt = $conn->prepare("UPDATE user_experience SET job_title = ?, company = ?, location = ?, start_date = ?, end_date = ?, description = ?, is_current = ? WHERE id = ? AND user_id = ?");
-                $stmt->bind_param("ssssssiis", $job_title, $work_comp, $work_loc, $start_date_formatted, $end_date_formatted, $work_descript, $is_current, $edit_id, $user_id);
-                
-                if ($stmt->execute()) {
-                    $response['success'] = true;
-                    $response['message'] = 'Work experience updated successfully!';
-                    $response['data'] = [
-                        'id' => $edit_id,
-                        'job_title' => $job_title,
-                        'company' => $work_comp,
-                        'location' => $work_loc,
-                        'start_date' => $start_date_formatted,
-                        'end_date' => $end_date_formatted,
-                        'description' => $work_descript,
-                        'is_current' => $is_current
-                    ];
-                } else {
-                    $response['message'] = 'Error updating work experience: ' . $stmt->error;
-                }
-                $stmt->close();
-            } else {
-                // Insert new experience
-                $sql_insert = "INSERT INTO user_experience (user_id, job_title, company, location, start_date, end_date, description, is_current) 
-                               VALUES ('$user_id', '$job_title', '$work_comp', '$work_loc', '$start_date_formatted', " . 
-                               ($end_date_formatted ? "'$end_date_formatted'" : "NULL") . ", '$work_descript', '$is_current')";
-
-                if ($conn->query($sql_insert) === TRUE) {
-                    $experienceData = [
-                        'id' => $conn->insert_id,
-                        'job_title' => $job_title,
-                        'company' => $work_comp,
-                        'location' => $work_loc,
-                        'start_date' => $start_date_formatted,
-                        'end_date' => $end_date_formatted,
-                        'description' => $work_descript,
-                        'is_current' => $is_current
-                    ];
-                    $response['success'] = true;
-                    $response['message'] = 'Work experience added successfully.';
-                    $response['data'] = $experienceData;
-                } else {
-                    $response['message'] = 'Error adding work experience: ' . $conn->error;
-                }
-            }
+    // Handle Delete Experience
+    if (isset($delete_data['delete_experience'])) {
+        $id = (int)($delete_data['id'] ?? 0);
+        
+        if ($id <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Invalid ID']);
+            exit();
         }
+        
+        $sql = "DELETE FROM user_experience WHERE id = ? AND user_id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("ii", $id, $user_id);
+        
+        if ($stmt->execute()) {
+            if ($stmt->affected_rows > 0) {
+                echo json_encode(['success' => true, 'message' => 'Work experience deleted successfully']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Work experience not found']);
+            }
+        } else {
+            error_log("Delete experience error: " . $stmt->error);
+            echo json_encode(['success' => false, 'message' => 'Error deleting work experience']);
+        }
+        $stmt->close();
+        exit();
     }
     
-    // Handle Skill form submission (add or update)
-    elseif (isset($_POST['saveSkill']) || (isset($_POST['skill_name']) && isset($_POST['skill_category']))) {
-        if (empty($_POST['skill_name']) || empty($_POST['skill_category']) || empty($_POST['skill_level']) || $_POST['skill_level'] == '0') {
-            $response['message'] = 'Please fill in all required fields and select a skill level.';
-        } else {
-            $skill_name = $conn->real_escape_string($_POST['skill_name']);
-            $skill_category = $conn->real_escape_string($_POST['skill_category']);
-            $skill_level = (int)$_POST['skill_level'];
-
-            if ($skill_level < 1 || $skill_level > 5) {
-                $response['message'] = 'Please select a valid skill level (1-5).';
-            } else {
-                // Check if this is an update (edit_id present) or insert
-                if (isset($_POST['edit_id']) && !empty($_POST['edit_id'])) {
-                    $edit_id = (int)$_POST['edit_id'];
-                    $stmt = $conn->prepare("UPDATE user_skills SET skill_name = ?, skill_category = ?, skill_level = ? WHERE id = ? AND user_id = ?");
-                    $stmt->bind_param("ssiii", $skill_name, $skill_category, $skill_level, $edit_id, $user_id);
-                    
-                    if ($stmt->execute()) {
-                        $response['success'] = true;
-                        $response['message'] = 'Skill updated successfully!';
-                        $response['data'] = [
-                            'id' => $edit_id,
-                            'skill_name' => $skill_name,
-                            'skill_category' => $skill_category,
-                            'skill_level' => $skill_level
-                        ];
-                    } else {
-                        $response['message'] = 'Error updating skill: ' . $stmt->error;
-                    }
-                    $stmt->close();
-                } else {
-                    // Insert new skill
-                    $sql_insert = "INSERT INTO user_skills (user_id, skill_name, skill_category, skill_level) 
-                                   VALUES ('$user_id', '$skill_name', '$skill_category', '$skill_level')";
-
-                    if ($conn->query($sql_insert) === TRUE) {
-                        $skillData = [
-                            'id' => $conn->insert_id,
-                            'skill_name' => $skill_name,
-                            'skill_category' => $skill_category,
-                            'skill_level' => $skill_level
-                        ];
-                        $response['success'] = true;
-                        $response['message'] = 'Skill added successfully.';
-                        $response['data'] = $skillData;
-                    } else {
-                        $response['message'] = 'Error adding skill: ' . $conn->error;
-                    }
-                }
-            }
+    // Handle Delete Skill
+    if (isset($delete_data['delete_skill'])) {
+        $id = (int)($delete_data['id'] ?? 0);
+        
+        if ($id <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Invalid ID']);
+            exit();
         }
+        
+        $sql = "DELETE FROM user_skills WHERE id = ? AND user_id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("ii", $id, $user_id);
+        
+        if ($stmt->execute()) {
+            if ($stmt->affected_rows > 0) {
+                echo json_encode(['success' => true, 'message' => 'Skill deleted successfully']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Skill not found']);
+            }
+        } else {
+            error_log("Delete skill error: " . $stmt->error);
+            echo json_encode(['success' => false, 'message' => 'Error deleting skill']);
+        }
+        $stmt->close();
+        exit();
     }
-    else {
-        $response['message'] = 'Invalid form submission.';
-    }
-} else {
-    $response['message'] = 'Invalid request method.';
 }
 
+// Handle Profile Picture Upload
+if (isset($_FILES['profile_picture'])) {
+    $target_dir = "uploads/profile_pictures/";
+    
+    // Create directory if it doesn't exist
+    if (!is_dir($target_dir)) {
+        mkdir($target_dir, 0777, true);
+    }
+    
+    $file_extension = strtolower(pathinfo($_FILES["profile_picture"]["name"], PATHINFO_EXTENSION));
+    $allowed_extensions = array("jpg", "jpeg", "png", "gif");
+    
+    if (!in_array($file_extension, $allowed_extensions)) {
+        echo json_encode(['success' => false, 'message' => 'Only JPG, JPEG, PNG & GIF files are allowed']);
+        exit();
+    }
+    
+    if ($_FILES["profile_picture"]["size"] > 5000000) {
+        echo json_encode(['success' => false, 'message' => 'File is too large. Max size is 5MB']);
+        exit();
+    }
+    
+    $new_filename = "profile_" . $user_id . "_" . time() . "." . $file_extension;
+    $target_file = $target_dir . $new_filename;
+    
+    if (move_uploaded_file($_FILES["profile_picture"]["tmp_name"], $target_file)) {
+        // Update database
+        $sql = "UPDATE applicants SET profile_picture = ? WHERE id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("si", $new_filename, $user_id);
+        
+        if ($stmt->execute()) {
+            // Return both filename and full URL path
+            $profile_picture_url = 'uploads/profile_pictures/' . $new_filename;
+            echo json_encode([
+                'success' => true, 
+                'message' => 'Profile picture updated', 
+                'filename' => $new_filename,
+                'profile_picture_url' => $profile_picture_url
+            ]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Error updating database']);
+        }
+        $stmt->close();
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Error uploading file']);
+    }
+    exit();
+}
+
+// Handle Password Update
+if (isset($_POST['updatePassword'])) {
+    error_log("=== PASSWORD UPDATE REQUEST START ===");
+    error_log("User ID: " . $user_id);
+    
+    $current_password = $_POST['current_password'] ?? '';
+    $new_password = $_POST['new_password'] ?? '';
+    
+    error_log("Current password length: " . strlen($current_password));
+    error_log("New password length: " . strlen($new_password));
+    
+    if (empty($current_password) || empty($new_password)) {
+        error_log("ERROR: Empty password fields");
+        echo json_encode(['success' => false, 'message' => 'Please provide both current and new passwords']);
+        exit();
+    }
+    
+    // Validate new password length
+    if (strlen($new_password) < 8) {
+        echo json_encode(['success' => false, 'message' => 'New password must be at least 8 characters long']);
+        exit();
+    }
+    
+    // Fetch current password from database
+    error_log("Fetching current password from database...");
+    $sql = "SELECT applicant_password FROM applicants WHERE id = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows === 0) {
+        error_log("ERROR: User not found in database");
+        $stmt->close();
+        echo json_encode(['success' => false, 'message' => 'User not found']);
+        exit();
+    }
+    
+    $row = $result->fetch_assoc();
+    $stored_password = $row['applicant_password'];
+    $stmt->close();
+    error_log("Stored password retrieved (length: " . strlen($stored_password) . ")");
+    
+    // Verify current password
+    if ($current_password !== $stored_password) {
+        error_log("ERROR: Current password does not match stored password");
+        echo json_encode(['success' => false, 'message' => 'Current password is incorrect']);
+        exit();
+    }
+    error_log("Current password verified successfully");
+    
+    // Check if new password is different from current
+    if ($current_password === $new_password) {
+        error_log("ERROR: New password is same as current password");
+        echo json_encode(['success' => false, 'message' => 'New password must be different from current password']);
+        exit();
+    }
+    error_log("New password is different from current");
+    
+    // Update password in database
+    error_log("Updating password in database...");
+    $update_sql = "UPDATE applicants SET applicant_password = ?, password_change_required = 0 WHERE id = ?";
+    $update_stmt = $conn->prepare($update_sql);
+    $update_stmt->bind_param("si", $new_password, $user_id);
+    
+    if ($update_stmt->execute()) {
+        error_log("SUCCESS: Password updated successfully");
+        $update_stmt->close();
+        echo json_encode(['success' => true, 'message' => 'Password updated successfully']);
+    } else {
+        error_log("ERROR: Password update failed: " . $update_stmt->error);
+        $update_stmt->close();
+        echo json_encode(['success' => false, 'message' => 'Error updating password: ' . $update_stmt->error]);
+    }
+    
+    error_log("=== PASSWORD UPDATE REQUEST END ===");
+    exit();
+}
+
+echo json_encode(['success' => false, 'message' => 'No valid action specified']);
 $conn->close();
-echo json_encode($response);
 ?>

@@ -45,37 +45,106 @@ if (!empty($admin_name)) {
 // Get dashboard statistics from job_applicants table
 $stats = [];
 
+// Admin role should NOT see application statistics
+$show_applicant_stats = false;
+$department_filter = "";
+$department_params = [];
+
+if (($admin_role === 'Department Head' || $admin_role === 'HR Manager' || $admin_role === 'Recruiter') && !empty($admin_department)) {
+    $show_applicant_stats = true;
+    $department_filter = " AND assigned_to_department = ?";
+    $department_params[] = $admin_department;
+}
+
 // Total Applications (excluding rejected/archived)
-$result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status != 'Rejected'");
-$stats['total_applicants'] = $result ? $result->fetch_assoc()['count'] : 0;
+if ($show_applicant_stats && !empty($department_params)) {
+    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status != 'Rejected'" . $department_filter);
+    $stmt->bind_param("s", ...$department_params);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $stats['total_applicants'] = $result->fetch_assoc()['count'];
+} else {
+    // Admin or users without department see 0
+    $stats['total_applicants'] = 0;
+}
 
 // Archived (Rejected) Applications
-$result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status = 'Rejected'");
-$stats['archived'] = $result ? $result->fetch_assoc()['count'] : 0;
+if ($show_applicant_stats && !empty($department_params)) {
+    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status = 'Rejected'" . $department_filter);
+    $stmt->bind_param("s", ...$department_params);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $stats['archived'] = $result->fetch_assoc()['count'];
+} else {
+    $stats['archived'] = 0;
+}
 
-// Total Jobs from job table
-$result = $conn->query("SELECT COUNT(*) as count FROM job");
-$stats['total_jobs'] = $result ? $result->fetch_assoc()['count'] : 0;
+// Total Jobs from job table (filter by department for department heads)
+if (!empty($department_params)) {
+    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job WHERE department_role = ?");
+    $stmt->bind_param("s", ...$department_params);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $stats['total_jobs'] = $result->fetch_assoc()['count'];
+} else {
+    $result = $conn->query("SELECT COUNT(*) as count FROM job");
+    $stats['total_jobs'] = $result ? $result->fetch_assoc()['count'] : 0;
+}
 
 // Active Users (unique applicants)
-$result = $conn->query("SELECT COUNT(DISTINCT full_name) as count FROM job_applicants");
-$stats['active_users'] = $result ? $result->fetch_assoc()['count'] : 0;
+if ($show_applicant_stats && !empty($department_params)) {
+    $stmt = $conn->prepare("SELECT COUNT(DISTINCT full_name) as count FROM job_applicants WHERE 1=1" . $department_filter);
+    $stmt->bind_param("s", ...$department_params);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $stats['active_users'] = $result->fetch_assoc()['count'];
+} else {
+    $stats['active_users'] = 0;
+}
 
 // Pending Reviews (Under Review)
-$result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status = 'Pending'");
-$stats['pending_reviews'] = $result ? $result->fetch_assoc()['count'] : 0;
+if ($show_applicant_stats && !empty($department_params)) {
+    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status = 'Pending'" . $department_filter);
+    $stmt->bind_param("s", ...$department_params);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $stats['pending_reviews'] = $result->fetch_assoc()['count'];
+} else {
+    $stats['pending_reviews'] = 0;
+}
 
 // Interview Scheduled
-$result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status = 'Interview Scheduled'");
-$stats['interview_scheduled'] = $result ? $result->fetch_assoc()['count'] : 0;
+if ($show_applicant_stats && !empty($department_params)) {
+    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status = 'Interview Scheduled'" . $department_filter);
+    $stmt->bind_param("s", ...$department_params);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $stats['interview_scheduled'] = $result->fetch_assoc()['count'];
+} else {
+    $stats['interview_scheduled'] = 0;
+}
 
 // Hired
-$result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status = 'Hired'");
-$stats['hired'] = $result ? $result->fetch_assoc()['count'] : 0;
+if ($show_applicant_stats && !empty($department_params)) {
+    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status = 'Hired'" . $department_filter);
+    $stmt->bind_param("s", ...$department_params);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $stats['hired'] = $result->fetch_assoc()['count'];
+} else {
+    $stats['hired'] = 0;
+}
 
 // Get recent applications (last 5)
-$recent_applicants_query = "SELECT * FROM job_applicants ORDER BY applied_date DESC LIMIT 5";
-$recent_applicants = $conn->query($recent_applicants_query);
+if ($show_applicant_stats && !empty($department_params)) {
+    $stmt = $conn->prepare("SELECT * FROM job_applicants WHERE 1=1" . $department_filter . " ORDER BY applied_date DESC LIMIT 5");
+    $stmt->bind_param("s", ...$department_params);
+    $stmt->execute();
+    $recent_applicants = $stmt->get_result();
+} else {
+    // Admin sees no applications - create empty result
+    $recent_applicants = null;
+}
 
 // Get recent jobs from job table with application counts
 $recent_jobs_query = "SELECT j.*, COUNT(ja.id) as application_count 
@@ -119,8 +188,16 @@ switch($chart_filter) {
         for ($i = 23; $i >= 0; $i--) {
             $hour = date('Y-m-d H:00:00', strtotime("-$i hours"));
             $next_hour = date('Y-m-d H:00:00', strtotime("-" . ($i-1) . " hours"));
-            $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE applied_date >= '$hour' AND applied_date < '$next_hour'");
-            $chart_data[] = $result ? $result->fetch_assoc()['count'] : 0;
+            if (!empty($department_params)) {
+                $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE applied_date >= ? AND applied_date < ?" . $department_filter);
+                $stmt->bind_param("sss", $hour, $next_hour, ...$department_params);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $chart_data[] = $result->fetch_assoc()['count'];
+            } else {
+                $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE applied_date >= '$hour' AND applied_date < '$next_hour'");
+                $chart_data[] = $result ? $result->fetch_assoc()['count'] : 0;
+            }
             $chart_labels[] = date('H:i', strtotime($hour));
         }
         break;
@@ -128,8 +205,16 @@ switch($chart_filter) {
         // Last 30 days
         for ($i = 29; $i >= 0; $i--) {
             $date = date('Y-m-d', strtotime("-$i days"));
-            $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = '$date'");
-            $chart_data[] = $result ? $result->fetch_assoc()['count'] : 0;
+            if (!empty($department_params)) {
+                $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = ?" . $department_filter);
+                $stmt->bind_param("ss", $date, ...$department_params);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $chart_data[] = $result->fetch_assoc()['count'];
+            } else {
+                $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = '$date'");
+                $chart_data[] = $result ? $result->fetch_assoc()['count'] : 0;
+            }
             $chart_labels[] = date('M j', strtotime($date));
         }
         break;
@@ -137,8 +222,16 @@ switch($chart_filter) {
         // Last 12 months
         for ($i = 11; $i >= 0; $i--) {
             $month = date('Y-m', strtotime("-$i months"));
-            $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE DATE_FORMAT(applied_date, '%Y-%m') = '$month'");
-            $chart_data[] = $result ? $result->fetch_assoc()['count'] : 0;
+            if (!empty($department_params)) {
+                $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE DATE_FORMAT(applied_date, '%Y-%m') = ?" . $department_filter);
+                $stmt->bind_param("ss", $month, ...$department_params);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $chart_data[] = $result->fetch_assoc()['count'];
+            } else {
+                $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE DATE_FORMAT(applied_date, '%Y-%m') = '$month'");
+                $chart_data[] = $result ? $result->fetch_assoc()['count'] : 0;
+            }
             $chart_labels[] = date('M Y', strtotime($month . '-01'));
         }
         break;
@@ -146,8 +239,16 @@ switch($chart_filter) {
         // Last 7 days
         for ($i = 6; $i >= 0; $i--) {
             $date = date('Y-m-d', strtotime("-$i days"));
-            $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = '$date'");
-            $chart_data[] = $result ? $result->fetch_assoc()['count'] : 0;
+            if (!empty($department_params)) {
+                $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = ?" . $department_filter);
+                $stmt->bind_param("ss", $date, ...$department_params);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $chart_data[] = $result->fetch_assoc()['count'];
+            } else {
+                $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = '$date'");
+                $chart_data[] = $result ? $result->fetch_assoc()['count'] : 0;
+            }
             $chart_labels[] = date('M j', strtotime($date));
         }
 }
@@ -171,8 +272,8 @@ $recent_activity = $conn->query($recent_activity_query);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NCHire Admin Dashboard</title>
-    <link rel="icon" type="image/png" href="../assets/images/image-removebg-preview (1).png">
-    <link rel="shortcut icon" type="image/png" href="../assets/images/image-removebg-preview (1).png">
+    <link rel="icon" type="image/png" href="../public/assets/images/image-removebg-preview (1).png">
+    <link rel="shortcut icon" type="image/png" href="../public/assets/images/image-removebg-preview (1).png">
     <script src="https://cdn.tailwindcss.com/3.4.16"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script>
@@ -258,6 +359,7 @@ $recent_activity = $conn->query($recent_activity_query);
                 <i class="fas fa-briefcase w-5 h-5"></i>
                 Job Postings
             </button>
+            <?php if ($admin_role === 'Secretary' || $admin_role === 'Department Head' || $admin_role === 'HR Manager' || $admin_role === 'Recruiter'): ?>
             <button onclick="showSection('applicants')" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg mb-2 text-gray-700 hover:bg-gray-100">
                 <i class="fas fa-user-check w-5 h-5"></i>
                 Applicants
@@ -266,6 +368,7 @@ $recent_activity = $conn->query($recent_activity_query);
                 <i class="fas fa-archive w-5 h-5"></i>
                 Archive
             </button>
+            <?php endif; ?>
             <?php if ($admin_role === 'Admin'): ?>
             <button onclick="showSection('users')" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg mb-2 text-gray-700 hover:bg-gray-100">
                 <i class="fas fa-users w-5 h-5"></i>
@@ -278,7 +381,7 @@ $recent_activity = $conn->query($recent_activity_query);
     <!-- Main content -->
     <div class="lg:ml-64">
         <!-- Top header -->
-        <header class="bg-white shadow-sm border-b border-gray-200">
+        <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
             <div class="flex items-center justify-between h-16 px-6">
                 <div class="flex items-center gap-4">
                     <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
@@ -704,7 +807,7 @@ $recent_activity = $conn->query($recent_activity_query);
             <div id="jobsSection" class="section hidden">
                 <div class="flex items-center justify-between mb-6">
                     <h1 class="text-3xl font-bold text-gray-900">Job Postings</h1>
-                    <button onclick="openJobTypeSelectionModal()" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors flex items-center gap-2">
+                    <button onclick="openCreateJobModal()" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors flex items-center gap-2">
     <i class="fas fa-plus"></i>
     Create Job
 </button>
@@ -807,19 +910,52 @@ $recent_activity = $conn->query($recent_activity_query);
                     </div>
                 </div>
 
-                <!-- Filter -->
+                <!-- Filter Section -->
                 <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 p-4">
-                    <div class="flex items-center gap-2">
-                        <label for="statusFilter" class="text-sm font-medium text-gray-700">Filter by Status:</label>
-                        <select id="statusFilter" onchange="filterApplicantsByStatus(this.value)" 
-                                class="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                            <option value="all">All Applicants</option>
-                            <option value="Pending">Pending</option>
-                            <option value="Interview Scheduled">Interview Scheduled</option>
-                            <option value="Resubmission Required">Resubmission Required</option>
-                            <option value="Rejected">Rejected</option>
-                            <option value="Hired">Hired</option>
-                        </select>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <!-- Search by Name -->
+                        <div>
+                            <label for="nameSearch" class="block text-sm font-medium text-gray-700 mb-1">Search Applicant:</label>
+                            <input type="text" id="nameSearch" placeholder="Search by name..." 
+                                   oninput="applyAllFilters()"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        
+                        <!-- Status Filter -->
+                        <div>
+                            <label for="statusFilter" class="block text-sm font-medium text-gray-700 mb-1">Filter by Status:</label>
+                            <select id="statusFilter" onchange="applyAllFilters()" 
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="all">All Applicants</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Interview Scheduled">Interview Scheduled</option>
+                                <option value="Resubmission Required">Resubmission Required</option>
+                                <option value="Rejected">Rejected</option>
+                                <option value="Hired">Hired</option>
+                            </select>
+                        </div>
+                        
+                        <!-- From Date -->
+                        <div>
+                            <label for="fromDate" class="block text-sm font-medium text-gray-700 mb-1">From Date:</label>
+                            <input type="date" id="fromDate" onchange="applyAllFilters()"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        
+                        <!-- To Date -->
+                        <div>
+                            <label for="toDate" class="block text-sm font-medium text-gray-700 mb-1">To Date:</label>
+                            <input type="date" id="toDate" onchange="applyAllFilters()"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                    
+                    <!-- Clear Filters Button -->
+                    <div class="mt-3 flex justify-end">
+                        <button onclick="clearAllFilters()" 
+                                class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors">
+                            <i class="fas fa-times mr-2"></i>Clear Filters
+                        </button>
                     </div>
                 </div>
 
@@ -831,6 +967,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Applicant</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Position</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Applied Date</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -908,6 +1045,13 @@ $recent_activity = $conn->query($recent_activity_query);
                         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                             <h2 class="text-lg font-semibold text-gray-900 mb-4">Actions</h2>
                             <div id="actionButtons" class="space-y-3">
+                                <!-- Secretary Action: Transfer to Department Head -->
+                                <button id="transferToDeptHeadBtn" onclick="openTransferModal()" 
+                                        class="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 hidden">
+                                    <i class="fas fa-share"></i>
+                                    Transfer to Department Head
+                                </button>
+                                
                                 <button id="scheduleBtn" onclick="openScheduleModal()" 
                                         class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
                                     <i class="fas fa-calendar-alt"></i>
@@ -947,13 +1091,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                 <button id="hireBtn" onclick="openHireModal()" 
                                         class="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 hidden">
                                     <i class="fas fa-check-circle"></i>
-                                    Initially Hire Applicant
-                                </button>
-                                
-                                <button id="permanentHireBtn" onclick="openPermanentHireModal()" 
-                                        class="w-full bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-800 transition-colors flex items-center justify-center gap-2 hidden">
-                                    <i class="fas fa-user-tie"></i>
-                                    Permanently Hire
+                                    Hire Applicant
                                 </button>
                                 
                                 <button id="resubmitBtn" onclick="openResubmitModal()" 
@@ -1132,8 +1270,8 @@ $recent_activity = $conn->query($recent_activity_query);
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
-                        <input type="text" name="title" required
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                        <input type="text" name="title" value="Instructor" required readonly
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-gray-100 cursor-not-allowed"
                                placeholder="Enter job title">
                     </div>
                     <div>
@@ -1156,13 +1294,12 @@ $recent_activity = $conn->query($recent_activity_query);
                                 class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                             <option value="Full-time">Full-time</option>
                             <option value="Part-time">Part-time</option>
-                            <option value="Contract">Contract</option>
                         </select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                        <input type="text" name="location" required
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                        <input type="text" name="location" value="Norzagaray College" required readonly
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-gray-100 cursor-not-allowed"
                                placeholder="Job location">
                     </div>
                 </div>
@@ -1876,17 +2013,18 @@ $recent_activity = $conn->query($recent_activity_query);
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Role *</label>
-                            <select name="role" required
+                            <select name="role" id="createUserRole" required
                                     class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                                 <option value="">Select role</option>
                                 <option value="Admin">Admin</option>
                                 <option value="Department Head">Department Head</option>
+                                <option value="Secretary">Secretary</option>
                             </select>
                         </div>
 
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Department *</label>
-                            <select name="department" required
+                        <div id="createDepartmentContainer">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Department <span id="createDeptRequired">*</span></label>
+                            <select name="department" id="createUserDepartment" required
                                     class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                                 <option value="">Select department</option>
                                 <option value="Computer Science">Computer Science</option>
@@ -1997,14 +2135,13 @@ $recent_activity = $conn->query($recent_activity_query);
                                     class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                                 <option value="">Select role</option>
                                 <option value="Admin">Admin</option>
-                                <option value="HR Manager">HR Manager</option>
                                 <option value="Department Head">Department Head</option>
-                                <option value="Recruiter">Recruiter</option>
+                                <option value="Secretary">Secretary</option> 
                             </select>
                         </div>
 
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Department *</label>
+                        <div id="editDepartmentContainer">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Department <span id="editDeptRequired">*</span></label>
                             <select name="department" id="editUserDepartment" required
                                     class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                                 <option value="">Select department</option>
@@ -2159,6 +2296,10 @@ $recent_activity = $conn->query($recent_activity_query);
     <script src="admin.js"></script>
     
     <script>
+        // Pass PHP session variables to JavaScript
+        const CURRENT_ADMIN_ROLE = '<?php echo $admin_role; ?>';
+        const CURRENT_ADMIN_NAME = '<?php echo htmlspecialchars($admin_name); ?>';
+        
         // Real-time dashboard functionality
         let refreshInterval;
         let isAutoRefreshEnabled = true;
@@ -2538,6 +2679,20 @@ $recent_activity = $conn->query($recent_activity_query);
                     </div>
                     
                     <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                        <input type="text" id="interviewLocation" required readonly
+                               value="Norzagaray College"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Room</label>
+                        <input type="text" id="interviewRoom" required 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                               placeholder="e.g., Room 201, HR Office">
+                    </div>
+                    
+                    <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
                         <textarea id="interviewNotes" rows="3" 
                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -2591,6 +2746,20 @@ $recent_activity = $conn->query($recent_activity_query);
                     </div>
                     
                     <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                        <input type="text" id="rescheduleInterviewLocation" required readonly
+                               value="Norzagaray College"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Room</label>
+                        <input type="text" id="rescheduleInterviewRoom" required 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                               placeholder="e.g., Room 201, HR Office">
+                    </div>
+                    
+                    <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Reason for Rescheduling</label>
                         <textarea id="rescheduleInterviewNotes" rows="3" required
                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -2641,6 +2810,20 @@ $recent_activity = $conn->query($recent_activity_query);
                         <label class="block text-sm font-medium text-gray-700 mb-1">New Demo Time</label>
                         <input type="time" id="rescheduleDemoTime" required 
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                        <input type="text" id="rescheduleDemoLocation" required readonly
+                               value="Norzagaray College"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Room</label>
+                        <input type="text" id="rescheduleDemoRoom" required 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                               placeholder="e.g., Room 301, Lab 2">
                     </div>
                     
                     <div>
@@ -2778,6 +2961,56 @@ $recent_activity = $conn->query($recent_activity_query);
                     <button type="submit" 
                             class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
                         Reject Application
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Transfer to Department Head Modal -->
+    <div id="transferModal" class="fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Transfer to Department Head</h3>
+                <button onclick="closeTransferModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <form id="transferForm">
+                <div class="space-y-4">
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div>
+                                <h4 class="font-semibold text-blue-900 text-sm">Document Review Complete</h4>
+                                <p class="text-xs text-blue-700 mt-1">
+                                    This will transfer the application to the Department Head for interview scheduling and further evaluation.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Notes (Optional)
+                        </label>
+                        <textarea id="transferNotes" rows="3"
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                  placeholder="Add any notes or comments for the Department Head..."></textarea>
+                        <p class="text-xs text-gray-500 mt-1">Any observations or important details about the documents.</p>
+                    </div>
+                </div>
+                
+                <div class="flex gap-3 mt-6">
+                    <button type="button" onclick="closeTransferModal()" 
+                            class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center gap-2">
+                        <i class="fas fa-share"></i>
+                        Transfer Application
                     </button>
                 </div>
             </form>
@@ -3484,7 +3717,7 @@ async function updateMyProfile(event) {
     event.preventDefault();
     
     const formData = new FormData();
-    formData.append('id', <?php echo $_SESSION['admin_id'] ?? 0; ?>);
+    formData.append('user_id', <?php echo $_SESSION['admin_id'] ?? 0; ?>);
     formData.append('name', document.getElementById('myProfileName').value);
     // Email is read-only, use current email from session
     formData.append('email', '<?php echo htmlspecialchars($admin_email); ?>');
@@ -3543,14 +3776,53 @@ async function updateMyProfile(event) {
 async function loadNotifications() {
     try {
         const response = await fetch('api/admin_notifications.php?limit=20');
-        const data = await response.json();
+        
+        // Check if response is OK
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        // Get response text first to check if it's valid JSON
+        const text = await response.text();
+        
+        // Try to parse JSON
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            console.error('Invalid JSON response:', text.substring(0, 200));
+            throw new Error('Server returned invalid JSON. Check PHP error log.');
+        }
         
         if (data.success) {
             updateNotificationBadge(data.unread_count);
             displayNotifications(data.notifications);
+        } else {
+            console.error('API error:', data.error);
+            // Show empty state with error message
+            const container = document.getElementById('notificationsList');
+            if (container) {
+                container.innerHTML = `
+                    <div class="p-8 text-center text-gray-500">
+                        <i class="fas fa-exclamation-circle text-4xl mb-3 text-red-400"></i>
+                        <p class="text-sm">${data.error || 'Failed to load notifications'}</p>
+                    </div>
+                `;
+            }
         }
     } catch (error) {
         console.error('Error loading notifications:', error);
+        // Show error in UI
+        const container = document.getElementById('notificationsList');
+        if (container) {
+            container.innerHTML = `
+                <div class="p-8 text-center text-gray-500">
+                    <i class="fas fa-exclamation-triangle text-4xl mb-3 text-orange-400"></i>
+                    <p class="text-sm">Failed to load notifications</p>
+                    <p class="text-xs mt-2">${error.message}</p>
+                </div>
+            `;
+        }
     }
 }
 

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Profile Reload</title>
+</head>
+<body>
+    <h1>Testing Profile List Reload</h1>
+    
+    <button onclick="testEducation()">Test Education API</button>
+    <button onclick="testExperience()">Test Experience API</button>
+    <button onclick="testSkills()">Test Skills API</button>
+    
+    <div id="results" style="margin-top: 20px; border: 1px solid #ccc; padding: 10px;">
+        <h3>Results:</h3>
+        <pre id="output"></pre>
+    </div>
+
+    <script>
+        async function testEducation() {
+            try {
+                const response = await fetch('get_profile_lists.php?type=education');
+                const result = await response.json();
+                document.getElementById('output').textContent = JSON.stringify(result, null, 2);
+                console.log('Education API Response:', result);
+            } catch (error) {
+                document.getElementById('output').textContent = 'Error: ' + error.message;
+                console.error('Error:', error);
+            }
+        }
+
+        async function testExperience() {
+            try {
+                const response = await fetch('get_profile_lists.php?type=experience');
+                const result = await response.json();
+                document.getElementById('output').textContent = JSON.stringify(result, null, 2);
+                console.log('Experience API Response:', result);
+            } catch (error) {
+                document.getElementById('output').textContent = 'Error: ' + error.message;
+                console.error('Error:', error);
+            }
+        }
+
+        async function testSkills() {
+            try {
+                const response = await fetch('get_profile_lists.php?type=skills');
+                const result = await response.json();
+                document.getElementById('output').textContent = JSON.stringify(result, null, 2);
+                console.log('Skills API Response:', result);
+            } catch (error) {
+                document.getElementById('output').textContent = 'Error: ' + error.message;
+                console.error('Error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

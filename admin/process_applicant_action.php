@@ -36,10 +36,17 @@ try {
         case 'schedule_interview':
             $interview_date = $_POST['interview_date'] ?? '';
             $interview_time = $_POST['interview_time'] ?? '';
+            $interview_location = $_POST['interview_location'] ?? '';
+            $interview_room = $_POST['interview_room'] ?? '';
             $interview_notes = $_POST['interview_notes'] ?? '';
             
             if (empty($interview_date) || empty($interview_time)) {
                 echo json_encode(['success' => false, 'error' => 'Interview date and time are required']);
+                exit;
+            }
+            
+            if (empty($interview_location) || empty($interview_room)) {
+                echo json_encode(['success' => false, 'error' => 'Interview location and room are required']);
                 exit;
             }
             
@@ -69,10 +76,13 @@ try {
             // Update applicant record
             $stmt = $conn->prepare("UPDATE job_applicants SET 
                                     status = 'Interview Scheduled',
+                                    workflow_stage = 'interview_scheduled',
                                     interview_date = ?,
+                                    interview_location = ?,
+                                    interview_room = ?,
                                     interview_notes = ?
                                     WHERE id = ?");
-            $stmt->bind_param("ssi", $interview_datetime, $interview_notes, $applicant_id);
+            $stmt->bind_param("ssssi", $interview_datetime, $interview_location, $interview_room, $interview_notes, $applicant_id);
             
             if ($stmt->execute()) {
                 // Simple notification system using email matching
@@ -90,7 +100,7 @@ try {
                     // Create notification using email as identifier
                     $notif_stmt = $conn->prepare("INSERT INTO notifications (user_email, user_name, title, message, type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
                     $title = "Interview Scheduled";
-                    $message = "Your interview has been scheduled for " . date('F j, Y \\a\\t g:i A', strtotime($interview_datetime)) . ". " . ($interview_notes ? "Notes: " . $interview_notes : "");
+                    $message = "Your interview has been scheduled for " . date('F j, Y \\a\\t g:i A', strtotime($interview_datetime)) . " at " . $interview_location . ", " . $interview_room . ". " . ($interview_notes ? "Notes: " . $interview_notes : "");
                     $type = "info";
                     $notif_stmt->bind_param("sssss", $applicant_email, $applicant_name, $title, $message, $type);
                     
@@ -101,11 +111,11 @@ try {
                     }
                     
                     // Send email notification to applicant
-                    sendInterviewScheduleEmail($applicant_email, $applicant_name, $interview_datetime, $interview_notes);
+                    sendInterviewScheduleEmail($applicant_email, $applicant_name, $interview_datetime, $interview_location, $interview_room, $interview_notes);
                     
                     // Create admin notification for all admins
                     $admin_title = "Interview Scheduled";
-                    $admin_message = "Interview scheduled for " . $applicant_name . " on " . date('F j, Y \\a\\t g:i A', strtotime($interview_datetime));
+                    $admin_message = "Interview scheduled for " . $applicant_name . " on " . date('F j, Y \\a\\t g:i A', strtotime($interview_datetime)) . " at " . $interview_location . ", " . $interview_room;
                     createAdminNotification($conn, $admin_title, $admin_message, 'info', 'interview_scheduled', $applicant_id, $applicant_name, true);
                     
                     // Log admin activity
@@ -192,23 +202,60 @@ try {
                 exit;
             }
             
+            // Get full applicant data including user_id for ban
+            $applicant_data_stmt = $conn->prepare("SELECT user_id, applicant_email, full_name, position FROM job_applicants WHERE id = ?");
+            $applicant_data_stmt->bind_param("i", $applicant_id);
+            $applicant_data_stmt->execute();
+            $applicant_result = $applicant_data_stmt->get_result();
+            $applicant_data = $applicant_result->fetch_assoc();
+            $user_id = $applicant_data['user_id'] ?? null;
+            $applicant_data_stmt->close();
+            
+            // Calculate ban expiration date (4 months from now)
+            $ban_expires = date('Y-m-d H:i:s', strtotime('+4 months'));
+            
             // Update applicant record and set rejected_date to archive
             $stmt = $conn->prepare("UPDATE job_applicants SET 
                                     status = 'Rejected',
+                                    workflow_stage = 'rejected',
                                     rejection_reason = ?,
                                     rejected_date = NOW()
                                     WHERE id = ?");
             $stmt->bind_param("si", $rejection_reason, $applicant_id);
             
             if ($stmt->execute()) {
-                // Simple notification system using email matching
-                $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name, position FROM job_applicants WHERE id = ?");
-                $applicant_stmt->bind_param("i", $applicant_id);
-                $applicant_stmt->execute();
-                $applicant_result = $applicant_stmt->get_result();
+                $stmt->close();
                 
-                if ($applicant_result->num_rows > 0) {
-                    $applicant_data = $applicant_result->fetch_assoc();
+                // Update applicant's ban status if user_id exists
+                if ($user_id) {
+                    $ban_stmt = $conn->prepare("UPDATE applicants 
+                                               SET rejection_ban_until = ?,
+                                                   ban_reason = ?,
+                                                   banned_by = ?,
+                                                   rejection_count = rejection_count + 1
+                                               WHERE id = ?");
+                    $ban_by = "Department Head: $admin_name";
+                    $ban_reason = "Application rejected by Department Head. Reason: $rejection_reason";
+                    $ban_stmt->bind_param("sssi", $ban_expires, $ban_reason, $ban_by, $user_id);
+                    $ban_stmt->execute();
+                    $ban_stmt->close();
+                    
+                    // Log ban in application_bans table for audit trail
+                    $log_stmt = $conn->prepare("INSERT INTO application_bans 
+                                               (applicant_id, applicant_email, application_id, banned_date, 
+                                                ban_expires, ban_reason, banned_by_id, banned_by_name, 
+                                                banned_by_role, rejection_reason, position_applied)
+                                               VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, 'Department Head', ?, ?)");
+                    $position = $applicant_data['position'] ?? 'Unknown Position';
+                    $log_stmt->bind_param("isisissss", $user_id, $applicant_data['applicant_email'], 
+                                         $applicant_id, $ban_expires, $ban_reason, 
+                                         $admin_id, $admin_name, $rejection_reason, $position);
+                    $log_stmt->execute();
+                    $log_stmt->close();
+                }
+                
+                // Simple notification system using email matching
+                if ($applicant_data) {
                     $applicant_email = $applicant_data['applicant_email'];
                     $applicant_name = $applicant_data['full_name'];
                     $position = $applicant_data['position'];
@@ -216,7 +263,7 @@ try {
                     // Create notification using email as identifier
                     $notif_stmt = $conn->prepare("INSERT INTO notifications (user_email, user_name, title, message, type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
                     $title = "Application Rejected";
-                    $message = "Unfortunately, your application has been rejected. Reason: " . $rejection_reason;
+                    $message = "Unfortunately, your application has been rejected. Reason: " . $rejection_reason . ". You cannot apply for new positions for 4 months.";
                     $type = "error";
                     $notif_stmt->bind_param("sssss", $applicant_email, $applicant_name, $title, $message, $type);
                     
@@ -232,13 +279,13 @@ try {
                     // Log admin activity
                     $activity_stmt = $conn->prepare("INSERT INTO admin_activity (activity_type, description, user_name, related_table, related_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
                     $activity_type = "applicant_rejected";
-                    $activity_desc = "$admin_name rejected application from $applicant_name for $position";
+                    $activity_desc = "$admin_name rejected application from $applicant_name for $position - 4 month ban applied";
                     $related_table = "job_applicants";
                     $activity_stmt->bind_param("ssssi", $activity_type, $activity_desc, $admin_name, $related_table, $applicant_id);
                     $activity_stmt->execute();
                 }
                 
-                echo json_encode(['success' => true, 'message' => 'Application rejected successfully']);
+                echo json_encode(['success' => true, 'message' => 'Application rejected successfully. Applicant banned from applying for 4 months.']);
             } else {
                 echo json_encode(['success' => false, 'error' => 'Failed to reject application']);
             }
@@ -248,10 +295,17 @@ try {
             // Reuse interview fields for demo scheduling
             $demo_date = $_POST['interview_date'] ?? '';
             $demo_time = $_POST['interview_time'] ?? '';
+            $demo_location = $_POST['interview_location'] ?? '';
+            $demo_room = $_POST['interview_room'] ?? '';
             $demo_notes = $_POST['interview_notes'] ?? '';
             
             if (empty($demo_date) || empty($demo_time)) {
                 echo json_encode(['success' => false, 'error' => 'Demo date and time are required']);
+                exit;
+            }
+            
+            if (empty($demo_location) || empty($demo_room)) {
+                echo json_encode(['success' => false, 'error' => 'Demo location and room are required']);
                 exit;
             }
             
@@ -278,12 +332,16 @@ try {
                 exit;
             }
             
-            // Update applicant record - only update status and demo_date
+            // Update applicant record
             $stmt = $conn->prepare("UPDATE job_applicants SET 
                                     status = 'Demo Scheduled',
-                                    demo_date = ?
+                                    workflow_stage = 'demo_scheduled',
+                                    demo_date = ?,
+                                    demo_location = ?,
+                                    demo_room = ?,
+                                    demo_notes = ?
                                     WHERE id = ?");
-            $stmt->bind_param("si", $demo_datetime, $applicant_id);
+            $stmt->bind_param("ssssi", $demo_datetime, $demo_location, $demo_room, $demo_notes, $applicant_id);
             
             if ($stmt->execute()) {
                 // Create notification
@@ -300,17 +358,17 @@ try {
                     
                     $notif_stmt = $conn->prepare("INSERT INTO notifications (user_email, user_name, title, message, type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
                     $title = "Demo Teaching Scheduled";
-                    $message = "Your demo teaching has been scheduled for " . date('F j, Y \\a\\t g:i A', strtotime($demo_datetime)) . ". " . ($demo_notes ? "Notes: " . $demo_notes : "");
+                    $message = "Your demo teaching has been scheduled for " . date('F j, Y \\a\\t g:i A', strtotime($demo_datetime)) . " at " . $demo_location . ", " . $demo_room . ". " . ($demo_notes ? "Notes: " . $demo_notes : "");
                     $type = "info";
                     $notif_stmt->bind_param("sssss", $applicant_email, $applicant_name, $title, $message, $type);
                     $notif_stmt->execute();
                     
                     // Send email notification to applicant
-                    sendDemoScheduleEmail($applicant_email, $applicant_name, $demo_datetime, $demo_notes);
+                    sendDemoScheduleEmail($applicant_email, $applicant_name, $demo_datetime, $demo_location, $demo_room, $demo_notes);
                     
                     // Create admin notification for all admins
                     $admin_title = "Demo Teaching Scheduled";
-                    $admin_message = "Demo teaching scheduled for " . $applicant_name . " on " . date('F j, Y \\a\\t g:i A', strtotime($demo_datetime));
+                    $admin_message = "Demo teaching scheduled for " . $applicant_name . " on " . date('F j, Y \\a\\t g:i A', strtotime($demo_datetime)) . " at " . $demo_location . ", " . $demo_room;
                     createAdminNotification($conn, $admin_title, $admin_message, 'info', 'demo_scheduled', $applicant_id, $applicant_name, true);
                     
                     // Log admin activity
@@ -334,6 +392,7 @@ try {
             // Update applicant record to Interview Passed status
             $stmt = $conn->prepare("UPDATE job_applicants SET 
                                     status = 'Interview Passed',
+                                    workflow_stage = 'interview_completed',
                                     interview_notes = ?
                                     WHERE id = ?");
             $stmt->bind_param("si", $interview_notes, $applicant_id);
@@ -382,6 +441,7 @@ try {
             // Update applicant record to Demo Passed status
             $stmt = $conn->prepare("UPDATE job_applicants SET 
                                     status = 'Demo Passed',
+                                    workflow_stage = 'demo_completed',
                                     demo_notes = ?
                                     WHERE id = ?");
             $stmt->bind_param("si", $demo_notes, $applicant_id);
@@ -487,16 +547,17 @@ try {
         case 'mark_initially_hired':
             $initially_hired_notes = $_POST['initially_hired_notes'] ?? '';
             
-            // Update applicant record
+            // Update applicant record - mark as Hired (final status)
             $stmt = $conn->prepare("UPDATE job_applicants SET 
-                                    status = 'Initially Hired',
-                                    initially_hired_date = NOW(),
-                                    initially_hired_notes = ?
+                                    status = 'Hired',
+                                    workflow_stage = 'hired',
+                                    hired_date = NOW(),
+                                    hire_notes = ?
                                     WHERE id = ?");
             $stmt->bind_param("si", $initially_hired_notes, $applicant_id);
             
             if ($stmt->execute()) {
-                // Create notification
+                // Get applicant info
                 $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name, position FROM job_applicants WHERE id = ?");
                 $applicant_stmt->bind_param("i", $applicant_id);
                 $applicant_stmt->execute();
@@ -509,27 +570,29 @@ try {
                     $position = $applicant_data['position'];
                     
                     $notif_stmt = $conn->prepare("INSERT INTO notifications (user_email, user_name, title, message, type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-                    $title = "Marked as Initially Hired";
-                    $message = "Congratulations! You have been marked as initially hired. Please wait for final approval and onboarding instructions. " . ($initially_hired_notes ? "Notes: " . $initially_hired_notes : "");
+                    $title = "Congratulations! You're Hired!";
+                    $message = "Congratulations! We are pleased to inform you that you have been hired for the position. " . ($initially_hired_notes ? "Notes: " . $initially_hired_notes : "Please wait for onboarding instructions.");
                     $type = "success";
                     $notif_stmt->bind_param("sssss", $applicant_email, $applicant_name, $title, $message, $type);
                     $notif_stmt->execute();
                     
                     // Send email notification
-                    sendInitiallyHiredEmail($applicant_email, $applicant_name, $initially_hired_notes);
+                    if (function_exists('sendHiredEmail')) {
+                        sendHiredEmail($applicant_email, $applicant_name, $initially_hired_notes);
+                    }
                     
                     // Log admin activity
                     $activity_stmt = $conn->prepare("INSERT INTO admin_activity (activity_type, description, user_name, related_table, related_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-                    $activity_type = "applicant_initially_hired";
-                    $activity_desc = "$admin_name marked $applicant_name as Initially Hired for $position";
+                    $activity_type = "applicant_hired";
+                    $activity_desc = "$admin_name hired $applicant_name for $position";
                     $related_table = "job_applicants";
                     $activity_stmt->bind_param("ssssi", $activity_type, $activity_desc, $admin_name, $related_table, $applicant_id);
                     $activity_stmt->execute();
                 }
                 
-                echo json_encode(['success' => true, 'message' => 'Applicant marked as initially hired successfully']);
+                echo json_encode(['success' => true, 'message' => 'Applicant hired successfully']);
             } else {
-                echo json_encode(['success' => false, 'error' => 'Failed to mark as initially hired']);
+                echo json_encode(['success' => false, 'error' => 'Failed to hire applicant']);
             }
             break;
             
@@ -539,6 +602,7 @@ try {
             // Update applicant record to final Hired status
             $stmt = $conn->prepare("UPDATE job_applicants SET 
                                     status = 'Hired',
+                                    workflow_stage = 'hired',
                                     hired_date = NOW(),
                                     hired_notes = ?
                                     WHERE id = ?");
@@ -588,6 +652,7 @@ try {
             // Update applicant record
             $stmt = $conn->prepare("UPDATE job_applicants SET 
                                     status = 'Hired',
+                                    workflow_stage = 'hired',
                                     hire_notes = ?
                                     WHERE id = ?");
             $stmt->bind_param("si", $hire_notes, $applicant_id);
@@ -635,10 +700,17 @@ try {
         case 'reschedule_interview':
             $interview_date = $_POST['interview_date'] ?? '';
             $interview_time = $_POST['interview_time'] ?? '';
+            $interview_location = $_POST['interview_location'] ?? '';
+            $interview_room = $_POST['interview_room'] ?? '';
             $interview_notes = $_POST['interview_notes'] ?? '';
             
             if (empty($interview_date) || empty($interview_time)) {
                 echo json_encode(['success' => false, 'error' => 'Interview date and time are required']);
+                exit;
+            }
+            
+            if (empty($interview_location) || empty($interview_room)) {
+                echo json_encode(['success' => false, 'error' => 'Interview location and room are required']);
                 exit;
             }
             
@@ -668,9 +740,11 @@ try {
             // Update applicant record - status remains "Interview Scheduled"
             $stmt = $conn->prepare("UPDATE job_applicants SET 
                                     interview_date = ?,
+                                    interview_location = ?,
+                                    interview_room = ?,
                                     interview_notes = ?
                                     WHERE id = ?");
-            $stmt->bind_param("ssi", $interview_datetime, $interview_notes, $applicant_id);
+            $stmt->bind_param("ssssi", $interview_datetime, $interview_location, $interview_room, $interview_notes, $applicant_id);
             
             if ($stmt->execute()) {
                 // Get applicant info for notification
@@ -687,17 +761,17 @@ try {
                     // Create notification
                     $notif_stmt = $conn->prepare("INSERT INTO notifications (user_email, user_name, title, message, type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
                     $title = "Interview Rescheduled";
-                    $message = "Your interview has been rescheduled to " . date('F j, Y \\a\\t g:i A', strtotime($interview_datetime)) . ". " . ($interview_notes ? "Reason: " . $interview_notes : "");
+                    $message = "Your interview has been rescheduled to " . date('F j, Y \\a\\t g:i A', strtotime($interview_datetime)) . " at " . $interview_location . ", " . $interview_room . ". " . ($interview_notes ? "Reason: " . $interview_notes : "");
                     $type = "warning";
                     $notif_stmt->bind_param("sssss", $applicant_email, $applicant_name, $title, $message, $type);
                     $notif_stmt->execute();
                     
                     // Send email notification to applicant
-                    sendInterviewRescheduledEmail($applicant_email, $applicant_name, $interview_datetime, $interview_notes);
+                    sendInterviewRescheduledEmail($applicant_email, $applicant_name, $interview_datetime, $interview_location, $interview_room, $interview_notes);
                     
                     // Create admin notification for all admins
                     $admin_title = "Interview Rescheduled";
-                    $admin_message = "Interview rescheduled for " . $applicant_name . " to " . date('F j, Y \\a\\t g:i A', strtotime($interview_datetime));
+                    $admin_message = "Interview rescheduled for " . $applicant_name . " to " . date('F j, Y \\a\\t g:i A', strtotime($interview_datetime)) . " at " . $interview_location . ", " . $interview_room;
                     createAdminNotification($conn, $admin_title, $admin_message, 'warning', 'interview_rescheduled', $applicant_id, $applicant_name, true);
                 }
                 
@@ -710,10 +784,17 @@ try {
         case 'reschedule_demo':
             $demo_date = $_POST['demo_date'] ?? '';
             $demo_time = $_POST['demo_time'] ?? '';
+            $demo_location = $_POST['demo_location'] ?? '';
+            $demo_room = $_POST['demo_room'] ?? '';
             $demo_notes = $_POST['demo_notes'] ?? '';
             
             if (empty($demo_date) || empty($demo_time)) {
                 echo json_encode(['success' => false, 'error' => 'Demo date and time are required']);
+                exit;
+            }
+            
+            if (empty($demo_location) || empty($demo_room)) {
+                echo json_encode(['success' => false, 'error' => 'Demo location and room are required']);
                 exit;
             }
             
@@ -742,9 +823,11 @@ try {
             
             // Update applicant record - status remains "Demo Scheduled"
             $stmt = $conn->prepare("UPDATE job_applicants SET 
-                                    demo_date = ?
+                                    demo_date = ?,
+                                    demo_location = ?,
+                                    demo_room = ?
                                     WHERE id = ?");
-            $stmt->bind_param("si", $demo_datetime, $applicant_id);
+            $stmt->bind_param("sssi", $demo_datetime, $demo_location, $demo_room, $applicant_id);
             
             if ($stmt->execute()) {
                 // Get applicant info for notification
@@ -761,17 +844,17 @@ try {
                     // Create notification
                     $notif_stmt = $conn->prepare("INSERT INTO notifications (user_email, user_name, title, message, type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
                     $title = "Demo Teaching Rescheduled";
-                    $message = "Your demo teaching has been rescheduled to " . date('F j, Y \\a\\t g:i A', strtotime($demo_datetime)) . ". " . ($demo_notes ? "Reason: " . $demo_notes : "");
+                    $message = "Your demo teaching has been rescheduled to " . date('F j, Y \\a\\t g:i A', strtotime($demo_datetime)) . " at " . $demo_location . ", " . $demo_room . ". " . ($demo_notes ? "Reason: " . $demo_notes : "");
                     $type = "warning";
                     $notif_stmt->bind_param("sssss", $applicant_email, $applicant_name, $title, $message, $type);
                     $notif_stmt->execute();
                     
                     // Send email notification to applicant
-                    sendDemoRescheduledEmail($applicant_email, $applicant_name, $demo_datetime, $demo_notes);
+                    sendDemoRescheduledEmail($applicant_email, $applicant_name, $demo_datetime, $demo_location, $demo_room, $demo_notes);
                     
                     // Create admin notification for all admins
                     $admin_title = "Demo Rescheduled";
-                    $admin_message = "Demo teaching rescheduled for " . $applicant_name . " to " . date('F j, Y \\a\\t g:i A', strtotime($demo_datetime));
+                    $admin_message = "Demo teaching rescheduled for " . $applicant_name . " to " . date('F j, Y \\a\\t g:i A', strtotime($demo_datetime)) . " at " . $demo_location . ", " . $demo_room;
                     createAdminNotification($conn, $admin_title, $admin_message, 'warning', 'demo_rescheduled', $applicant_id, $applicant_name, true);
                 }
                 
