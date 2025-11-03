@@ -437,6 +437,92 @@ $skills_stmt->close();
 <link href="https://cdnjs.cloudflare.com/ajax/libs/remixicon/4.6.0/remixicon.min.css" rel="stylesheet">
 <style>
 :where([class^="ri-"])::before { content: "\f3c2"; }
+
+/* ============================================
+   MOBILE RESPONSIVE STYLES FOR USER PROFILE
+   ============================================ */
+
+@media (max-width: 768px) {
+    /* Header adjustments */
+    header .px-6 {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    /* Main content padding */
+    .max-w-7xl {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+    
+    /* Profile sections */
+    .grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    /* Profile cards */
+    .rounded-xl {
+        border-radius: 0.75rem;
+    }
+    
+    /* Form inputs */
+    input, textarea, select {
+        font-size: 16px !important; /* Prevents zoom on iOS */
+    }
+    
+    /* Buttons */
+    .flex.gap-3 {
+        flex-direction: column;
+    }
+    
+    .flex.gap-3 button {
+        width: 100%;
+    }
+    
+    /* Profile picture upload */
+    .relative.group {
+        width: 100%;
+        max-width: 150px;
+        margin: 0 auto;
+    }
+    
+    /* Skills and experience items */
+    .flex.items-center.justify-between {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    /* Modal responsive */
+    .max-w-md {
+        max-width: 95vw !important;
+    }
+    
+    /* Toast notifications */
+    #toastContainer {
+        right: 0.5rem;
+        left: 0.5rem;
+        top: 1rem;
+    }
+    
+    /* Profile header */
+    .mb-8 h1 {
+        font-size: 1.5rem !important;
+    }
+    
+    /* Section titles */
+    h2 {
+        font-size: 1.25rem !important;
+    }
+}
+
+/* Tablet adjustments */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .max-w-7xl {
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
+    }
+}
 </style>
 <script>
 tailwind.config = {
@@ -2095,7 +2181,7 @@ window.showNotification = showNotification;
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-2" for="skill_name">Skill</label>
-        <input type="text" name="skill_name" id="skill_name" placeholder="e.g., JavaScript" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
+        <input type="text" name="skill_name" id="skill_name" placeholder="Enter skill name (e.g., JavaScript, Communication, Project Management)" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-2">Proficiency Level</label>

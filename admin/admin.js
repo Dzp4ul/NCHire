@@ -1697,15 +1697,12 @@ async function viewApplicantDetails(applicantId) {
         if (data.success) {
             const applicant = data.applicant;
             
-            // Update status badge in header
-            const statusBadgeHTML = getStatusBadge(applicant.status);
-            document.getElementById('applicantStatus').innerHTML = statusBadgeHTML;
-            
             // Update status badge in Actions section
+            const statusBadgeHTML = getStatusBadge(applicant.status);
             const actionStatusBadge = document.getElementById('actionStatusBadge');
             if (actionStatusBadge) {
                 actionStatusBadge.innerHTML = statusBadgeHTML;
-                console.log('Initial status loaded:', applicant.status, statusBadgeHTML);
+                console.log('Status loaded:', applicant.status);
             }
             
             // Update personal information
@@ -2044,6 +2041,12 @@ async function viewApplicantDetails(applicantId) {
 }
 
 function getStatusBadge(status) {
+    // Ensure status is a string, not an object
+    if (typeof status === 'object') {
+        console.error('Status is an object:', status);
+        status = status?.status || status?.name || 'Unknown';
+    }
+    
     let colorClass = 'bg-gray-100 text-gray-800';
     let icon = '';
     
@@ -2595,12 +2598,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     showToast(successMessages[action], 'success');
                     closeScheduleModal();
                     
-                    // Immediately update the status badge
-                    const newStatus = statusMap[action];
-                    const statusBadge = getStatusBadge(newStatus);
-                    document.getElementById('applicantStatus').innerHTML = statusBadge;
-                    
                     // Update action buttons immediately
+                    const newStatus = statusMap[action];
                     updateActionButtons(newStatus);
                     
                     // Reset form action
@@ -2659,10 +2658,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     showToast('Resubmission request sent successfully!', 'success');
                     closeResubmitModal();
                     
-                    // Immediately update the status badge
-                    const statusBadge = getStatusBadge('Resubmission Required');
-                    document.getElementById('applicantStatus').innerHTML = statusBadge;
-                    
                     // Update action buttons immediately
                     updateActionButtons('Resubmission Required');
                     
@@ -2702,23 +2697,6 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (result.success) {
                 closeRejectModal();
-                
-                // Immediately update the status badge to show "Rejected"
-                const rejectedBadge = '<span class="px-3 py-2 text-sm font-bold rounded-full bg-red-100 text-red-800 border-2 border-red-300 inline-flex items-center"><i class="fas fa-times-circle mr-1"></i>Rejected</span>';
-                
-                // Update header status
-                const statusContainer = document.getElementById('applicantStatus');
-                if (statusContainer) {
-                    statusContainer.innerHTML = rejectedBadge;
-                    console.log('Header status updated to: Rejected');
-                }
-                
-                // Update Actions section status
-                const actionStatusBadge = document.getElementById('actionStatusBadge');
-                if (actionStatusBadge) {
-                    actionStatusBadge.innerHTML = rejectedBadge;
-                    console.log('Actions status updated to: Rejected');
-                }
                 
                 // Update action buttons immediately - hide all buttons for rejected status
                 updateActionButtons('Rejected');
@@ -2802,23 +2780,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (result.success) {
                 closeHireModal();
                 
-                // Immediately update the status badge to show "Initially Hired"
-                const hiredBadge = '<span class="px-3 py-2 text-sm font-bold rounded-full bg-green-100 text-green-800 border-2 border-green-300 inline-flex items-center"><i class="fas fa-user-check mr-1"></i>Initially Hired</span>';
-                
-                // Update header status
-                const statusContainer = document.getElementById('applicantStatus');
-                if (statusContainer) {
-                    statusContainer.innerHTML = hiredBadge;
-                    console.log('Header status updated to: Initially Hired');
-                }
-                
-                // Update Actions section status
-                const actionStatusBadge = document.getElementById('actionStatusBadge');
-                if (actionStatusBadge) {
-                    actionStatusBadge.innerHTML = hiredBadge;
-                    console.log('Actions status updated to: Initially Hired');
-                }
-                
                 // Update action buttons immediately - hide all buttons for initially hired status
                 updateActionButtons('Initially Hired');
                 
@@ -2861,15 +2822,6 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (result.success) {
                 closePermanentHireModal();
-                
-                // Immediately update the status badge to show "Hired"
-                const hiredBadge = '<span class="px-3 py-2 text-sm font-bold rounded-full bg-green-100 text-green-800 border-2 border-green-300 inline-flex items-center"><i class="fas fa-user-tie mr-1"></i>Hired</span>';
-                
-                // Update header status
-                const statusContainer = document.getElementById('applicantStatus');
-                if (statusContainer) {
-                    statusContainer.innerHTML = hiredBadge;
-                }
                 
                 // Replace action buttons with success message
                 const actionButtonsContainer = document.getElementById('actionButtons');
@@ -2925,15 +2877,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (result.success) {
                 closeApproveInterviewModal();
                 
-                // Immediately update the status badge to show "Interview Passed"
-                const interviewBadge = '<span class="px-3 py-2 text-sm font-bold rounded-full bg-teal-100 text-teal-800 border-2 border-teal-300 inline-flex items-center"><i class="fas fa-user-check mr-1"></i>Interview Passed</span>';
-                
-                // Update header status
-                const statusContainer = document.getElementById('applicantStatus');
-                if (statusContainer) {
-                    statusContainer.innerHTML = interviewBadge;
-                }
-                
                 // Update action buttons immediately
                 updateActionButtons('Interview Passed');
                 
@@ -2976,15 +2919,6 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (result.success) {
                 closeApproveDemoModal();
-                
-                // Immediately update the status badge to show "Demo Passed"
-                const demoBadge = '<span class="px-3 py-2 text-sm font-bold rounded-full bg-emerald-100 text-emerald-800 border-2 border-emerald-300 inline-flex items-center"><i class="fas fa-check-double mr-1"></i>Demo Passed</span>';
-                
-                // Update header status
-                const statusContainer = document.getElementById('applicantStatus');
-                if (statusContainer) {
-                    statusContainer.innerHTML = demoBadge;
-                }
                 
                 // Update action buttons immediately
                 updateActionButtons('Demo Passed');
@@ -3034,10 +2968,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     showToast('Demo scheduled successfully!', 'success');
                     closeDemoModal();
                     
-                    // Update status badge
-                    const statusBadge = getStatusBadge('Demo Scheduled');
-                    document.getElementById('applicantStatus').innerHTML = statusBadge;
-                    
                     // Update action buttons
                     updateActionButtons('Demo Scheduled');
                     
@@ -3081,10 +3011,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (result.success) {
                         showToast('Applicant marked as initially hired successfully!', 'success');
                         closeInitialHireModal();
-                        
-                        // Update status badge
-                        const statusBadge = getStatusBadge('Initially Hired');
-                        document.getElementById('applicantStatus').innerHTML = statusBadge;
                         
                         // Update action buttons
                         updateActionButtons('Initially Hired');
@@ -3167,10 +3093,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (result.success) {
                     showToast('Interview rescheduled successfully!', 'success');
                     closeRescheduleInterviewModal();
-                    
-                    // Update status badge - status remains "Interview Scheduled"
-                    const statusBadge = getStatusBadge('Interview Scheduled');
-                    document.getElementById('applicantStatus').innerHTML = statusBadge;
                     
                     // Update action buttons
                     updateActionButtons('Interview Scheduled');
@@ -3257,10 +3179,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (result.success) {
                     showToast('Demo teaching rescheduled successfully!', 'success');
                     closeRescheduleDemoModal();
-                    
-                    // Update status badge - status remains "Demo Scheduled"
-                    const statusBadge = getStatusBadge('Demo Scheduled');
-                    document.getElementById('applicantStatus').innerHTML = statusBadge;
                     
                     // Update action buttons
                     updateActionButtons('Demo Scheduled');

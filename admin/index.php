@@ -175,12 +175,36 @@ $create_activity_table = "CREATE TABLE IF NOT EXISTS admin_activity (
 )";
 $conn->query($create_activity_table);
 
-// Get chart filter from URL parameter (default to weekly)
-$chart_filter = isset($_GET['chart_filter']) ? $_GET['chart_filter'] : 'weekly';
+// Get filters from URL parameters
+$school_year = isset($_GET['school_year']) ? $_GET['school_year'] : '';
+$semester = isset($_GET['semester']) ? $_GET['semester'] : '';
+// Always use weekly view (last 7 days)
+$chart_filter = 'weekly';
 
 // Get chart data based on filter
 $chart_data = [];
 $chart_labels = [];
+
+// Build date range filter for school year and semester
+$date_filter = "";
+$date_params = [];
+if (!empty($school_year) && !empty($semester)) {
+    // Parse school year (e.g., "2024-2025")
+    list($start_year, $end_year) = explode('-', $school_year);
+    
+    if ($semester == 'first') {
+        // First Semester: June to October
+        $date_start = "$start_year-06-01";
+        $date_end = "$start_year-10-31 23:59:59";
+    } else {
+        // Second Semester: November to March
+        $date_start = "$start_year-11-01";
+        $date_end = "$end_year-03-31 23:59:59";
+    }
+    
+    $date_filter = " AND applied_date >= ? AND applied_date <= ?";
+    $date_params = [$date_start, $date_end];
+}
 
 switch($chart_filter) {
     case 'daily':
@@ -189,13 +213,20 @@ switch($chart_filter) {
             $hour = date('Y-m-d H:00:00', strtotime("-$i hours"));
             $next_hour = date('Y-m-d H:00:00', strtotime("-" . ($i-1) . " hours"));
             if (!empty($department_params)) {
-                $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE applied_date >= ? AND applied_date < ?" . $department_filter);
-                $stmt->bind_param("sss", $hour, $next_hour, ...$department_params);
+                $query = "SELECT COUNT(*) as count FROM job_applicants WHERE applied_date >= ? AND applied_date < ?" . $department_filter . $date_filter;
+                $params = array_merge([$hour, $next_hour], $department_params, $date_params);
+                $types = str_repeat('s', count($params));
+                $stmt = $conn->prepare($query);
+                $stmt->bind_param($types, ...$params);
                 $stmt->execute();
                 $result = $stmt->get_result();
                 $chart_data[] = $result->fetch_assoc()['count'];
             } else {
-                $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE applied_date >= '$hour' AND applied_date < '$next_hour'");
+                $extra_filter = "";
+                if (!empty($date_filter)) {
+                    $extra_filter = " AND applied_date >= '{$date_params[0]}' AND applied_date <= '{$date_params[1]}'";
+                }
+                $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE applied_date >= '$hour' AND applied_date < '$next_hour'" . $extra_filter);
                 $chart_data[] = $result ? $result->fetch_assoc()['count'] : 0;
             }
             $chart_labels[] = date('H:i', strtotime($hour));
@@ -206,13 +237,20 @@ switch($chart_filter) {
         for ($i = 29; $i >= 0; $i--) {
             $date = date('Y-m-d', strtotime("-$i days"));
             if (!empty($department_params)) {
-                $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = ?" . $department_filter);
-                $stmt->bind_param("ss", $date, ...$department_params);
+                $query = "SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = ?" . $department_filter . $date_filter;
+                $params = array_merge([$date], $department_params, $date_params);
+                $types = str_repeat('s', count($params));
+                $stmt = $conn->prepare($query);
+                $stmt->bind_param($types, ...$params);
                 $stmt->execute();
                 $result = $stmt->get_result();
                 $chart_data[] = $result->fetch_assoc()['count'];
             } else {
-                $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = '$date'");
+                $extra_filter = "";
+                if (!empty($date_filter)) {
+                    $extra_filter = " AND applied_date >= '{$date_params[0]}' AND applied_date <= '{$date_params[1]}'";
+                }
+                $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = '$date'" . $extra_filter);
                 $chart_data[] = $result ? $result->fetch_assoc()['count'] : 0;
             }
             $chart_labels[] = date('M j', strtotime($date));
@@ -223,13 +261,20 @@ switch($chart_filter) {
         for ($i = 11; $i >= 0; $i--) {
             $month = date('Y-m', strtotime("-$i months"));
             if (!empty($department_params)) {
-                $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE DATE_FORMAT(applied_date, '%Y-%m') = ?" . $department_filter);
-                $stmt->bind_param("ss", $month, ...$department_params);
+                $query = "SELECT COUNT(*) as count FROM job_applicants WHERE DATE_FORMAT(applied_date, '%Y-%m') = ?" . $department_filter . $date_filter;
+                $params = array_merge([$month], $department_params, $date_params);
+                $types = str_repeat('s', count($params));
+                $stmt = $conn->prepare($query);
+                $stmt->bind_param($types, ...$params);
                 $stmt->execute();
                 $result = $stmt->get_result();
                 $chart_data[] = $result->fetch_assoc()['count'];
             } else {
-                $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE DATE_FORMAT(applied_date, '%Y-%m') = '$month'");
+                $extra_filter = "";
+                if (!empty($date_filter)) {
+                    $extra_filter = " AND applied_date >= '{$date_params[0]}' AND applied_date <= '{$date_params[1]}'";
+                }
+                $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE DATE_FORMAT(applied_date, '%Y-%m') = '$month'" . $extra_filter);
                 $chart_data[] = $result ? $result->fetch_assoc()['count'] : 0;
             }
             $chart_labels[] = date('M Y', strtotime($month . '-01'));
@@ -240,13 +285,20 @@ switch($chart_filter) {
         for ($i = 6; $i >= 0; $i--) {
             $date = date('Y-m-d', strtotime("-$i days"));
             if (!empty($department_params)) {
-                $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = ?" . $department_filter);
-                $stmt->bind_param("ss", $date, ...$department_params);
+                $query = "SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = ?" . $department_filter . $date_filter;
+                $params = array_merge([$date], $department_params, $date_params);
+                $types = str_repeat('s', count($params));
+                $stmt = $conn->prepare($query);
+                $stmt->bind_param($types, ...$params);
                 $stmt->execute();
                 $result = $stmt->get_result();
                 $chart_data[] = $result->fetch_assoc()['count'];
             } else {
-                $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = '$date'");
+                $extra_filter = "";
+                if (!empty($date_filter)) {
+                    $extra_filter = " AND applied_date >= '{$date_params[0]}' AND applied_date <= '{$date_params[1]}'";
+                }
+                $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = '$date'" . $extra_filter);
                 $chart_data[] = $result ? $result->fetch_assoc()['count'] : 0;
             }
             $chart_labels[] = date('M j', strtotime($date));
@@ -522,12 +574,24 @@ $recent_activity = $conn->query($recent_activity_query);
                     <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                         <div class="flex items-center justify-between mb-4">
                             <h2 class="text-lg font-semibold text-gray-900">Applications Overview</h2>
-                            <select id="chartFilter" onchange="updateChart()" class="text-sm border border-gray-300 rounded-md px-3 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <option value="daily" <?php echo $chart_filter == 'daily' ? 'selected' : ''; ?>>Daily (24h)</option>
-                                <option value="weekly" <?php echo $chart_filter == 'weekly' ? 'selected' : ''; ?>>Weekly (7d)</option>
-                                <option value="monthly" <?php echo $chart_filter == 'monthly' ? 'selected' : ''; ?>>Monthly (30d)</option>
-                                <option value="yearly" <?php echo $chart_filter == 'yearly' ? 'selected' : ''; ?>>Yearly (12m)</option>
-                            </select>
+                            <div class="flex gap-2">
+                                <select id="schoolYearFilter" onchange="updateChart()" class="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">All School Years</option>
+                                    <?php
+                                    $current_year = date('Y');
+                                    for ($year = $current_year; $year >= $current_year - 5; $year--) {
+                                        $sy = $year . '-' . ($year + 1);
+                                        $selected = ($school_year == $sy) ? 'selected' : '';
+                                        echo "<option value='$sy' $selected>SY $sy</option>";
+                                    }
+                                    ?>
+                                </select>
+                                <select id="semesterFilter" onchange="updateChart()" class="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">All Semesters</option>
+                                    <option value="first" <?php echo $semester == 'first' ? 'selected' : ''; ?>>First Semester</option>
+                                    <option value="second" <?php echo $semester == 'second' ? 'selected' : ''; ?>>Second Semester</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="h-80 overflow-x-auto overflow-y-hidden flex items-end pb-8" id="chartContainer">
                             <div class="flex items-end justify-start gap-3 h-5/6 min-w-max px-4">
@@ -983,16 +1047,11 @@ $recent_activity = $conn->query($recent_activity_query);
 
             <!-- Applicant Details Section -->
             <div id="applicantDetailsSection" class="section hidden">
-                <div class="flex items-center justify-between mb-6">
-                    <div class="flex items-center gap-4">
-                        <button onclick="showSection('applicants')" class="text-gray-600 hover:text-gray-800">
-                            <i class="fas fa-arrow-left text-xl"></i>
-                        </button>
-                        <h1 class="text-2xl font-bold text-gray-900">Applicant Details</h1>
-                    </div>
-                    <div id="applicantStatus" class="flex items-center gap-3">
-                        <!-- Status badge will be inserted here -->
-                    </div>
+                <div class="flex items-center gap-4 mb-6">
+                    <button onclick="showSection('applicants')" class="text-gray-600 hover:text-gray-800">
+                        <i class="fas fa-arrow-left text-xl"></i>
+                    </button>
+                    <h1 class="text-2xl font-bold text-gray-900">Applicant Details</h1>
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -2306,8 +2365,51 @@ $recent_activity = $conn->query($recent_activity_query);
         
         // Update chart based on filter selection
         function updateChart() {
-            const filter = document.getElementById('chartFilter').value;
-            window.location.href = `?chart_filter=${filter}`;
+            const schoolYear = document.getElementById('schoolYearFilter').value;
+            const semester = document.getElementById('semesterFilter').value;
+            
+            const params = new URLSearchParams();
+            if (schoolYear) params.append('school_year', schoolYear);
+            if (semester) params.append('semester', semester);
+            
+            // Fetch new chart data via AJAX
+            fetch(`get_chart_data.php?${params.toString()}`)
+                .then(response => response.json())
+                .then(data => {
+                    updateChartDisplay(data.chart_data, data.chart_labels);
+                })
+                .catch(error => {
+                    console.error('Error fetching chart data:', error);
+                });
+        }
+        
+        // Update chart display with new data
+        function updateChartDisplay(chartData, chartLabels) {
+            const chartContainer = document.getElementById('chartContainer');
+            if (!chartContainer) return;
+            
+            const maxValue = Math.max(...chartData) || 1;
+            
+            let html = '<div class="flex items-end justify-start gap-3 h-5/6 min-w-max px-4">';
+            
+            chartData.forEach((value, index) => {
+                let height = (value / maxValue) * 280;
+                height = Math.max(height, 20); // Minimum height
+                
+                html += `
+                    <div class="flex flex-col items-center" style="min-width: 80px;">
+                        <div class="w-16 bg-primary rounded-t chart-bar opacity-80 hover:opacity-100 relative group transition-all duration-200" style="height: ${height}px;">
+                            <div class="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-3 py-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 shadow-lg">
+                                ${value} applications
+                            </div>
+                        </div>
+                        <span class="text-sm text-gray-600 mt-3 text-center font-medium break-words" style="width: 70px;">${chartLabels[index]}</span>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            chartContainer.innerHTML = html;
         }
         
         // Auto-refresh dashboard data

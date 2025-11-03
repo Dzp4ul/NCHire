@@ -880,6 +880,147 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
 .animate-fade-in {
     animation: fadeIn 0.3s ease-out;
 }
+
+/* ============================================
+   MOBILE RESPONSIVE STYLES
+   ============================================ */
+
+/* Mobile Navigation */
+.mobile-menu {
+    transition: transform 0.3s ease-in-out;
+}
+
+.mobile-menu.hidden {
+    transform: translateX(-100%);
+}
+
+/* Desktop Navigation Hidden on Mobile */
+@media (max-width: 768px) {
+    .desktop-nav {
+        display: none !important;
+    }
+    
+    .mobile-menu-btn {
+        display: flex !important;
+    }
+    
+    /* Header spacing adjustments */
+    header .px-6 {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    /* Main content padding */
+    main {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        padding-top: 1.5rem !important;
+    }
+    
+    /* Job cards full width on mobile */
+    #jobsContainer .job-card {
+        width: 100% !important;
+    }
+    
+    /* Filter controls stack vertically */
+    #searchFilters .flex-wrap {
+        flex-direction: column !important;
+    }
+    
+    #searchFilters .flex-wrap > * {
+        width: 100% !important;
+    }
+    
+    /* Notification dropdown full width on mobile */
+    #notificationDropdown {
+        right: -1rem;
+        left: -1rem;
+        width: calc(100vw - 2rem) !important;
+        max-width: none !important;
+    }
+    
+    /* Profile dropdown positioning */
+    #profileDropdown {
+        right: 0;
+    }
+    
+    /* Pagination responsive */
+    #paginationContainer {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    #paginationInfo {
+        margin-right: 0 !important;
+    }
+    
+    /* Modal responsive */
+    .modal-content {
+        max-width: 95vw !important;
+        margin: 1rem !important;
+    }
+    
+    /* Application wizard responsive */
+    #wizardContainer {
+        padding: 1rem !important;
+    }
+    
+    .wizard-step-content {
+        padding: 1rem !important;
+    }
+    
+    /* Form inputs full width */
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="date"],
+    textarea,
+    select {
+        font-size: 16px !important; /* Prevents zoom on iOS */
+    }
+    
+    /* Job detail view responsive */
+    #jobDetailView .p-8 {
+        padding: 1.5rem !important;
+    }
+    
+    /* Hide desktop logo text on small screens */
+    .logo-text {
+        display: none;
+    }
+}
+
+/* Tablet styles */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .desktop-nav {
+        display: flex !important;
+    }
+    
+    .mobile-menu-btn {
+        display: none !important;
+    }
+    
+    /* Adjust spacing for tablets */
+    main {
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
+    }
+}
+
+/* Desktop styles */
+@media (min-width: 1025px) {
+    .desktop-nav {
+        display: flex !important;
+    }
+    
+    .mobile-menu-btn {
+        display: none !important;
+    }
+    
+    .logo-text {
+        display: inline;
+    }
+}
 </style>
 <script>
 tailwind.config = {
@@ -1148,9 +1289,10 @@ function closeRejectionModal() {
 <div class="flex items-center gap-3">
 <img src="https://static.readdy.ai/image/2d44f09b25f25697de5dc274e7f0a5a3/04242d6bffded145c33d09c9dcfae98c.png" alt="Norzagaray College Logo" class="w-12 h-12 object-contain">
 </div>
-<span class="text-2xl font-bold">NCHire</span>
+<span class="text-xl md:text-2xl font-bold">NCHire</span>
 </div>
-<nav class="flex space-x-6">
+<!-- Desktop Navigation -->
+<nav class="desktop-nav hidden md:flex space-x-6">
 <a href="#" class="nav-link hover:text-secondary transition-colors relative" id="dashboardLink" data-section="dashboard">
   Dashboard
   <span class="nav-indicator absolute bottom-0 left-0 w-full h-0.5 bg-secondary transform scale-x-0 transition-transform duration-200"></span>
@@ -1165,7 +1307,11 @@ function closeRejectionModal() {
 </a>
 </nav>
 </div>
-<div class="flex items-center space-x-4">
+<div class="flex items-center space-x-2 md:space-x-4">
+<!-- Mobile Menu Button -->
+<button class="mobile-menu-btn hidden md:hidden p-2 hover:bg-primary-dark rounded-lg transition-colors" id="mobileMenuBtn" aria-label="Open menu">
+<i class="ri-menu-line text-2xl"></i>
+</button>
 <div class="relative inline-block">
 <div class="w-8 h-8 flex items-center justify-center cursor-pointer hover:bg-gray-100 rounded-full transition-colors" id="notificationBtn">
 <i class="ri-notification-line text-xl"></i>
@@ -1221,6 +1367,40 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
 </div>
 </div>
 </header>
+
+<!-- Mobile Menu Overlay -->
+<div id="mobileMenu" class="mobile-menu fixed inset-0 bg-black bg-opacity-50 z-40 hidden">
+    <div class="mobile-menu-content bg-white w-64 h-full shadow-xl transform transition-transform duration-300">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-8">
+                <h2 class="text-xl font-bold text-gray-900">Menu</h2>
+                <button id="closeMobileMenu" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                    <i class="ri-close-line text-2xl text-gray-600"></i>
+                </button>
+            </div>
+            <nav class="space-y-4">
+                <a href="#" class="mobile-nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 transition-colors" data-section="dashboard">
+                    <i class="ri-dashboard-line text-xl text-primary"></i>
+                    <span class="text-gray-900 font-medium">Dashboard</span>
+                </a>
+                <a href="#" class="mobile-nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 transition-colors" data-section="applications">
+                    <i class="ri-file-list-3-line text-xl text-primary"></i>
+                    <span class="text-gray-900 font-medium">My Applications</span>
+                </a>
+                <a href="user_profile.php" class="mobile-nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <i class="ri-user-line text-xl text-primary"></i>
+                    <span class="text-gray-900 font-medium">Profile</span>
+                </a>
+                <hr class="my-4">
+                <a href="#" onclick="confirmLogout(event)" class="mobile-nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-red-50 transition-colors">
+                    <i class="ri-logout-box-line text-xl text-red-600"></i>
+                    <span class="text-red-600 font-medium">Sign Out</span>
+                </a>
+            </nav>
+        </div>
+    </div>
+</div>
+
 <main id="mainContent" class="max-w-7xl mx-auto px-6 py-8">
 <div id="jobHeader" class="mb-8">
 <h1 class="text-3xl font-bold text-gray-900 mb-2">Available Job Opportunities</h1>
@@ -9256,6 +9436,64 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, 500); // Small delay to ensure all scripts are loaded
     }
+});
+</script>
+
+<!-- Mobile Menu JavaScript -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const mobileMenu = document.getElementById('mobileMenu');
+    const closeMobileMenu = document.getElementById('closeMobileMenu');
+    const mobileNavLinks = document.querySelectorAll('.mobile-nav-link');
+
+    // Open mobile menu
+    if (mobileMenuBtn) {
+        mobileMenuBtn.addEventListener('click', function() {
+            mobileMenu.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        });
+    }
+
+    // Close mobile menu
+    if (closeMobileMenu) {
+        closeMobileMenu.addEventListener('click', function() {
+            mobileMenu.classList.add('hidden');
+            document.body.style.overflow = '';
+        });
+    }
+
+    // Close menu when clicking outside
+    if (mobileMenu) {
+        mobileMenu.addEventListener('click', function(e) {
+            if (e.target === mobileMenu) {
+                mobileMenu.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
+        });
+    }
+
+    // Handle mobile navigation clicks
+    mobileNavLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            const section = this.dataset.section;
+            if (section) {
+                e.preventDefault();
+                
+                // Close mobile menu
+                mobileMenu.classList.add('hidden');
+                document.body.style.overflow = '';
+                
+                // Trigger the appropriate section
+                if (section === 'dashboard') {
+                    window.location.reload();
+                } else if (section === 'applications') {
+                    loadMyApplications();
+                    updateActiveNavigation('applications');
+                }
+            }
+        });
+    });
 });
 </script>
 
