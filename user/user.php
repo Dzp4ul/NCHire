@@ -1401,10 +1401,10 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
     </div>
 </div>
 
-<main id="mainContent" class="max-w-7xl mx-auto px-6 py-8">
+<main id="mainContent" class="max-w-[1400px] mx-auto px-12 py-8">
 <div id="jobHeader" class="mb-8">
-<h1 class="text-3xl font-bold text-gray-900 mb-2">Available Job Opportunities</h1>
-<p class="text-gray-600">Find your perfect career match at NCHire</p>
+<h1 class="text-4xl font-bold text-gray-900 mb-3">Available Job Opportunities</h1>
+<p class="text-lg text-gray-600">Find your perfect career match at NCHire</p>
 </div>
 <!-- Search, Filter and Sort Section -->
 <div id="searchFilters" class="mb-6 space-y-4">
@@ -1414,14 +1414,14 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
       <i class="ri-search-line text-gray-400 text-lg"></i>
     </div>
     <input type="text" id="searchInput" placeholder="Search job positions, departments, or locations..." 
-           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
+           class="w-full pl-10 pr-4 py-3.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-base">
   </div>
   
   <!-- Filter and Sort Controls -->
   <div class="flex flex-wrap gap-3 items-center">
     <!-- Department Filter -->
     <div class="relative">
-      <select id="departmentFilter" class="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 text-sm focus:ring-2 focus:ring-primary focus:border-transparent">
+      <select id="departmentFilter" class="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2.5 pr-8 text-base focus:ring-2 focus:ring-primary focus:border-transparent">
         <option value="">All Departments</option>
         <option value="computer science">Computer Science</option>
         <option value="hospitality management">Hospitality Management</option>
@@ -1434,7 +1434,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
     
     <!-- Job Type Filter -->
     <div class="relative">
-      <select id="jobTypeFilter" class="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 text-sm focus:ring-2 focus:ring-primary focus:border-transparent">
+      <select id="jobTypeFilter" class="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2.5 pr-8 text-base focus:ring-2 focus:ring-primary focus:border-transparent">
         <option value="">All Types</option>
         <option value="full-time">Full-time</option>
         <option value="part-time">Part-time</option>
@@ -1446,7 +1446,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
     
     <!-- Sort Dropdown -->
     <div class="relative">
-      <select id="sortSelect" class="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 text-sm focus:ring-2 focus:ring-primary focus:border-transparent">
+      <select id="sortSelect" class="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2.5 pr-8 text-base focus:ring-2 focus:ring-primary focus:border-transparent">
         <option value="newest">Newest First</option>
         <option value="oldest">Oldest First</option>
         <option value="title_asc">Title A-Z</option>
@@ -1525,7 +1525,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                     <span>Back to Jobs</span>
                 </button>
             </div>
-            <div class="max-w-4xl w-full mx-auto">
+            <div class="max-w-6xl w-full mx-auto">
                 <div class="flex items-start justify-between">
                     <div class="flex-1">
                         <h1 id="detailJobTitle" class="text-3xl font-bold mb-4"></h1>
@@ -1546,62 +1546,121 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
 
         <!-- Job Content -->
         <div class="p-8">
-            <div class="max-w-4xl mx-auto">
-                <!-- Minimum Qualifications Section -->
-                <div class="mb-8">
-                    <h2 class="text-xl font-bold text-gray-900 mb-6">MINIMUM QUALIFICATIONS</h2>
-                    
-                    <div class="grid md:grid-cols-2 gap-8 mb-6">
-                        <div>
-                            <h3 class="text-gray-500 font-semibold mb-2">EDUCATION</h3>
-                            <p id="detailEducation" class="text-gray-700">Loading...</p>
-                        </div>
-                        <div>
-                            <h3 class="text-gray-500 font-semibold mb-2">EXPERIENCE</h3>
-                            <p id="detailExperience" class="text-gray-700">Loading...</p>
-                        </div>
-                    </div>
-
-                    <div class="mb-6">
-                        <h3 class="text-gray-500 font-semibold mb-2">TRAINING</h3>
-                        <p id="detailTraining" class="text-gray-700">Loading...</p>
-                    </div>
-
-                    <div class="mb-6">
-                        <h3 class="text-gray-500 font-semibold mb-2">ELIGIBILITY</h3>
-                        <p id="detailEligibility" class="text-gray-700">Loading...</p>
-                    </div>
-                </div>
-
-                <!-- Job Requirements Section -->
-                <div id="requirementsSection" class="mb-8 bg-blue-50 border-l-4 border-primary rounded-lg p-6">
-                    <h2 class="text-xl font-bold text-primary mb-4 flex items-center">
-                        <i class="ri-file-list-line mr-2"></i>
-                        JOB REQUIREMENTS
+            <div class="max-w-6xl mx-auto">
+                <!-- Job Highlights Section -->
+                <div class="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border-l-4 border-blue-600">
+                    <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                        <i class="ri-star-line text-blue-600 mr-2"></i>
+                        JOB HIGHLIGHTS
                     </h2>
-                    <div id="detailJobRequirements" class="text-gray-700 space-y-2">
-                        <!-- Job requirements will be populated here -->
-                    </div>
-                </div>
-
-                <!-- Additional Details Section -->
-                <div class="mb-8">
-                    <h2 class="text-xl font-bold text-gray-900 mb-6">ADDITIONAL DETAILS</h2>
-                    
-                    <div class="mb-6">
-                        <h3 class="text-gray-900 font-semibold mb-3">Competency:</h3>
-                        <div id="detailCompetency" class="text-gray-700 mb-2">Loading...</div>
+                    <div class="grid md:grid-cols-3 gap-4">
+                        <div class="bg-white rounded-lg p-4 shadow-sm">
+                            <div class="flex items-center mb-2">
+                                <i class="ri-calendar-check-line text-blue-600 text-xl mr-2"></i>
+                                <h3 class="font-semibold text-gray-900">Job Type</h3>
+                            </div>
+                            <p id="highlightJobType" class="text-gray-700">Loading...</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-4 shadow-sm">
+                            <div class="flex items-center mb-2">
+                                <i class="ri-map-pin-2-line text-blue-600 text-xl mr-2"></i>
+                                <h3 class="font-semibold text-gray-900">Location</h3>
+                            </div>
+                            <p id="highlightLocation" class="text-gray-700">Loading...</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-4 shadow-sm">
+                            <div class="flex items-center mb-2">
+                                <i class="ri-building-2-line text-blue-600 text-xl mr-2"></i>
+                                <h3 class="font-semibold text-gray-900">Department</h3>
+                            </div>
+                            <p id="highlightDepartment" class="text-gray-700">Loading...</p>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Job Description Section -->
-                <div class="mb-8">
-                    <h2 class="text-xl font-bold text-gray-900 mb-6">DESCRIPTION</h2>
-                    <div id="detailJobDescription" class="text-gray-700 space-y-3">
+                <div class="mb-8 bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                    <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                        <i class="ri-file-text-line text-blue-600 mr-2"></i>
+                        POSITION OVERVIEW
+                    </h2>
+                    <div id="detailJobDescription" class="text-gray-700 space-y-2 leading-relaxed">
                         <!-- Job description will be populated here -->
                     </div>
                 </div>
 
+                <!-- Duties & Responsibilities Section -->
+                <div id="dutiesSection" class="mb-8 bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                    <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                        <i class="ri-task-line text-blue-600 mr-2"></i>
+                        DUTIES & RESPONSIBILITIES
+                    </h2>
+                    <div id="detailDuties" class="text-gray-700 space-y-2">
+                        <!-- Duties will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Minimum Qualifications Section -->
+                <div class="mb-8 bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                    <h2 class="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                        <i class="ri-shield-check-line text-blue-600 mr-2"></i>
+                        MINIMUM QUALIFICATIONS
+                    </h2>
+                    
+                    <div class="grid md:grid-cols-2 gap-8 mb-6">
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h3 class="text-gray-900 font-semibold mb-3 flex items-center">
+                                <i class="ri-graduation-cap-line text-blue-600 mr-2"></i>
+                                EDUCATION
+                            </h3>
+                            <p id="detailEducation" class="text-gray-700">Loading...</p>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h3 class="text-gray-900 font-semibold mb-3 flex items-center">
+                                <i class="ri-briefcase-line text-blue-600 mr-2"></i>
+                                EXPERIENCE
+                            </h3>
+                            <p id="detailExperience" class="text-gray-700">Loading...</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                        <h3 class="text-gray-900 font-semibold mb-3 flex items-center">
+                            <i class="ri-book-open-line text-blue-600 mr-2"></i>
+                            TRAINING
+                        </h3>
+                        <p id="detailTraining" class="text-gray-700">Loading...</p>
+                    </div>
+
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-gray-900 font-semibold mb-3 flex items-center">
+                            <i class="ri-medal-line text-blue-600 mr-2"></i>
+                            ELIGIBILITY
+                        </h3>
+                        <p id="detailEligibility" class="text-gray-700">Loading...</p>
+                    </div>
+                </div>
+
+                <!-- Required Documents Section -->
+                <div id="requirementsSection" class="mb-8 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-6 border-l-4 border-amber-500">
+                    <h2 class="text-xl font-bold text-amber-800 mb-4 flex items-center">
+                        <i class="ri-file-list-3-line mr-2"></i>
+                        REQUIRED DOCUMENTS FOR APPLICATION
+                    </h2>
+                    <p class="text-sm text-amber-700 mb-4">Please prepare the following documents before applying:</p>
+                    <div id="detailJobRequirements" class="space-y-3">
+                        <!-- Job requirements will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Required Competencies Section -->
+                <div class="mb-8 bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                    <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                        <i class="ri-lightbulb-line text-blue-600 mr-2"></i>
+                        REQUIRED COMPETENCIES
+                    </h2>
+                    <div id="detailCompetency" class="text-gray-700 space-y-2 leading-relaxed">Loading...</div>
+                </div>
 
                 <!-- Apply Button -->
                 <div class="flex justify-center pt-6 border-t border-gray-200">
@@ -4570,7 +4629,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Change to View Application
         button.textContent = 'View Application';
-        button.className = 'px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm whitespace-nowrap !rounded-button';
+        button.className = 'px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-base whitespace-nowrap';
         button.disabled = false;
         
         if (window.currentApplicationId) {
@@ -5177,6 +5236,13 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       
       console.log('✅ All required files validated successfully!');
+      
+      // Hide the Save Draft button since user is submitting the application
+      const saveDraftBtn = document.getElementById('saveDraftBtn');
+      if (saveDraftBtn) {
+        saveDraftBtn.style.display = 'none';
+        console.log('✅ Save Draft button hidden');
+      }
       
       submitBtn.disabled = true;
       submitBtn.innerHTML = '<i class="ri-loader-4-line animate-spin mr-2"></i>Uploading...';
@@ -7520,7 +7586,7 @@ document.addEventListener('DOMContentLoaded', function () {
             
           // Change button to "View Application" state - keep it clickable
           button.textContent = 'View Application';
-          button.className = 'px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm whitespace-nowrap !rounded-button';
+          button.className = 'px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-base whitespace-nowrap';
           button.disabled = false;
           button.setAttribute('data-application-status', 'in-progress');
           
@@ -7565,17 +7631,23 @@ document.addEventListener('DOMContentLoaded', function () {
               console.log('✅ Found existing application for job ID:', buttonJobId, 'Status:', application.status);
               
               const status = (application.status || '').toLowerCase();
+              const isCancelled = status.includes('cancel');
               const isCompleted = status.includes('hired') || status.includes('reject');
               
-              if (isCompleted) {
+              if (isCancelled) {
+                // Application is cancelled - show cancelled button (disabled)
+                button.textContent = 'Cancelled';
+                button.className = 'px-5 py-2.5 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed text-base whitespace-nowrap';
+                button.disabled = true;
+              } else if (isCompleted) {
                 // Application is completed (hired or rejected) - disable button
                 button.textContent = status.includes('hired') ? 'Hired' : 'Rejected';
-                button.className = 'px-4 py-2 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed text-sm whitespace-nowrap !rounded-button';
+                button.className = 'px-5 py-2.5 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed text-base whitespace-nowrap';
                 button.disabled = true;
               } else {
                 // Application is in progress - keep clickable to view status
                 button.textContent = 'View Application';
-                button.className = 'px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm whitespace-nowrap !rounded-button';
+                button.className = 'px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-base whitespace-nowrap';
                 button.disabled = false;
                 button.setAttribute('data-application-id', application.id);
                 button.setAttribute('data-application-status', 'in-progress');
@@ -7696,38 +7768,38 @@ function displayJobs(jobs) {
   
   jobs.forEach(job => {
     const jobCard = document.createElement('div');
-    jobCard.className = 'bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow mb-6';
+    jobCard.className = 'bg-white rounded-xl shadow-sm border border-gray-200 p-8 hover:shadow-md transition-shadow mb-6';
     jobCard.innerHTML = `
       <div class="flex justify-between items-start mb-4">
         <div>
-          <h3 class="text-xl font-semibold text-gray-900 mb-2">${escapeHtml(job.job_title)}</h3>
-          <div class="flex items-center text-sm text-gray-600 space-x-4">
+          <h3 class="text-2xl font-semibold text-gray-900 mb-3">${escapeHtml(job.job_title)}</h3>
+          <div class="flex items-center text-base text-gray-600 space-x-5">
             <span class="flex items-center">
-              <div class="w-4 h-4 flex items-center justify-center mr-1">
-                <i class="ri-building-line"></i>
+              <div class="w-5 h-5 flex items-center justify-center mr-2">
+                <i class="ri-building-line text-lg"></i>
               </div>${escapeHtml(job.department_role)}
             </span>
             <span class="flex items-center">
-              <div class="w-4 h-4 flex items-center justify-center mr-1">
-                <i class="ri-time-line"></i>
+              <div class="w-5 h-5 flex items-center justify-center mr-2">
+                <i class="ri-time-line text-lg"></i>
               </div>${escapeHtml(job.job_type)}
             </span>
             <span class="flex items-center">
-              <div class="w-4 h-4 flex items-center justify-center mr-1">
-                <i class="ri-map-pin-line"></i>
+              <div class="w-5 h-5 flex items-center justify-center mr-2">
+                <i class="ri-map-pin-line text-lg"></i>
               </div>${escapeHtml(job.locations)}
             </span>
           </div>
         </div>
-        <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">Open</span>
+        <span class="bg-green-100 text-green-800 px-4 py-1.5 rounded-full text-base font-medium">Open</span>
       </div>
-      <p class="text-gray-700 mb-4">${escapeHtml(job.job_description).replace(/\n/g, '<br>')}</p>
+      <p class="text-base text-gray-700 mb-5 leading-relaxed">${escapeHtml(job.job_description).replace(/\n/g, '<br>')}</p>
       <div class="flex items-center justify-between">
-        <div class="text-lg font-semibold text-gray-900">${escapeHtml(job.salary_range)}</div>
+        <div class="text-xl font-semibold text-gray-900">${escapeHtml(job.salary_range)}</div>
         <div class="flex space-x-3">
-          <button class="px-4 py-2 text-primary border border-primary rounded-lg hover:bg-primary hover:text-white transition-colors text-sm whitespace-nowrap !rounded-button view-details-btn" 
+          <button class="px-5 py-2.5 text-primary border border-primary rounded-lg hover:bg-primary hover:text-white transition-colors text-base whitespace-nowrap view-details-btn" 
                   data-job-id="${job.id}">View Details</button>
-          <button class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors apply-btn" data-job-id="${job.id}">Apply Now</button>
+          <button class="px-7 py-2.5 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors text-base apply-btn" data-job-id="${job.id}">Apply Now</button>
         </div>
       </div>
     `;
@@ -8588,6 +8660,31 @@ function populateJobDetails(job) {
     deadlineElement.textContent = 'No deadline specified';
   }
   
+  // Update Job Highlights section
+  document.getElementById('highlightJobType').textContent = job.job_type || 'Not specified';
+  document.getElementById('highlightLocation').textContent = job.locations || 'Not specified';
+  document.getElementById('highlightDepartment').textContent = job.department_role || 'Not specified';
+  
+  // Update Job Description (Position Overview)
+  const descriptionContainer = document.getElementById('detailJobDescription');
+  if (job.job_description) {
+    const descriptions = job.job_description.split('\n').filter(desc => desc.trim());
+    descriptionContainer.innerHTML = descriptions.map(desc => `<p class="flex items-start"><i class="ri-checkbox-circle-fill text-blue-600 mr-2 mt-1"></i><span>${desc.trim()}</span></p>`).join('');
+  } else {
+    descriptionContainer.innerHTML = '<p class="text-gray-500 italic">No description available</p>';
+  }
+  
+  // Update Duties & Responsibilities section
+  const dutiesSection = document.getElementById('dutiesSection');
+  const dutiesContainer = document.getElementById('detailDuties');
+  if (job.duties && job.duties.trim()) {
+    dutiesSection.style.display = 'block';
+    const duties = job.duties.split('\n').filter(duty => duty.trim());
+    dutiesContainer.innerHTML = duties.map(duty => `<p class="flex items-start"><i class="ri-arrow-right-circle-fill text-blue-600 mr-2 mt-1"></i><span>${duty.trim()}</span></p>`).join('');
+  } else {
+    dutiesSection.style.display = 'none';
+  }
+  
   // Update qualifications
   document.getElementById('detailEducation').textContent = job.education || 'Not specified';
   document.getElementById('detailExperience').textContent = job.experience || 'Not specified';
@@ -8608,22 +8705,19 @@ function populateJobDetails(job) {
   ];
   
   requirementsContainer.innerHTML = documentRequirements.map(req => `
-    <div class="flex items-start">
-      <i class="ri-file-text-line text-primary mr-2 mt-0.5"></i>
-      <p class="flex-1">${req.text}${req.required ? '' : ' <span class="text-green-600 text-sm">(Optional)</span>'}</p>
+    <div class="flex items-start bg-white rounded-lg p-3">
+      <i class="ri-file-text-line text-amber-600 mr-3 mt-0.5 text-lg"></i>
+      <p class="flex-1 text-gray-700">${req.text}${req.required ? ' <span class="text-red-500 text-sm">*</span>' : ' <span class="text-green-600 text-sm font-medium">(Optional)</span>'}</p>
     </div>
   `).join('');
   
   // Update competency
-  document.getElementById('detailCompetency').textContent = job.competency || 'Not specified';
-  
-  // Update job description
-  const descriptionContainer = document.getElementById('detailJobDescription');
-  if (job.job_description) {
-    const descriptions = job.job_description.split('\n').filter(desc => desc.trim());
-    descriptionContainer.innerHTML = descriptions.map(desc => `<p>• ${desc.trim()}</p>`).join('');
+  const competencyContainer = document.getElementById('detailCompetency');
+  if (job.competency && job.competency.trim()) {
+    const competencies = job.competency.split('\n').filter(comp => comp.trim());
+    competencyContainer.innerHTML = competencies.map(comp => `<p class="flex items-start"><i class="ri-star-fill text-amber-500 mr-2 mt-1"></i><span>${comp.trim()}</span></p>`).join('');
   } else {
-    descriptionContainer.innerHTML = '<p>No description available</p>';
+    competencyContainer.innerHTML = '<p class="text-gray-500 italic">Not specified</p>';
   }
   
   // Update apply button based on application status
@@ -8634,7 +8728,7 @@ function populateJobDetails(job) {
   if (job.application_id) {
     // User has applied - show "View Application" button
     applyBtn.textContent = 'View Application';
-    applyBtn.className = 'px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium';
+    applyBtn.className = 'px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-base';
     applyBtn.setAttribute('data-application-id', job.application_id);
     applyBtn.setAttribute('data-application-status', job.application_status || '');
     applyBtn.onclick = async function() {
@@ -8878,17 +8972,23 @@ function updateExistingApplicationStates() {
           
           if (application) {
             const status = (application.status || '').toLowerCase();
+            const isCancelled = status.includes('cancel');
             const isCompleted = status.includes('hired') || status.includes('reject');
             
-            if (isCompleted) {
+            if (isCancelled) {
+              // Application is cancelled - disable button
+              button.textContent = 'Cancelled';
+              button.className = 'px-5 py-2.5 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed text-base whitespace-nowrap';
+              button.disabled = true;
+            } else if (isCompleted) {
               // Application is completed - disable button
               button.textContent = status.includes('hired') ? 'Hired' : 'Rejected';
-              button.className = 'px-4 py-2 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed text-sm whitespace-nowrap !rounded-button';
+              button.className = 'px-5 py-2.5 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed text-base whitespace-nowrap';
               button.disabled = true;
             } else {
               // Application is in progress - keep clickable
               button.textContent = 'View Application';
-              button.className = 'px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm whitespace-nowrap !rounded-button';
+              button.className = 'px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-base whitespace-nowrap';
               button.disabled = false;
               button.setAttribute('data-application-id', application.id);
               button.setAttribute('data-application-status', 'in-progress');
@@ -8899,8 +8999,13 @@ function updateExistingApplicationStates() {
             if (jobCard) {
               const statusBadge = jobCard.querySelector('.bg-green-100');
               if (statusBadge) {
-                statusBadge.textContent = isCompleted ? (status.includes('hired') ? 'Hired' : 'Rejected') : 'In Progress';
-                statusBadge.className = isCompleted ? 'bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-medium' : 'bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium';
+                if (isCancelled) {
+                  statusBadge.textContent = 'Cancelled';
+                  statusBadge.className = 'bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-medium';
+                } else {
+                  statusBadge.textContent = isCompleted ? (status.includes('hired') ? 'Hired' : 'Rejected') : 'In Progress';
+                  statusBadge.className = isCompleted ? 'bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-medium' : 'bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium';
+                }
               }
             }
           }

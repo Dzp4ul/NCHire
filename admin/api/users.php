@@ -106,8 +106,20 @@ switch ($method) {
             }
         }
         
-        // Generate random temporary password (8 characters)
-        $temporaryPassword = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%'), 0, 10);
+        // Generate random temporary password (10 characters: letters, numbers, symbols)
+        $letters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        $numbers = '0123456789';
+        $symbols = '!@#$%^&*';
+        
+        // Ensure password has at least 1 letter, 1 number, 1 symbol
+        $temporaryPassword = 
+            $letters[rand(0, strlen($letters) - 1)] .  // 1 letter
+            $numbers[rand(0, strlen($numbers) - 1)] .  // 1 number
+            $symbols[rand(0, strlen($symbols) - 1)] .  // 1 symbol
+            substr(str_shuffle($letters . $numbers . $symbols), 0, 7); // 7 more random chars
+        
+        // Shuffle the final password to randomize position of required characters
+        $temporaryPassword = str_shuffle($temporaryPassword);
         
         // Hash the temporary password
         $hashed_password = password_hash($temporaryPassword, PASSWORD_DEFAULT);

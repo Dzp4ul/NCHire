@@ -46,7 +46,8 @@ session_start();
                       $status = $row['status'] ?? 'Pending';
                       $status_l = strtolower($status);
                       $status_class = 'bg-yellow-100 text-yellow-800';
-                      if (strpos($status_l, 'interview') !== false && strpos($status_l, 'passed') !== false) $status_class = 'bg-teal-100 text-teal-800';
+                      if (strpos($status_l, 'cancel') !== false) $status_class = 'bg-gray-100 text-gray-800';
+                      else if (strpos($status_l, 'interview') !== false && strpos($status_l, 'passed') !== false) $status_class = 'bg-teal-100 text-teal-800';
                       else if (strpos($status_l, 'interview') !== false) $status_class = 'bg-blue-100 text-blue-800';
                       else if (strpos($status_l, 'demo') !== false && strpos($status_l, 'passed') !== false) $status_class = 'bg-emerald-100 text-emerald-800';
                       else if (strpos($status_l, 'demo') !== false) $status_class = 'bg-indigo-100 text-indigo-800';
@@ -67,8 +68,8 @@ session_start();
                         .'<button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-primary rounded-lg hover:bg-gray-100 !rounded-button" data-action="view">'
                         .'<i class="ri-eye-line"></i>'
                         .'</button>'
-                        .'<button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-red-600 rounded-lg hover:bg-gray-100 !rounded-button" data-action="delete">'
-                        .'<i class="ri-close-line"></i>'
+                        .'<button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-orange-600 rounded-lg hover:bg-gray-100 !rounded-button" data-action="cancel">'
+                        .'<i class="ri-close-circle-line"></i>'
                         .'</button>'
                         .'</div>'
                         .'</div>';
@@ -166,6 +167,55 @@ session_start();
   </div>
 </div>
 
+<!-- Toast Notification Animations -->
+<style>
+@keyframes slideInRight {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+}
+</style>
+
+<!-- Cancel Confirmation Modal -->
+<div id="deleteConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl max-w-md w-full">
+    <div class="p-6">
+      <!-- Orange icon circle -->
+      <div class="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <i class="ri-close-circle-line text-3xl text-orange-600"></i>
+      </div>
+      
+      <h3 class="text-xl font-bold text-gray-900 text-center mb-2">Cancel Application?</h3>
+      <p class="text-gray-600 text-center mb-6">Are you sure you want to cancel this application? You can apply again later if needed.</p>
+      
+      <div class="flex gap-3">
+        <button type="button" onclick="closeDeleteModal()" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
+          Go Back
+        </button>
+        <button type="button" onclick="confirmDelete()" class="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium">
+          Cancel Application
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Upload Psych Exam Receipt Modal -->
 <div id="uploadPsychModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
   <div class="bg-white rounded-xl shadow-2xl max-w-md w-full">
@@ -213,6 +263,7 @@ session_start();
 
   const statusToClasses = (status) => {
     const s = (status || '').toLowerCase();
+    if (s.includes('cancel')) return 'bg-gray-100 text-gray-800';
     if (s.includes('interview')) return 'bg-blue-100 text-blue-800';
     if (s.includes('resubmission')) return 'bg-orange-100 text-orange-800';
     if (s.includes('reject')) return 'bg-red-100 text-red-800';
@@ -245,8 +296,8 @@ session_start();
           <button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-primary rounded-lg hover:bg-gray-100 !rounded-button" data-action="view">
             <i class="ri-eye-line"></i>
           </button>
-          <button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-red-600 rounded-lg hover:bg-gray-100 !rounded-button" data-action="delete">
-            <i class="ri-close-line"></i>
+          <button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-orange-600 rounded-lg hover:bg-gray-100 !rounded-button" data-action="cancel">
+            <i class="ri-close-circle-line"></i>
           </button>
         </div>
       </div>
@@ -279,6 +330,9 @@ session_start();
     }
   }
 
+  // Store the application ID to delete
+  let pendingDeleteId = null;
+  
   // Delegated events for view and delete
   container.addEventListener('click', async (e) => {
     const btn = e.target.closest('button[data-action]');
@@ -311,35 +365,59 @@ session_start();
       }
     }
 
-    if (action === 'delete') {
-      if (!confirm('Are you sure you want to delete this application?')) return;
-      try {
-        const form = new FormData();
-        form.append('id', id);
-        const res = await fetch('delete_application.php', {
-          method: 'POST',
-          body: form,
-          credentials: 'same-origin'
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error || 'Delete failed');
-        // Optimistically remove row
-        row.remove();
-        showToast('Application deleted', 'success');
-        // Reload to ensure state is fresh
-        loadApplications();
-      } catch (err) {
-        showToast('Error deleting: ' + err.message, 'error');
-      }
+    if (action === 'cancel') {
+      // Store the ID and show custom modal
+      pendingDeleteId = id;
+      document.getElementById('deleteConfirmModal').classList.remove('hidden');
     }
   });
+  
+  // Close delete modal
+  window.closeDeleteModal = function() {
+    document.getElementById('deleteConfirmModal').classList.add('hidden');
+    pendingDeleteId = null;
+  };
+  
+  // Confirm delete action
+  window.confirmDelete = async function() {
+    if (!pendingDeleteId) return;
+    
+    const id = pendingDeleteId;
+    const row = document.querySelector(`[data-id="${id}"]`);
+    
+    // Close modal
+    closeDeleteModal();
+    
+    try {
+      const form = new FormData();
+      form.append('id', id);
+      form.append('action', 'cancel');
+      const res = await fetch('cancel_application.php', {
+        method: 'POST',
+        body: form,
+        credentials: 'same-origin'
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Cancel failed');
+      // Update row status instead of removing
+      showToast('Your application has been successfully cancelled', 'success');
+      // Reload to show updated status
+      loadApplications();
+    } catch (err) {
+      showToast('Error cancelling application: ' + err.message, 'error');
+    }
+  };
 
   function showToast(message, type = 'info') {
     const el = document.createElement('div');
-    el.className = `fixed top-4 right-4 ${type === 'success' ? 'bg-green-100 text-green-800 border-green-300' : type === 'error' ? 'bg-red-100 text-red-800 border-red-300' : 'bg-blue-100 text-blue-800 border-blue-300'} px-4 py-3 rounded border shadow`;
-    el.innerHTML = `<div class="flex items-center"><i class="${type === 'success' ? 'ri-check-line' : type === 'error' ? 'ri-error-warning-line' : 'ri-information-line'} mr-2"></i><span>${escapeHtml(message)}</span></div>`;
+    el.className = `fixed top-4 right-4 ${type === 'success' ? 'bg-green-100 text-green-800 border-green-300' : type === 'error' ? 'bg-red-100 text-red-800 border-red-300' : 'bg-blue-100 text-blue-800 border-blue-300'} px-4 py-3 rounded border shadow-lg`;
+    el.style.cssText = 'z-index: 999999; min-width: 300px; animation: slideInRight 0.3s ease-out;';
+    el.innerHTML = `<div class="flex items-center"><i class="${type === 'success' ? 'ri-check-circle-line' : type === 'error' ? 'ri-error-warning-line' : 'ri-information-line'} mr-2 text-lg"></i><span class="font-medium">${escapeHtml(message)}</span></div>`;
     document.body.appendChild(el);
-    setTimeout(() => el.remove(), 3000);
+    setTimeout(() => {
+      el.style.animation = 'slideOutRight 0.3s ease-out';
+      setTimeout(() => el.remove(), 300);
+    }, 3000);
   }
 
   // Initial load and polling for near real-time updates

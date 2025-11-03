@@ -148,8 +148,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['signup_submit'])) {
     $signup_password = $_POST['signup_password'] ?? '';
     $signup_confirm_password = $_POST['signup_confirm_password'] ?? '';
 
-    // Check if passwords match
-    if ($signup_password !== $signup_confirm_password) {
+    // Validate password strength
+    if (strlen($signup_password) < 8) {
+        $signup_error = "Password must be at least 8 characters long.";
+    } elseif (!preg_match('/[A-Za-z]/', $signup_password)) {
+        $signup_error = "Password must contain at least one letter.";
+    } elseif (!preg_match('/[0-9]/', $signup_password)) {
+        $signup_error = "Password must contain at least one number.";
+    } elseif (!preg_match('/[^A-Za-z0-9]/', $signup_password)) {
+        $signup_error = "Password must contain at least one symbol (e.g., !@#$%^&*).";
+    } elseif ($signup_password !== $signup_confirm_password) {
         $signup_error = "Passwords do not match.";
     } else {
         // Check if email already exists
@@ -572,8 +580,9 @@ window.alert = function(message) { showToast(message, 'info'); };
 
       <div class="mb-4">
         <label class="block text-gray-700 mb-2">Password</label>
+        <p class="text-sm text-gray-600 mb-2">Must be at least 8 characters with numbers, letters, and symbols</p>
         <div class="relative">
-          <input type="text" name="fake_signup_pass" id="signUpPassword" class="w-full border border-gray-300 rounded-lg p-3 pr-12 focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Enter your password" autocomplete="off" autocomplete="disabled" data-real-name="signup_password" data-real-type="password" onfocus="if(this.hasAttribute('data-autofilled')){this.value='';this.removeAttribute('data-autofilled');}" required>
+          <input type="text" name="fake_signup_pass" id="signUpPassword" class="w-full border border-gray-300 rounded-lg p-3 pr-12 focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Enter your password" autocomplete="off" autocomplete="disabled" data-real-name="signup_password" data-real-type="password" onfocus="if(this.hasAttribute('data-autofilled')){this.value='';this.removeAttribute('data-autofilled');}" minlength="8" required>
           <button type="button" id="toggleSignUpPassword" class="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-primary">
             <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
   <!-- Eye outline -->
@@ -1433,6 +1442,57 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 </script>
 
+<script>
+// Client-side password validation for signup form
+document.addEventListener('DOMContentLoaded', function() {
+    const signupForm = document.querySelector('#signUpModal form');
+    const passwordInput = document.getElementById('signUpPassword');
+    const confirmPasswordInput = document.getElementById('signUpConfirmPassword');
+    
+    if (signupForm) {
+        signupForm.addEventListener('submit', function(e) {
+            const password = passwordInput.value;
+            const confirmPassword = confirmPasswordInput.value;
+            
+            // Check password requirements
+            if (password.length < 8) {
+                e.preventDefault();
+                alert('Password must be at least 8 characters long.');
+                passwordInput.focus();
+                return false;
+            }
+            
+            if (!/[A-Za-z]/.test(password)) {
+                e.preventDefault();
+                alert('Password must contain at least one letter.');
+                passwordInput.focus();
+                return false;
+            }
+            
+            if (!/[0-9]/.test(password)) {
+                e.preventDefault();
+                alert('Password must contain at least one number.');
+                passwordInput.focus();
+                return false;
+            }
+            
+            if (!/[^A-Za-z0-9]/.test(password)) {
+                e.preventDefault();
+                alert('Password must contain at least one symbol (e.g., !@#$%^&*).');
+                passwordInput.focus();
+                return false;
+            }
+            
+            if (password !== confirmPassword) {
+                e.preventDefault();
+                alert('Passwords do not match.');
+                confirmPasswordInput.focus();
+                return false;
+            }
+        });
+    }
+});
+</script>
 
 <script>
 // Function to show verification success popup

@@ -149,7 +149,7 @@ if ($show_applicant_stats && !empty($department_params)) {
 // Get recent jobs from job table with application counts
 $recent_jobs_query = "SELECT j.*, COUNT(ja.id) as application_count 
                       FROM job j 
-                      LEFT JOIN job_applicants ja ON j.job_title = ja.position 
+                      LEFT JOIN job_applicants ja ON j.id = ja.job_id 
                       GROUP BY j.id 
                       ORDER BY j.id DESC 
                       LIMIT 5";
@@ -883,18 +883,20 @@ $recent_activity = $conn->query($recent_activity_query);
                         <div class="flex-1">
                             <div class="relative">
                                 <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                                <input type="text" placeholder="Search jobs..." 
+                                <input type="text" id="jobSearchInput" placeholder="Search jobs..." 
+                                       oninput="filterJobs()" 
                                        class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                             </div>
                         </div>
                         <div class="flex gap-2">
-                            <select class="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                            <select id="jobStatusFilter" onchange="filterJobs()" 
+                                    class="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                                 <option value="all">All Status</option>
                                 <option value="active">Active</option>
-                                <option value="draft">Draft</option>
                                 <option value="closed">Closed</option>
                             </select>
-                            <button class="border border-gray-300 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors flex items-center gap-2">
+                            <button onclick="openMoreFiltersModal()" 
+                                    class="border border-gray-300 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors flex items-center gap-2">
                                 <i class="fas fa-filter"></i>
                                 More Filters
                             </button>
@@ -1366,9 +1368,21 @@ $recent_activity = $conn->query($recent_activity_query);
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Salary Range</label>
-                        <input type="text" name="salary" required
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                               placeholder="e.g., ₱25,000 - ₱35,000">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Minimum</label>
+                                <input type="text" id="salaryMin1" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="25,000">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Maximum</label>
+                                <input type="text" id="salaryMax1" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="35,000">
+                            </div>
+                        </div>
+                        <input type="hidden" name="salary" id="salaryRange1">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Application Deadline</label>
@@ -1496,9 +1510,21 @@ $recent_activity = $conn->query($recent_activity_query);
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Salary Range</label>
-                        <input type="text" name="salary" required
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                               placeholder="e.g., ₱25,000 - ₱35,000">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Minimum</label>
+                                <input type="text" id="salaryMin2" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="15,000">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Maximum</label>
+                                <input type="text" id="salaryMax2" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="20,000">
+                            </div>
+                        </div>
+                        <input type="hidden" name="salary" id="salaryRange2">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Application Deadline</label>
@@ -1623,9 +1649,21 @@ $recent_activity = $conn->query($recent_activity_query);
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Salary Range</label>
-                        <input type="text" name="salary" required
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                               placeholder="e.g., ₱25,000 - ₱35,000">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Minimum</label>
+                                <input type="text" id="salaryMin3" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="18,000">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Maximum</label>
+                                <input type="text" id="salaryMax3" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="25,000">
+                            </div>
+                        </div>
+                        <input type="hidden" name="salary" id="salaryRange3">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Application Deadline</label>
@@ -1690,7 +1728,7 @@ $recent_activity = $conn->query($recent_activity_query);
                 </div>
 
                 <div class="flex justify-end gap-3 pt-4">
-                    <button type="button" onclick="closeCreatesecJobModal()"
+                    <button type="button" onclick="closecreatesecJobModal()"
                             class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
                         Cancel
                     </button>
@@ -1758,9 +1796,21 @@ $recent_activity = $conn->query($recent_activity_query);
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Salary Range</label>
-                        <input type="text" name="salary" required
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                               placeholder="e.g., ₱25,000 - ₱35,000">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Minimum</label>
+                                <input type="text" id="salaryMin4" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="25,000">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Maximum</label>
+                                <input type="text" id="salaryMax4" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="35,000">
+                            </div>
+                        </div>
+                        <input type="hidden" name="salary" id="salaryRange4">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Application Deadline</label>
@@ -1842,9 +1892,21 @@ $recent_activity = $conn->query($recent_activity_query);
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Salary Range</label>
-                        <input type="text" name="salary" required
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                               placeholder="e.g., ₱25,000 - ₱35,000">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Minimum</label>
+                                <input type="text" id="salaryMin5" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="15,000">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Maximum</label>
+                                <input type="text" id="salaryMax5" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="20,000">
+                            </div>
+                        </div>
+                        <input type="hidden" name="salary" id="salaryRange5">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Application Deadline</label>
@@ -1923,9 +1985,21 @@ $recent_activity = $conn->query($recent_activity_query);
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Salary Range</label>
-                        <input type="text" name="salary" required
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                               placeholder="e.g., ₱25,000 - ₱35,000">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Minimum</label>
+                                <input type="text" id="salaryMin6" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="18,000">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Maximum</label>
+                                <input type="text" id="salaryMax6" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="25,000">
+                            </div>
+                        </div>
+                        <input type="hidden" name="salary" id="salaryRange6">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Application Deadline</label>
@@ -1956,16 +2030,139 @@ $recent_activity = $conn->query($recent_activity_query);
         </div>
     </div>
 
-<div id="viewJobModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-  <div class="bg-white p-6 rounded-lg shadow-lg w-1/3">
-    <h2 class="text-xl font-bold mb-4 job-title"></h2>
-    <p><strong>Department:</strong> <span class="job-dept"></span></p>
-    <p><strong>Type:</strong> <span class="job-type"></span></p>
-    <p><strong>Location:</strong> <span class="job-loc"></span></p>
-    <p><strong>Salary:</strong> <span class="job-salary"></span></p>
-    <p><strong>Deadline:</strong> <span class="job-deadline"></span></p>
-    <p><strong>Description:</strong> <span class="job-desc"></span></p>
-    <button onclick="closeViewJobModal()" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded">Close</button>
+<div id="viewJobModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6 rounded-t-xl sticky top-0 z-10">
+      <div class="flex items-center justify-between">
+        <div class="flex-1">
+          <h2 class="text-2xl font-bold mb-2 job-title"></h2>
+          <div class="flex flex-wrap gap-4 text-sm text-blue-100">
+            <span class="flex items-center"><i class="fas fa-building mr-2"></i><span class="job-dept"></span></span>
+            <span class="flex items-center"><i class="fas fa-clock mr-2"></i><span class="job-type"></span></span>
+            <span class="flex items-center"><i class="fas fa-map-marker-alt mr-2"></i><span class="job-loc"></span></span>
+          </div>
+        </div>
+        <button onclick="closeViewJobModal()" class="text-white hover:text-gray-200 transition-colors">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+      <div class="mt-4 flex items-center justify-between">
+        <div class="text-white text-xl font-semibold">
+          <i class="fas fa-peso-sign mr-2"></i><span class="job-salary"></span>
+        </div>
+        <div class="text-right">
+          <div class="text-blue-100 text-xs font-medium">APPLICATION DEADLINE</div>
+          <div class="text-white text-lg font-bold job-deadline"></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Content -->
+    <div class="p-6 space-y-6">
+      <!-- Job Highlights -->
+      <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-5 border-l-4 border-blue-600">
+        <h3 class="text-lg font-bold text-gray-900 mb-3 flex items-center">
+          <i class="fas fa-star text-blue-600 mr-2"></i>Job Highlights
+        </h3>
+        <div class="grid grid-cols-3 gap-4">
+          <div class="bg-white rounded-lg p-3 shadow-sm">
+            <div class="text-xs text-gray-500 font-semibold mb-1">Job Type</div>
+            <div class="text-gray-900 font-medium job-type-highlight"></div>
+          </div>
+          <div class="bg-white rounded-lg p-3 shadow-sm">
+            <div class="text-xs text-gray-500 font-semibold mb-1">Location</div>
+            <div class="text-gray-900 font-medium job-loc-highlight"></div>
+          </div>
+          <div class="bg-white rounded-lg p-3 shadow-sm">
+            <div class="text-xs text-gray-500 font-semibold mb-1">Department</div>
+            <div class="text-gray-900 font-medium job-dept-highlight"></div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Position Overview -->
+      <div class="bg-white border border-gray-200 rounded-xl p-5">
+        <h3 class="text-lg font-bold text-gray-900 mb-3 flex items-center">
+          <i class="fas fa-file-alt text-blue-600 mr-2"></i>Position Overview
+        </h3>
+        <div class="text-gray-700 space-y-2 job-desc"></div>
+      </div>
+      
+      <!-- Duties & Responsibilities -->
+      <div id="job-duties-section" class="bg-white border border-gray-200 rounded-xl p-5" style="display: none;">
+        <h3 class="text-lg font-bold text-gray-900 mb-3 flex items-center">
+          <i class="fas fa-tasks text-blue-600 mr-2"></i>Duties & Responsibilities
+        </h3>
+        <div class="text-gray-700 space-y-2 job-duties"></div>
+      </div>
+      
+      <!-- Minimum Qualifications -->
+      <div class="bg-white border border-gray-200 rounded-xl p-5">
+        <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
+          <i class="fas fa-check-circle text-blue-600 mr-2"></i>Minimum Qualifications
+        </h3>
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div class="bg-gray-50 rounded-lg p-4">
+            <div class="text-sm font-semibold text-gray-900 mb-2 flex items-center">
+              <i class="fas fa-graduation-cap text-blue-600 mr-2"></i>Education
+            </div>
+            <div class="text-gray-700 job-education"></div>
+          </div>
+          <div class="bg-gray-50 rounded-lg p-4">
+            <div class="text-sm font-semibold text-gray-900 mb-2 flex items-center">
+              <i class="fas fa-briefcase text-blue-600 mr-2"></i>Experience
+            </div>
+            <div class="text-gray-700 job-experience"></div>
+          </div>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-4 mb-4">
+          <div class="text-sm font-semibold text-gray-900 mb-2 flex items-center">
+            <i class="fas fa-book text-blue-600 mr-2"></i>Training
+          </div>
+          <div class="text-gray-700 job-training"></div>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-4">
+          <div class="text-sm font-semibold text-gray-900 mb-2 flex items-center">
+            <i class="fas fa-medal text-blue-600 mr-2"></i>Eligibility
+          </div>
+          <div class="text-gray-700 job-eligibility"></div>
+        </div>
+      </div>
+      
+      <!-- Required Documents -->
+      <div class="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-5 border-l-4 border-amber-500">
+        <h3 class="text-lg font-bold text-amber-800 mb-3 flex items-center">
+          <i class="fas fa-file-alt text-amber-600 mr-2"></i>Required Documents for Application
+        </h3>
+        <p class="text-sm text-amber-700 mb-3">Applicants must submit the following documents:</p>
+        <div class="grid grid-cols-2 gap-2 text-sm">
+          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-check text-green-600 mr-2"></i>Application Letter</div>
+          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-check text-green-600 mr-2"></i>Updated Resume</div>
+          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-check text-green-600 mr-2"></i>Transcript of Record</div>
+          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-check text-green-600 mr-2"></i>Diploma</div>
+          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-info-circle text-blue-600 mr-2"></i>Professional License <span class="text-xs text-gray-500">(Optional)</span></div>
+          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-check text-green-600 mr-2"></i>Certificate of Employment</div>
+          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-check text-green-600 mr-2"></i>Training Certificates</div>
+          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-info-circle text-blue-600 mr-2"></i>Masteral Certificate <span class="text-xs text-gray-500">(Optional)</span></div>
+        </div>
+      </div>
+      
+      <!-- Required Competencies -->
+      <div class="bg-white border border-gray-200 rounded-xl p-5">
+        <h3 class="text-lg font-bold text-gray-900 mb-3 flex items-center">
+          <i class="fas fa-lightbulb text-blue-600 mr-2"></i>Required Competencies
+        </h3>
+        <div class="text-gray-700 space-y-2 job-competency"></div>
+      </div>
+    </div>
+    
+    <!-- Footer -->
+    <div class="bg-gray-50 p-4 rounded-b-xl flex justify-end gap-3 sticky bottom-0">
+      <button onclick="closeViewJobModal()" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium">
+        Close
+      </button>
+    </div>
   </div>
 </div>
 
@@ -3680,6 +3877,65 @@ $recent_activity = $conn->query($recent_activity_query);
             </div>
         </div>
     </div>
+
+<!-- More Filters Modal -->
+<div id="moreFiltersModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 transform transition-all">
+        <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-900">More Filters</h3>
+                <button onclick="closeMoreFiltersModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <div class="p-6 space-y-4">
+            <!-- Department Filter -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Department</label>
+                <select id="jobDepartmentFilter" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                    <option value="all">All Departments</option>
+                    <option value="Computer Science">Computer Science</option>
+                    <option value="Hospitality Management">Hospitality Management</option>
+                    <option value="Education">Education</option>
+                </select>
+            </div>
+            
+            <!-- Job Type Filter -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Job Type</label>
+                <select id="jobTypeFilter" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                    <option value="all">All Types</option>
+                    <option value="Full-time">Full-time</option>
+                    <option value="Part-time">Part-time</option>
+                </select>
+            </div>
+            
+            <!-- Date Range Filter -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Deadline Range</label>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">From</label>
+                        <input type="date" id="jobDeadlineFrom" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">To</label>
+                        <input type="date" id="jobDeadlineTo" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="p-6 border-t border-gray-200 flex gap-3">
+            <button onclick="clearJobFilters()" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                Clear Filters
+            </button>
+            <button onclick="applyMoreFilters()" class="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-800 transition-colors font-medium">
+                Apply Filters
+            </button>
+        </div>
+    </div>
+</div>
 
 <!-- Logout Confirmation Modal -->
 <div id="logoutModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center">

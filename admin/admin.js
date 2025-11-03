@@ -62,87 +62,16 @@ async function loadJobs() {
     try {
         const response = await fetch('gets_job.php');
         jobs = await response.json();
-
-        tbody.innerHTML = '';
-
-        jobs.forEach(job => {
-            // compute status
-            let status = "Active";
-            const today = new Date();
-            const deadline = new Date(job.application_deadline);
-
-            if (today > deadline) {
-                status = "Closed";
-            }
-
-            const row = document.createElement('tr');
-            row.className = 'hover:bg-gray-50';
-            row.innerHTML = `
-                <td class="px-6 py-4">
-                    <div>
-                        <div class="font-medium text-gray-900">${job.job_title}</div>
-                        <div class="text-sm text-gray-500">${job.locations}</div>
-                        <div class="text-sm text-green-600 font-medium">${job.salary_range}</div>
-                    </div>
-                </td>
-                <td class="px-6 py-4 text-sm text-gray-900">${job.department_role}</td>
-                <td class="px-6 py-4">
-                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                        ${job.job_type}
-                    </span>
-                </td>
-                <td class="px-6 py-4 text-sm text-gray-900">${job.application_deadline}</td>
-                <td class="px-6 py-4">
-                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full 
-                        ${status === "Active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}">
-                        ${status}
-                    </span>
-                </td>
-                <td class="px-6 py-4">
-                    <div class="flex items-center gap-2">
-                        <button onclick="viewJob(${job.id})" class="text-gray-400 hover:text-gray-600" title="View">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button onclick="editJob(${job.id})" class="text-gray-400 hover:text-blue-600" title="Edit">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="share-job-btn text-gray-400 hover:text-green-600" 
-                                data-job-id="${job.id}" 
-                                data-job-title="${job.job_title.replace(/"/g, '&quot;')}" 
-                                title="Copy Link to Share">
-                            <i class="fas fa-share-alt"></i>
-                        </button>
-                        <button onclick="deleteJob(${job.id})" class="text-gray-400 hover:text-red-600" title="Delete">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </td>
-            `;
-            tbody.appendChild(row);
-        });
         
-        // Add event delegation for share buttons (remove old listener first to prevent duplicates)
-        const oldListener = tbody._shareClickListener;
-        if (oldListener) {
-            tbody.removeEventListener('click', oldListener);
-        }
+        // Store all jobs for filtering
+        allJobs = [...jobs];
+        filteredJobs = [...jobs];
         
-        const shareClickListener = function(e) {
-            const shareBtn = e.target.closest('.share-job-btn');
-            if (shareBtn) {
-                e.preventDefault();
-                e.stopPropagation();
-                const jobId = shareBtn.dataset.jobId;
-                const jobTitle = shareBtn.dataset.jobTitle;
-                copyJobLink(jobId, jobTitle);
-            }
-        };
-        
-        tbody.addEventListener('click', shareClickListener);
-        tbody._shareClickListener = shareClickListener;
+        // Display jobs using the filter display function
+        displayFilteredJobs();
         
     } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-red-500">Failed to load jobs.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-red-500">Failed to load jobs.</td></tr>';
         console.error(error);
     }
 }
@@ -177,6 +106,178 @@ function copyJobLink(jobId, jobTitle) {
         document.body.removeChild(tempInput);
         showToast(`Link copied! Share "${jobTitle}" on social media`, 'success');
     });
+}
+
+// Global variables for job filtering
+let allJobs = []; // Store all jobs
+let filteredJobs = []; // Store filtered results
+
+// Filter jobs based on search and filters
+function filterJobs() {
+    const searchTerm = document.getElementById('jobSearchInput').value.toLowerCase();
+    const statusFilter = document.getElementById('jobStatusFilter').value;
+    
+    // Get more filters values (if set)
+    const departmentFilter = document.getElementById('jobDepartmentFilter')?.value || 'all';
+    const typeFilter = document.getElementById('jobTypeFilter')?.value || 'all';
+    const deadlineFrom = document.getElementById('jobDeadlineFrom')?.value || '';
+    const deadlineTo = document.getElementById('jobDeadlineTo')?.value || '';
+    
+    // Filter jobs
+    filteredJobs = allJobs.filter(job => {
+        // Calculate status
+        const today = new Date();
+        const deadline = new Date(job.application_deadline);
+        const jobStatus = today > deadline ? "Closed" : "Active";
+        
+        // Search filter (job title, location, department)
+        const matchesSearch = !searchTerm || 
+            job.job_title.toLowerCase().includes(searchTerm) ||
+            job.locations.toLowerCase().includes(searchTerm) ||
+            job.department_role.toLowerCase().includes(searchTerm);
+        
+        // Status filter
+        const matchesStatus = statusFilter === 'all' || 
+            jobStatus.toLowerCase() === statusFilter.toLowerCase();
+        
+        // Department filter
+        const matchesDepartment = departmentFilter === 'all' || 
+            job.department_role === departmentFilter;
+        
+        // Job type filter
+        const matchesType = typeFilter === 'all' || 
+            job.job_type === typeFilter;
+        
+        // Deadline range filter
+        let matchesDeadlineRange = true;
+        if (deadlineFrom && deadline < new Date(deadlineFrom)) {
+            matchesDeadlineRange = false;
+        }
+        if (deadlineTo && deadline > new Date(deadlineTo)) {
+            matchesDeadlineRange = false;
+        }
+        
+        return matchesSearch && matchesStatus && matchesDepartment && matchesType && matchesDeadlineRange;
+    });
+    
+    // Display filtered results
+    displayFilteredJobs();
+}
+
+// Display filtered jobs
+function displayFilteredJobs() {
+    const tbody = document.getElementById('jobsTableBody');
+    tbody.innerHTML = '';
+    
+    if (filteredJobs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-500">No jobs found matching your filters.</td></tr>';
+        return;
+    }
+    
+    filteredJobs.forEach(job => {
+        // Compute status
+        const today = new Date();
+        const deadline = new Date(job.application_deadline);
+        const status = today > deadline ? "Closed" : "Active";
+        
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-gray-50';
+        row.innerHTML = `
+            <td class="px-6 py-4">
+                <div>
+                    <div class="font-medium text-gray-900">${job.job_title}</div>
+                    <div class="text-sm text-gray-500">${job.locations}</div>
+                    <div class="text-sm text-green-600 font-medium">${job.salary_range}</div>
+                </div>
+            </td>
+            <td class="px-6 py-4 text-sm text-gray-900">${job.department_role}</td>
+            <td class="px-6 py-4">
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                    ${job.job_type}
+                </span>
+            </td>
+            <td class="px-6 py-4 text-sm text-gray-900">${job.application_deadline}</td>
+            <td class="px-6 py-4">
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full 
+                    ${status === "Active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}">
+                    ${status}
+                </span>
+            </td>
+            <td class="px-6 py-4">
+                <div class="flex items-center gap-2">
+                    <button onclick="viewJob(${job.id})" class="text-gray-400 hover:text-gray-600" title="View">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button onclick="editJob(${job.id})" class="text-gray-400 hover:text-blue-600" title="Edit">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="share-job-btn text-gray-400 hover:text-green-600" 
+                            data-job-id="${job.id}" 
+                            data-job-title="${job.job_title.replace(/"/g, '&quot;')}" 
+                            title="Copy Link to Share">
+                        <i class="fas fa-share-alt"></i>
+                    </button>
+                    <button onclick="deleteJob(${job.id})" class="text-gray-400 hover:text-red-600" title="Delete">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+    
+    // Add event delegation for share buttons
+    const oldListener = tbody._shareClickListener;
+    if (oldListener) {
+        tbody.removeEventListener('click', oldListener);
+    }
+    
+    const shareClickListener = function(e) {
+        const shareBtn = e.target.closest('.share-job-btn');
+        if (shareBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            const jobId = shareBtn.dataset.jobId;
+            const jobTitle = shareBtn.dataset.jobTitle;
+            copyJobLink(jobId, jobTitle);
+        }
+    };
+    
+    tbody.addEventListener('click', shareClickListener);
+    tbody._shareClickListener = shareClickListener;
+}
+
+// More Filters Modal Functions
+function openMoreFiltersModal() {
+    document.getElementById('moreFiltersModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeMoreFiltersModal() {
+    document.getElementById('moreFiltersModal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function applyMoreFilters() {
+    filterJobs();
+    closeMoreFiltersModal();
+    showToast('Filters applied successfully', 'success');
+}
+
+function clearJobFilters() {
+    // Clear all filter inputs
+    document.getElementById('jobSearchInput').value = '';
+    document.getElementById('jobStatusFilter').value = 'all';
+    document.getElementById('jobDepartmentFilter').value = 'all';
+    document.getElementById('jobTypeFilter').value = 'all';
+    document.getElementById('jobDeadlineFrom').value = '';
+    document.getElementById('jobDeadlineTo').value = '';
+    
+    // Reset to show all jobs
+    filteredJobs = [...allJobs];
+    displayFilteredJobs();
+    closeMoreFiltersModal();
+    showToast('All filters cleared', 'success');
 }
 
 // Users array - will be loaded from database
@@ -900,13 +1001,60 @@ function viewJob(id) {
     if (!job) return;
 
     const modal = document.getElementById('viewJobModal');
-    modal.querySelector('.job-title').innerText = job.job_title;
-    modal.querySelector('.job-dept').innerText = job.department_role;
-    modal.querySelector('.job-type').innerText = job.job_type;
-    modal.querySelector('.job-loc').innerText = job.locations;
-    modal.querySelector('.job-salary').innerText = job.salary_range;
-    modal.querySelector('.job-deadline').innerText = job.application_deadline;
-    modal.querySelector('.job-desc').innerText = job.job_description;
+    
+    // Update header information
+    modal.querySelector('.job-title').innerText = job.job_title || 'Job Title';
+    modal.querySelectorAll('.job-dept').forEach(el => el.innerText = job.department_role || 'Not specified');
+    modal.querySelectorAll('.job-type').forEach(el => el.innerText = job.job_type || 'Not specified');
+    modal.querySelectorAll('.job-loc').forEach(el => el.innerText = job.locations || 'Not specified');
+    modal.querySelector('.job-salary').innerText = job.salary_range || 'Not specified';
+    modal.querySelector('.job-deadline').innerText = job.application_deadline ? new Date(job.application_deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Not specified';
+    
+    // Update job highlights
+    modal.querySelector('.job-type-highlight').innerText = job.job_type || 'Not specified';
+    modal.querySelector('.job-loc-highlight').innerText = job.locations || 'Not specified';
+    modal.querySelector('.job-dept-highlight').innerText = job.department_role || 'Not specified';
+    
+    // Update Position Overview (Job Description)
+    const descContainer = modal.querySelector('.job-desc');
+    if (job.job_description && job.job_description.trim()) {
+        const descriptions = job.job_description.split('\n').filter(desc => desc.trim());
+        descContainer.innerHTML = descriptions.map(desc => 
+            `<p class="flex items-start"><i class="fas fa-check-circle text-blue-600 mr-2 mt-1"></i><span>${desc.trim()}</span></p>`
+        ).join('');
+    } else {
+        descContainer.innerHTML = '<p class="text-gray-500 italic">No description available</p>';
+    }
+    
+    // Update Duties & Responsibilities
+    const dutiesSection = document.getElementById('job-duties-section');
+    const dutiesContainer = modal.querySelector('.job-duties');
+    if (job.duties && job.duties.trim()) {
+        dutiesSection.style.display = 'block';
+        const duties = job.duties.split('\n').filter(duty => duty.trim());
+        dutiesContainer.innerHTML = duties.map(duty => 
+            `<p class="flex items-start"><i class="fas fa-arrow-right text-blue-600 mr-2 mt-1"></i><span>${duty.trim()}</span></p>`
+        ).join('');
+    } else {
+        dutiesSection.style.display = 'none';
+    }
+    
+    // Update Qualifications
+    modal.querySelector('.job-education').innerText = job.education || 'Not specified';
+    modal.querySelector('.job-experience').innerText = job.experience || 'Not specified';
+    modal.querySelector('.job-training').innerText = job.training || 'Not specified';
+    modal.querySelector('.job-eligibility').innerText = job.eligibility || 'Not specified';
+    
+    // Update Competencies
+    const competencyContainer = modal.querySelector('.job-competency');
+    if (job.competency && job.competency.trim()) {
+        const competencies = job.competency.split('\n').filter(comp => comp.trim());
+        competencyContainer.innerHTML = competencies.map(comp => 
+            `<p class="flex items-start"><i class="fas fa-star text-amber-500 mr-2 mt-1"></i><span>${comp.trim()}</span></p>`
+        ).join('');
+    } else {
+        competencyContainer.innerHTML = '<p class="text-gray-500 italic">Not specified</p>';
+    }
 
     modal.classList.remove('hidden');
 }
@@ -1082,6 +1230,7 @@ function deleteJob(id) {
 function confirmDeleteJob() {
     const modal = document.getElementById('deleteJobModal');
     const jobId = modal.dataset.jobId;
+    const jobTitle = modal.querySelector('.job-title').innerText;
 
     fetch('delete_job.php', {
         method: 'POST',
@@ -1091,14 +1240,21 @@ function confirmDeleteJob() {
     .then(res => res.json())
     .then(result => {
         if (result.success) {
+            showToast(`Job posting "${jobTitle}" has been deleted successfully`, 'success');
             loadJobs();
             // Refresh dashboard if we're on the dashboard page
             if (typeof loadDashboardData === 'function') {
                 loadDashboardData();
             }
         } else {
+            showToast(result.message || 'Failed to delete job posting', 'error');
             console.error(result.message);
         }
+        modal.classList.add('hidden');
+    })
+    .catch(error => {
+        showToast('Network error: Failed to delete job posting', 'error');
+        console.error('Error deleting job:', error);
         modal.classList.add('hidden');
     });
 }
@@ -2123,9 +2279,37 @@ function updateActionButtons(status, applicant = null) {
     if (existingPsychIndicator) {
         existingPsychIndicator.remove();
     }
+    const existingCancelledInfo = document.querySelector('.cancelled-info');
+    if (existingCancelledInfo) {
+        existingCancelledInfo.remove();
+    }
     
     // Check if psychological exam receipt has been uploaded
     const hasPsychReceipt = applicant && applicant.psych_exam_receipt;
+    
+    // CHECK IF APPLICATION IS CANCELLED
+    const applicationStatus = applicant && applicant.status ? applicant.status.toLowerCase() : '';
+    if (applicationStatus.includes('cancel')) {
+        // Show "Application Cancelled" message - no action buttons
+        const actionButtonsContainer = document.getElementById('actionButtons');
+        if (actionButtonsContainer && !actionButtonsContainer.querySelector('.cancelled-info')) {
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'cancelled-info bg-gray-50 border border-gray-300 rounded-lg p-4';
+            infoDiv.innerHTML = `
+                <div class="flex items-start gap-3">
+                    <i class="fas fa-times-circle text-gray-600 mt-1"></i>
+                    <div>
+                        <h4 class="font-semibold text-gray-900 text-sm">Application Cancelled</h4>
+                        <p class="text-xs text-gray-700 mt-1">
+                            This application has been cancelled by the applicant. No further actions can be taken.
+                        </p>
+                    </div>
+                </div>
+            `;
+            actionButtonsContainer.prepend(infoDiv);
+        }
+        return; // Exit - no action buttons for cancelled applications
+    }
     
     // SECRETARY ACTIONS: Transfer, Request Resubmission, Reject
     if (workflowStage === 'secretary_review') {
@@ -3682,5 +3866,76 @@ async function updateJob(event) {
         showToast('Failed to update job. Please try again.', 'error');
     }
 }
+
+// Salary Range Input Formatting
+document.addEventListener('DOMContentLoaded', function() {
+    // Function to format number with commas
+    function formatNumberWithCommas(value) {
+        // Remove non-digits
+        value = value.replace(/\D/g, '');
+        // Add commas
+        return value.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+
+    // Function to update hidden salary field
+    function updateSalaryRange(minId, maxId, rangeId) {
+        const minInput = document.getElementById(minId);
+        const maxInput = document.getElementById(maxId);
+        const rangeInput = document.getElementById(rangeId);
+        
+        if (minInput && maxInput && rangeInput) {
+            const minVal = minInput.value.replace(/,/g, '');
+            const maxVal = maxInput.value.replace(/,/g, '');
+            
+            if (minVal && maxVal) {
+                // Store without peso sign - let frontend add it when displaying
+                rangeInput.value = `${formatNumberWithCommas(minVal)} - ${formatNumberWithCommas(maxVal)}`;
+            }
+        }
+    }
+
+    // Attach event listeners to all salary inputs
+    const salaryInputs = document.querySelectorAll('.salary-input');
+    salaryInputs.forEach(input => {
+        // Format on input
+        input.addEventListener('input', function(e) {
+            const cursorPosition = e.target.selectionStart;
+            const oldLength = e.target.value.length;
+            
+            // Format the value
+            e.target.value = formatNumberWithCommas(e.target.value);
+            
+            // Restore cursor position
+            const newLength = e.target.value.length;
+            const newPosition = cursorPosition + (newLength - oldLength);
+            e.target.setSelectionRange(newPosition, newPosition);
+            
+            // Update corresponding hidden field
+            const inputId = e.target.id;
+            if (inputId) {
+                const num = inputId.match(/\d+/)[0];
+                updateSalaryRange(`salaryMin${num}`, `salaryMax${num}`, `salaryRange${num}`);
+            }
+        });
+
+        // Only allow numbers and commas
+        input.addEventListener('keypress', function(e) {
+            if (!/[\d,]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') {
+                e.preventDefault();
+            }
+        });
+    });
+
+    // Update hidden fields on form submission
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            // Update all salary range fields before submission
+            for (let i = 1; i <= 6; i++) {
+                updateSalaryRange(`salaryMin${i}`, `salaryMax${i}`, `salaryRange${i}`);
+            }
+        });
+    });
+});
 
 

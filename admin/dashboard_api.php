@@ -50,7 +50,7 @@ try {
     // Get recent jobs from job table with application counts
     $recent_jobs_query = "SELECT j.*, COUNT(ja.id) as application_count 
                           FROM job j 
-                          LEFT JOIN job_applicants ja ON j.job_title = ja.position 
+                          LEFT JOIN job_applicants ja ON j.id = ja.job_id 
                           GROUP BY j.id 
                           ORDER BY j.id DESC 
                           LIMIT 5";

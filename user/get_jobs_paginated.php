@@ -137,11 +137,19 @@ try {
     
     $jobs = [];
     while ($row = $result->fetch_assoc()) {
-        // Format salary range properly
-        $salaryParts = explode(' - ', $row['salary_range']);
-        $formattedSalary = '₱' . $salaryParts[0];
-        if (isset($salaryParts[1])) {
-            $formattedSalary .= ' - ₱' . $salaryParts[1];
+        // Format salary range properly - only add ₱ if not already present
+        $salaryRange = $row['salary_range'];
+        
+        // Check if peso sign is already present
+        if (strpos($salaryRange, '₱') === false) {
+            $salaryParts = explode(' - ', $salaryRange);
+            $formattedSalary = '₱' . $salaryParts[0];
+            if (isset($salaryParts[1])) {
+                $formattedSalary .= ' - ₱' . $salaryParts[1];
+            }
+        } else {
+            // Already has peso sign, use as-is
+            $formattedSalary = $salaryRange;
         }
         
         $jobs[] = [
