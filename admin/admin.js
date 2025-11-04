@@ -531,6 +531,9 @@ function viewArchivedApplicant(applicantId) {
     viewApplicant(applicantId);
 }
 
+// Global variable to store all users
+let allUsers = [];
+
 // Load Users from Database
 async function loadUsers() {
     const tbody = document.getElementById('usersTableBody');
@@ -538,16 +541,37 @@ async function loadUsers() {
     
     try {
         const response = await fetch('api/users.php');
-        users = await response.json();
+        allUsers = await response.json();
         
-        if (!Array.isArray(users) || users.length === 0) {
+        if (!Array.isArray(allUsers) || allUsers.length === 0) {
             tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">No users found</td></tr>';
+            updateUserResultsCount(0, 0);
             return;
         }
         
-        tbody.innerHTML = '';
+        // Initial display of all users
+        displayUsers(allUsers);
         
-        users.forEach(user => {
+    } catch (error) {
+        console.error('Error loading users:', error);
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-red-500">Failed to load users</td></tr>';
+        updateUserResultsCount(0, 0);
+    }
+}
+
+// Display users in the table
+function displayUsers(usersToDisplay) {
+    const tbody = document.getElementById('usersTableBody');
+    
+    if (!Array.isArray(usersToDisplay) || usersToDisplay.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">No users found matching the filters</td></tr>';
+        updateUserResultsCount(0, allUsers.length);
+        return;
+    }
+    
+    tbody.innerHTML = '';
+    
+    usersToDisplay.forEach(user => {
             const row = document.createElement('tr');
             row.className = 'hover:bg-gray-50';
             row.innerHTML = `
@@ -585,18 +609,62 @@ async function loadUsers() {
                         <button onclick="editUser(${user.id})" class="text-gray-400 hover:text-blue-600" title="Edit User">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <button onclick="deleteUser(${user.id})" class="text-gray-400 hover:text-red-600" title="Delete User">
-                            <i class="fas fa-trash"></i>
-                        </button>
                     </div>
                 </td>
             `;
             tbody.appendChild(row);
         });
-    } catch (error) {
-        console.error('Error loading users:', error);
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-red-500">Failed to load users</td></tr>';
+    
+    updateUserResultsCount(usersToDisplay.length, allUsers.length);
+}
+
+// Filter users based on search and filters
+function filterUsers() {
+    const searchTerm = document.getElementById('userSearch')?.value.toLowerCase() || '';
+    const roleFilter = document.getElementById('roleFilter')?.value || '';
+    const statusFilter = document.getElementById('statusFilter')?.value || '';
+    
+    let filtered = allUsers.filter(user => {
+        // Search filter (name or email)
+        const matchesSearch = user.name.toLowerCase().includes(searchTerm) || 
+                            user.email.toLowerCase().includes(searchTerm);
+        
+        // Role filter
+        const matchesRole = !roleFilter || user.role === roleFilter;
+        
+        // Status filter
+        const matchesStatus = !statusFilter || user.status === statusFilter;
+        
+        return matchesSearch && matchesRole && matchesStatus;
+    });
+    
+    displayUsers(filtered);
+}
+
+// Update results count display
+function updateUserResultsCount(showing, total) {
+    const countElement = document.getElementById('userResultsCount');
+    if (countElement) {
+        if (showing === total) {
+            countElement.textContent = `Showing all ${total} user${total !== 1 ? 's' : ''}`;
+        } else {
+            countElement.textContent = `Showing ${showing} of ${total} user${total !== 1 ? 's' : ''}`;
+        }
     }
+}
+
+// Clear all filters
+function clearUserFilters() {
+    const searchInput = document.getElementById('userSearch');
+    const roleFilter = document.getElementById('roleFilter');
+    const statusFilter = document.getElementById('statusFilter');
+    
+    if (searchInput) searchInput.value = '';
+    if (roleFilter) roleFilter.value = '';
+    if (statusFilter) statusFilter.value = '';
+    
+    // Re-display all users
+    displayUsers(allUsers);
 }
 
 // Modal functions
@@ -624,6 +692,12 @@ function openCreateUserModal() {
         preview.innerHTML = '<i class="fas fa-user text-gray-400 text-4xl"></i>';
     }
     
+    // Reset department dropdown to show placeholder
+    const deptDropdown = document.getElementById('createUserDepartment');
+    if (deptDropdown) {
+        deptDropdown.value = '';
+    }
+    
     // Hide department field by default
     toggleDepartmentField('create', '');
     
@@ -643,6 +717,8 @@ function toggleDepartmentField(formType, role) {
         container.style.display = 'block';
         if (departmentSelect) {
             departmentSelect.required = true;
+            // Reset to empty so user can see the placeholder "Select department"
+            departmentSelect.value = '';
         }
         if (requiredSpan) {
             requiredSpan.style.display = 'inline';
@@ -652,7 +728,7 @@ function toggleDepartmentField(formType, role) {
         container.style.display = 'none';
         if (departmentSelect) {
             departmentSelect.required = false;
-            departmentSelect.value = 'General'; // Set default value for non-department roles
+            departmentSelect.value = ''; // Clear value when hidden
         }
         if (requiredSpan) {
             requiredSpan.style.display = 'none';
@@ -734,7 +810,16 @@ async function createJob(event) {
         if (result.success) {
             alert(result.message);
             loadJobs(); // ✅ refresh from DB
-            closeCreateJobModal();
+            
+            // Close the correct modal and reset its form
+            if (!document.getElementById('createJobModal').classList.contains('hidden')) {
+                closeCreateJobModal();
+            } else if (!document.getElementById('createutilityJobModal').classList.contains('hidden')) {
+                closeCreateutilityJobModal();
+            } else if (!document.getElementById('createsecJobModal').classList.contains('hidden')) {
+                closeCreatesecJobModal();
+            }
+            
             // Refresh dashboard if we're on the dashboard page
             if (typeof loadDashboardData === 'function') {
                 loadDashboardData();
@@ -1368,6 +1453,27 @@ async function editUser(id) {
         deptSelect.value = user.department;
         statusSelect.value = user.status;
         
+        // Prevent admin from setting their own status to Inactive
+        if (typeof CURRENT_ADMIN_ID !== 'undefined' && user.id == CURRENT_ADMIN_ID) {
+            // Disable the Inactive option in status dropdown
+            const inactiveOption = statusSelect.querySelector('option[value="Inactive"]');
+            if (inactiveOption) {
+                inactiveOption.disabled = true;
+                inactiveOption.textContent = 'Inactive (Cannot deactivate yourself)';
+            }
+            // If current status is already Inactive (shouldn't happen), force it to Active
+            if (statusSelect.value === 'Inactive') {
+                statusSelect.value = 'Active';
+            }
+        } else {
+            // Re-enable the Inactive option for other users
+            const inactiveOption = statusSelect.querySelector('option[value="Inactive"]');
+            if (inactiveOption) {
+                inactiveOption.disabled = false;
+                inactiveOption.textContent = 'Inactive';
+            }
+        }
+        
         // Toggle department field visibility based on role
         toggleDepartmentField('edit', user.role);
         
@@ -1572,35 +1678,7 @@ async function updateUser(event) {
     }
 }
 
-async function deleteUser(id) {
-    // Prevent admin from deleting their own account
-    if (typeof CURRENT_ADMIN_ID !== 'undefined' && id == CURRENT_ADMIN_ID) {
-        showToast('You cannot delete your own account!', 'error');
-        return;
-    }
-    
-    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-        return;
-    }
-    
-    try {
-        const response = await fetch(`api/users.php?id=${id}`, {
-            method: 'DELETE'
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showToast('User deleted successfully!', 'success');
-            loadUsers();
-        } else {
-            showToast(result.message || 'Failed to delete user', 'error');
-        }
-    } catch (error) {
-        console.error('Error deleting user:', error);
-        showToast('An error occurred while deleting user', 'error');
-    }
-}
+// Delete user function removed - users cannot be deleted for data integrity
 
 function moreUserActions(id) {
     alert(`More actions for user ID: ${id}`);
@@ -1645,15 +1723,24 @@ function openCreatesecJobModal(jobuType) {
 
 
 function closeCreateJobModal() {
-    document.getElementById('createJobModal').classList.add('hidden');
+    const modal = document.getElementById('createJobModal');
+    modal.classList.add('hidden');
+    const form = modal.querySelector('form');
+    if (form) form.reset();
 }
 
 function closeCreateutilityJobModal() {
-    document.getElementById('createutilityJobModal').classList.add('hidden');
+    const modal = document.getElementById('createutilityJobModal');
+    modal.classList.add('hidden');
+    const form = modal.querySelector('form');
+    if (form) form.reset();
 }
 
 function closeCreatesecJobModal() {
-    document.getElementById('createsecJobModal').classList.add('hidden');
+    const modal = document.getElementById('createsecJobModal');
+    modal.classList.add('hidden');
+    const form = modal.querySelector('form');
+    if (form) form.reset();
 }
 
 function closeeditJobModal() {
@@ -2075,6 +2162,23 @@ async function viewApplicantDetails(applicantId) {
                         <p class="text-gray-900">${applicant.interview_notes}</p>
                     </div>
                     ` : ''}
+                    ${(applicant.status === 'Interview Passed' || 
+                      applicant.status === 'Demo Scheduled' || 
+                      applicant.status === 'Demo Passed' ||
+                      applicant.status === 'Psych Scheduled' ||
+                      applicant.status === 'Initially Hired' ||
+                      applicant.status === 'Permanently Hired' ||
+                      applicant.status === 'Hired' ||
+                      applicant.workflow_stage === 'interview_completed' ||
+                      applicant.workflow_stage === 'demo_scheduled' ||
+                      applicant.workflow_stage === 'demo_completed') ? `
+                    <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <p class="text-sm font-semibold text-green-800 flex items-center">
+                            <i class="fas fa-check-circle mr-2"></i>
+                            Interview Approved
+                        </p>
+                    </div>
+                    ` : ''}
                 `;
                 interviewInfo.style.display = 'block';
             } else {
@@ -2106,12 +2210,21 @@ async function viewApplicantDetails(applicantId) {
                         <label class="block text-sm font-medium text-gray-600">Time</label>
                         <p class="text-gray-900">${demoTime}</p>
                     </div>
+                    ${applicant.status === 'Demo Passed' || applicant.workflow_stage === 'demo_completed' ? `
+                    <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <p class="text-sm font-semibold text-green-800 flex items-center">
+                            <i class="fas fa-check-circle mr-2"></i>
+                            Demo Teaching Approved
+                        </p>
+                    </div>
+                    ` : `
                     <div class="mt-2 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
                         <p class="text-sm text-indigo-800 flex items-center">
                             <i class="fas fa-info-circle mr-2"></i>
                             Demo teaching session scheduled. Applicant will prepare teaching materials.
                         </p>
                     </div>
+                    `}
                 `;
                 demoInfo.style.display = 'block';
             } else {
@@ -2215,21 +2328,41 @@ function getStatusBadge(status) {
             colorClass = 'bg-green-100 text-green-800';
             icon = '<i class="fas fa-check mr-1"></i>';
             break;
-        case 'Hired':
-            colorClass = 'bg-green-100 text-green-800 border-2 border-green-300';
-            icon = '<i class="fas fa-check-circle mr-1"></i>';
-            break;
-        case 'Rejected':
-            colorClass = 'bg-red-100 text-red-800 border-2 border-red-300';
-            icon = '<i class="fas fa-times-circle mr-1"></i>';
-            break;
         case 'Interview Scheduled':
             colorClass = 'bg-blue-100 text-blue-800';
             icon = '<i class="fas fa-calendar mr-1"></i>';
             break;
+        case 'Interview Passed':
+            colorClass = 'bg-teal-100 text-teal-800';
+            icon = '<i class="fas fa-user-check mr-1"></i>';
+            break;
+        case 'Demo Scheduled':
+            colorClass = 'bg-indigo-100 text-indigo-800';
+            icon = '<i class="fas fa-chalkboard-teacher mr-1"></i>';
+            break;
+        case 'Demo Passed':
+            colorClass = 'bg-emerald-100 text-emerald-800';
+            icon = '<i class="fas fa-check-double mr-1"></i>';
+            break;
+        case 'Psychological Exam':
+            colorClass = 'bg-purple-100 text-purple-800';
+            icon = '<i class="fas fa-brain mr-1"></i>';
+            break;
+        case 'Initially Hired':
+            colorClass = 'bg-green-100 text-green-700 border border-green-300';
+            icon = '<i class="fas fa-user-check mr-1"></i>';
+            break;
+        case 'Hired':
+            colorClass = 'bg-green-100 text-green-800 border-2 border-green-300';
+            icon = '<i class="fas fa-check-circle mr-1"></i>';
+            break;
         case 'Resubmission Required':
             colorClass = 'bg-orange-100 text-orange-800';
             icon = '<i class="fas fa-redo mr-1"></i>';
+            break;
+        case 'Rejected':
+            colorClass = 'bg-red-100 text-red-800 border-2 border-red-300';
+            icon = '<i class="fas fa-times-circle mr-1"></i>';
             break;
     }
     
@@ -2283,6 +2416,14 @@ function updateActionButtons(status, applicant = null) {
     if (existingCancelledInfo) {
         existingCancelledInfo.remove();
     }
+    const existingHiredStatus = document.querySelector('.hired-status');
+    if (existingHiredStatus) {
+        existingHiredStatus.remove();
+    }
+    const existingRejectedStatus = document.querySelector('.rejected-status');
+    if (existingRejectedStatus) {
+        existingRejectedStatus.remove();
+    }
     
     // Check if psychological exam receipt has been uploaded
     const hasPsychReceipt = applicant && applicant.psych_exam_receipt;
@@ -2309,6 +2450,29 @@ function updateActionButtons(status, applicant = null) {
             actionButtonsContainer.prepend(infoDiv);
         }
         return; // Exit - no action buttons for cancelled applications
+    }
+    
+    // CHECK IF APPLICATION IS REJECTED
+    if (workflowStage === 'rejected' || (status && status.toLowerCase() === 'rejected')) {
+        const actionButtonsContainerRejected = document.getElementById('actionButtons');
+        if (actionButtonsContainerRejected && !actionButtonsContainerRejected.querySelector('.rejected-status')) {
+            const rejectedDiv = document.createElement('div');
+            rejectedDiv.className = 'rejected-status bg-red-50 border-2 border-red-300 rounded-lg p-6';
+            rejectedDiv.innerHTML = `
+                <div class="text-center">
+                    <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
+                        <i class="fas fa-times-circle text-3xl text-red-600"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-red-900 mb-2">Application Rejected</h3>
+                    <p class="text-sm text-red-700">
+                        This application has been rejected. The applicant has been notified and the application has been archived.
+                    </p>
+                </div>
+            `;
+            actionButtonsContainerRejected.innerHTML = '';
+            actionButtonsContainerRejected.appendChild(rejectedDiv);
+        }
+        return; // Exit - no action buttons for rejected applications
     }
     
     // SECRETARY ACTIONS: Transfer, Request Resubmission, Reject
@@ -2423,8 +2587,26 @@ function updateActionButtons(status, applicant = null) {
         return;
     }
     
-    // HIRED: No more actions needed
+    // HIRED: Show success message
     if (workflowStage === 'hired') {
+        const actionButtonsContainerHired = document.getElementById('actionButtons');
+        if (actionButtonsContainerHired && !actionButtonsContainerHired.querySelector('.hired-status')) {
+            const hiredDiv = document.createElement('div');
+            hiredDiv.className = 'hired-status bg-green-50 border-2 border-green-300 rounded-lg p-6';
+            hiredDiv.innerHTML = `
+                <div class="text-center">
+                    <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+                        <i class="fas fa-user-check text-3xl text-green-600"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-green-900 mb-2">Applicant Hired</h3>
+                    <p class="text-sm text-green-700">
+                        This applicant has been successfully hired. No further actions are required.
+                    </p>
+                </div>
+            `;
+            actionButtonsContainerHired.innerHTML = '';
+            actionButtonsContainerHired.appendChild(hiredDiv);
+        }
         return; // No buttons for completed applications
     }
     
@@ -2508,7 +2690,8 @@ function updateActionButtons(status, applicant = null) {
             break;
         case 'Hired':
         case 'Rejected':
-            // No actions available for final statuses
+            // These are handled earlier in the function with workflow stages
+            // No need to duplicate the display logic here
             break;
         default:
             // Default case - show schedule, resubmit, and reject
@@ -2534,16 +2717,9 @@ function openScheduleModal() {
     // Set minimum date to today
     const today = new Date().toISOString().split('T')[0];
     const dateInput = document.getElementById('interviewDate');
-    const timeInput = document.getElementById('interviewTime');
     
     if (dateInput) {
         dateInput.setAttribute('min', today);
-    }
-    
-    // Set time restrictions (8:00 AM to 4:00 PM)
-    if (timeInput) {
-        timeInput.setAttribute('min', '08:00');
-        timeInput.setAttribute('max', '16:00');
     }
     
     document.getElementById('scheduleModal').classList.remove('hidden');
@@ -2557,6 +2733,51 @@ function closeScheduleModal() {
 }
 
 function openResubmitModal() {
+    // Get the document checkboxes container
+    const checkboxContainer = document.getElementById('documentCheckboxes');
+    
+    // Define all possible documents with their labels
+    const allDocuments = [
+        { field: 'application_letter', label: 'Application Letter' },
+        { field: 'letter_of_intent', label: 'Letter of Intent' },
+        { field: 'resume', label: 'Updated and Comprehensive Resume' },
+        { field: 'tor', label: 'Transcript of Record (TOR)' },
+        { field: 'diploma', label: 'Diploma' },
+        { field: 'professional_license', label: 'Professional License' },
+        { field: 'coe', label: 'Certificate of Employment (COE)' },
+        { field: 'seminars_trainings', label: 'Seminar/Training Certificates' },
+        { field: 'masteral_cert', label: 'Masteral Certificate' }
+    ];
+    
+    // Clear existing checkboxes
+    checkboxContainer.innerHTML = '';
+    
+    // Only show checkboxes for documents that were uploaded
+    let uploadedCount = 0;
+    allDocuments.forEach(doc => {
+        // Check if this document was uploaded by the applicant
+        if (currentApplicantData && currentApplicantData[doc.field]) {
+            uploadedCount++;
+            
+            // Create checkbox HTML
+            const label = document.createElement('label');
+            label.className = 'flex items-center';
+            label.innerHTML = `
+                <input type="checkbox" name="resubmit_documents" value="${doc.field}" 
+                       class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                <span class="ml-2 text-sm text-gray-700">${doc.label}</span>
+            `;
+            checkboxContainer.appendChild(label);
+        }
+    });
+    
+    // Show message if no documents were uploaded
+    if (uploadedCount === 0) {
+        checkboxContainer.innerHTML = '<p class="text-sm text-gray-500 italic">No documents have been uploaded yet.</p>';
+    }
+    
+    console.log(`✅ Resubmission modal showing ${uploadedCount} uploaded documents`);
+    
     document.getElementById('resubmitModal').classList.remove('hidden');
     document.getElementById('resubmitModal').classList.add('flex');
 }
@@ -2638,16 +2859,9 @@ function openRescheduleInterviewModal() {
     // Set minimum date to today
     const today = new Date().toISOString().split('T')[0];
     const dateInput = document.getElementById('rescheduleInterviewDate');
-    const timeInput = document.getElementById('rescheduleInterviewTime');
     
     if (dateInput) {
         dateInput.setAttribute('min', today);
-    }
-    
-    // Set time restrictions (8:00 AM to 4:00 PM)
-    if (timeInput) {
-        timeInput.setAttribute('min', '08:00');
-        timeInput.setAttribute('max', '16:00');
     }
     
     document.getElementById('rescheduleInterviewModal').classList.remove('hidden');
@@ -2664,16 +2878,9 @@ function openRescheduleDemoModal() {
     // Set minimum date to today
     const today = new Date().toISOString().split('T')[0];
     const dateInput = document.getElementById('rescheduleDemoDate');
-    const timeInput = document.getElementById('rescheduleDemoTime');
     
     if (dateInput) {
         dateInput.setAttribute('min', today);
-    }
-    
-    // Set time restrictions (8:00 AM to 4:00 PM)
-    if (timeInput) {
-        timeInput.setAttribute('min', '08:00');
-        timeInput.setAttribute('max', '16:00');
     }
     
     document.getElementById('rescheduleDemoModal').classList.remove('hidden');
@@ -2690,16 +2897,9 @@ function openDemoScheduleModal() {
     // Set minimum date to today
     const today = new Date().toISOString().split('T')[0];
     const dateInput = document.getElementById('interviewDate');
-    const timeInput = document.getElementById('interviewTime');
     
     if (dateInput) {
         dateInput.setAttribute('min', today);
-    }
-    
-    // Set time restrictions (8:00 AM to 4:00 PM)
-    if (timeInput) {
-        timeInput.setAttribute('min', '08:00');
-        timeInput.setAttribute('max', '16:00');
     }
     
     // Reuse the same schedule modal but change the title and action
@@ -2709,8 +2909,43 @@ function openDemoScheduleModal() {
     document.getElementById('scheduleForm').dataset.action = 'schedule_demo';
 }
 
+// Helper function to check if time is a valid 15-minute interval
+function isValid15MinuteInterval(timeString) {
+    if (!timeString) return false;
+    
+    const [hours, minutes] = timeString.split(':').map(Number);
+    
+    // Check if minutes are 00, 15, 30, or 45
+    return minutes % 15 === 0;
+}
+
+// Add time validation to all time inputs
+function validateTimeInput(inputElement) {
+    if (!inputElement) return;
+    
+    inputElement.addEventListener('change', function() {
+        if (this.value && !isValid15MinuteInterval(this.value)) {
+            showToast('Please select a time in 15-minute intervals (e.g., 8:00, 8:15, 8:30, 8:45)', 'warning');
+            this.classList.add('border-red-500');
+        } else {
+            this.classList.remove('border-red-500');
+        }
+    });
+    
+    inputElement.addEventListener('blur', function() {
+        if (this.value && !isValid15MinuteInterval(this.value)) {
+            this.classList.add('border-red-500');
+        }
+    });
+}
+
 // Form submission handlers
 document.addEventListener('DOMContentLoaded', function() {
+    // Apply time validation to all time inputs
+    validateTimeInput(document.getElementById('interviewTime'));
+    validateTimeInput(document.getElementById('rescheduleInterviewTime'));
+    validateTimeInput(document.getElementById('rescheduleDemoTime'));
+    
     // Schedule Interview/Demo/Psych Form
     document.getElementById('scheduleForm').addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -2721,6 +2956,13 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (!dateValue || !timeValue) {
             showToast('Please select both date and time', 'warning');
+            return;
+        }
+        
+        // Validate 15-minute interval
+        if (!isValid15MinuteInterval(timeValue)) {
+            showToast('Please select a time in 15-minute intervals (e.g., 8:00, 8:15, 8:30, 8:45)', 'warning');
+            document.getElementById('interviewTime').classList.add('border-red-500');
             return;
         }
         
@@ -3229,6 +3471,13 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        // Validate 15-minute interval
+        if (!isValid15MinuteInterval(timeValue)) {
+            showToast('Please select a time in 15-minute intervals (e.g., 8:00, 8:15, 8:30, 8:45)', 'warning');
+            document.getElementById('rescheduleInterviewTime').classList.add('border-red-500');
+            return;
+        }
+        
         if (!reasonValue || reasonValue.trim() === '') {
             showToast('Please provide a reason for rescheduling', 'warning');
             return;
@@ -3312,6 +3561,13 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (!dateValue || !timeValue) {
             showToast('Please select both date and time', 'warning');
+            return;
+        }
+        
+        // Validate 15-minute interval
+        if (!isValid15MinuteInterval(timeValue)) {
+            showToast('Please select a time in 15-minute intervals (e.g., 8:00, 8:15, 8:30, 8:45)', 'warning');
+            document.getElementById('rescheduleDemoTime').classList.add('border-red-500');
             return;
         }
         
