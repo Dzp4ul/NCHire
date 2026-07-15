@@ -48,7 +48,7 @@ if (isset($_SESSION['application_error'])) {
 
 $host = "127.0.0.1";
 $user = "root";
-$pass = "12345678";
+$pass = "";
 $dbname = "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
@@ -1423,7 +1423,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
     <div class="relative">
       <select id="departmentFilter" class="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2.5 pr-8 text-base focus:ring-2 focus:ring-primary focus:border-transparent">
         <option value="">All Departments</option>
-        <option value="computer science">Computer Science</option>
+        <option value="computing studies">Computing Studies</option>
         <option value="hospitality management">Hospitality Management</option>
         <option value="education">Education</option>
       </select>
@@ -1449,10 +1449,6 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
       <select id="sortSelect" class="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2.5 pr-8 text-base focus:ring-2 focus:ring-primary focus:border-transparent">
         <option value="newest">Newest First</option>
         <option value="oldest">Oldest First</option>
-        <option value="title_asc">Title A-Z</option>
-        <option value="title_desc">Title Z-A</option>
-        <option value="department_asc">Department A-Z</option>
-        <option value="department_desc">Department Z-A</option>
       </select>
       <div class="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
         <i class="ri-sort-desc text-gray-400"></i>
@@ -1553,7 +1549,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                         <i class="ri-star-line text-blue-600 mr-2"></i>
                         JOB HIGHLIGHTS
                     </h2>
-                    <div class="grid md:grid-cols-3 gap-4">
+                    <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div class="bg-white rounded-lg p-4 shadow-sm">
                             <div class="flex items-center mb-2">
                                 <i class="ri-calendar-check-line text-blue-600 text-xl mr-2"></i>
@@ -1574,6 +1570,13 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                                 <h3 class="font-semibold text-gray-900">Department</h3>
                             </div>
                             <p id="highlightDepartment" class="text-gray-700">Loading...</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-4 shadow-sm">
+                            <div class="flex items-center mb-2">
+                                <i class="ri-book-2-line text-blue-600 text-xl mr-2"></i>
+                                <h3 class="font-semibold text-gray-900">Subject</h3>
+                            </div>
+                            <p id="highlightSubject" class="text-gray-700">Loading...</p>
                         </div>
                     </div>
                 </div>
@@ -2032,13 +2035,13 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                 <!-- Step 3: Interview Scheduled -->
                 <section id="step3" class="wizard-step hidden">
                     <h2 class="text-xl font-semibold text-gray-900 mb-2">Interview Scheduled</h2>
-                    <p class="text-gray-600 mb-6">Waiting for admin to schedule and approve your interview</p>
+                    <p class="text-gray-600 mb-6">Waiting for dean to schedule and approve your interview</p>
                     
                     <div class="bg-white rounded-lg border border-gray-200 p-6">
                         <div id="interview_status_container" class="text-center py-8">
                             <i class="ri-calendar-line text-6xl text-blue-500 mb-4"></i>
                             <h3 class="text-lg font-semibold text-gray-900 mb-2">Interview Scheduling</h3>
-                            <p class="text-gray-600" id="interview_status_text">Your application has been submitted. Please wait while the admin reviews your documents and schedules an interview.</p>
+                            <p class="text-gray-600" id="interview_status_text">Your application has been submitted. Please wait while the dean reviews your documents and schedules an interview.</p>
                             <div id="interview_details" class="hidden mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                                 <!-- Interview details will be populated here -->
                             </div>
@@ -2061,13 +2064,13 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                 <!-- Step 4: Demo Scheduled -->
                 <section id="step4" class="wizard-step hidden">
                     <h2 class="text-xl font-semibold text-gray-900 mb-2">Demo Teaching Scheduled</h2>
-                    <p class="text-gray-600 mb-6">Waiting for admin to schedule and approve your demo teaching</p>
+                    <p class="text-gray-600 mb-6">Waiting for dean to schedule and approve your demo teaching</p>
                     
                     <div class="bg-white rounded-lg border border-gray-200 p-6">
                         <div id="demo_status_container" class="text-center py-8">
                             <i class="ri-presentation-line text-6xl text-indigo-500 mb-4"></i>
                             <h3 class="text-lg font-semibold text-gray-900 mb-2">Demo Teaching Scheduling</h3>
-                            <p class="text-gray-600" id="demo_status_text">Your interview has been completed. Please wait while the admin schedules your demo teaching session.</p>
+                            <p class="text-gray-600" id="demo_status_text">Your interview has been completed. Please wait while the dean schedules your demo teaching session.</p>
                             <div id="demo_details" class="hidden mt-6 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                                 <!-- Demo details will be populated here -->
                             </div>
@@ -2090,7 +2093,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                 <!-- Step 5: Psychological Exam -->
                 <section id="step5" class="wizard-step hidden">
                     <h2 class="text-xl font-semibold text-gray-900 mb-2">Psychological Examination</h2>
-                    <p class="text-gray-600 mb-6">Upload your psychological exam receipt or proof of completion. After submission, please wait for the admin to review and mark you as hired.</p>
+                    <p class="text-gray-600 mb-6">Upload your psychological exam receipt or proof of completion. After submission, please wait for the dean to review and mark you as hired.</p>
                     
                     <div class="bg-white rounded-lg border border-gray-200 p-6">
                         <div id="psych_status_container" class="py-8">
@@ -2217,45 +2220,50 @@ const profileDropdown = document.getElementById('profileDropdown');
 const searchInput = document.getElementById('searchInput');
 const searchResults = document.getElementById('searchResults');
 
-notificationBtn.addEventListener('click', function(e) {
-e.stopPropagation();
-console.log('Notification button clicked');
-profileDropdown.classList.add('hidden');
-notificationDropdown.classList.toggle('hidden');
-console.log('Dropdown visibility:', !notificationDropdown.classList.contains('hidden'));
+if (notificationBtn && notificationDropdown) {
+  notificationBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    console.log('Notification button clicked');
+    if (profileDropdown) profileDropdown.classList.add('hidden');
+    notificationDropdown.classList.toggle('hidden');
+    console.log('Dropdown visibility:', !notificationDropdown.classList.contains('hidden'));
 
-// Force show dropdown and load notifications when opened
-if (!notificationDropdown.classList.contains('hidden')) {
-  console.log('Showing dropdown and loading notifications');
-  notificationDropdown.style.display = 'block';
-  notificationDropdown.style.visibility = 'visible';
-  loadNotifications();
-} else {
-  console.log('Hiding dropdown');
-  notificationDropdown.style.display = '';
-  notificationDropdown.style.visibility = '';
+    // Force show dropdown and load notifications when opened
+    if (!notificationDropdown.classList.contains('hidden')) {
+      console.log('Showing dropdown and loading notifications');
+      notificationDropdown.style.display = 'block';
+      notificationDropdown.style.visibility = 'visible';
+      if (typeof loadNotifications === 'function') loadNotifications();
+    } else {
+      console.log('Hiding dropdown');
+      notificationDropdown.style.display = '';
+      notificationDropdown.style.visibility = '';
+    }
+  });
 }
-});
 
-profileDropdownBtn.addEventListener('click', function(e) {
-e.stopPropagation();
-notificationDropdown.classList.add('hidden');
-profileDropdown.classList.toggle('hidden');
-});
+if (profileDropdownBtn && profileDropdown) {
+  profileDropdownBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (notificationDropdown) notificationDropdown.classList.add('hidden');
+    profileDropdown.classList.toggle('hidden');
+  });
+}
 
 document.addEventListener('click', function(e) {
-if (notificationDropdown && notificationBtn && !notificationDropdown.contains(e.target) && !notificationBtn.contains(e.target)) {
-notificationDropdown.classList.add('hidden');
-}
-if (profileDropdown && profileDropdownBtn && !profileDropdown.contains(e.target) && !profileDropdownBtn.contains(e.target)) {
-profileDropdown.classList.add('hidden');
-}
-if (searchResults && searchInput && !searchResults.contains(e.target) && !searchInput.contains(e.target)) {
-searchResults.classList.add('hidden');
-}
+  if (notificationDropdown && notificationBtn && !notificationDropdown.contains(e.target) && !notificationBtn.contains(e.target)) {
+    notificationDropdown.classList.add('hidden');
+  }
+  if (profileDropdown && profileDropdownBtn && !profileDropdown.contains(e.target) && !profileDropdownBtn.contains(e.target)) {
+    profileDropdown.classList.add('hidden');
+  }
+  if (searchResults && searchInput && !searchResults.contains(e.target) && !searchInput.contains(e.target)) {
+    searchResults.classList.add('hidden');
+  }
 });
 
-searchInput.addEventListener('input', function() {
+if (searchInput) {
+  searchInput.addEventListener('input', function() {
 const searchTerm = this.value.toLowerCase();
 if (searchTerm.length > 0) {
 const allJobs = Object.values(jobListings).flat();
@@ -2296,24 +2304,25 @@ searchResults.classList.add('hidden');
 }
 });
 
-searchResults.addEventListener('click', function(e) {
-const jobItem = e.target.closest('.p-4');
-if (jobItem) {
-const jobTitle = jobItem.querySelector('h4').textContent;
-searchInput.value = jobTitle;
-searchResults.classList.add('hidden');
-const jobElement = Array.from(document.querySelectorAll('h3')).find(el => el.textContent === jobTitle);
-if (jobElement) {
-jobElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-jobElement.closest('.bg-white').classList.add('ring-2', 'ring-primary');
-setTimeout(() => {
-jobElement.closest('.bg-white').classList.remove('ring-2', 'ring-primary');
-}, 2000);
+  if (searchResults) {
+    searchResults.addEventListener('click', function(e) {
+      const jobItem = e.target.closest('.p-4');
+      if (jobItem) {
+        const jobTitle = jobItem.querySelector('h4').textContent;
+        searchInput.value = jobTitle;
+        searchResults.classList.add('hidden');
+        const jobElement = Array.from(document.querySelectorAll('h3')).find(el => el.textContent === jobTitle);
+        if (jobElement) {
+          jobElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          jobElement.closest('.bg-white').classList.add('ring-2', 'ring-primary');
+          setTimeout(() => {
+            jobElement.closest('.bg-white').classList.remove('ring-2', 'ring-primary');
+          }, 2000);
+        }
+      }
+    });
+  }
 }
-}
-});
-
-
 });
 </script>
 
@@ -2675,16 +2684,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     hiddenInput.remove();
                   }
                   
-                  // Restore container styling
+                  // Restore container styling - remove ALL inline styles
                   if (container) {
-                    container.style.border = '';
-                    container.style.padding = '';
-                    container.style.background = '';
+                    container.removeAttribute('style');
                   }
                   
                   // Show file input again
                   if (input) {
-                    input.style.display = 'block';
+                    input.removeAttribute('style');
                     input.setAttribute('required', 'required');
                     input.removeAttribute('data-draft-available');
                     input.removeAttribute('data-draft-files');
@@ -2895,16 +2902,16 @@ document.addEventListener('DOMContentLoaded', function() {
           if (nextBtn) {
             nextBtn.disabled = true;
             nextBtn.className = 'px-6 py-3 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed';
-            nextBtn.title = 'Wait for admin to approve your interview';
+            nextBtn.title = 'Wait for dean to approve your interview';
           }
           
           // Show waiting message
           const statusHtml = `
             <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p class="text-yellow-700 font-medium flex items-center justify-center">
-                <i class="ri-time-line mr-2"></i>Interview scheduled - Waiting for admin approval
+                <i class="ri-time-line mr-2"></i>Interview scheduled - Waiting for dean approval
               </p>
-              <p class="text-yellow-600 text-sm text-center mt-2">Please attend your interview. The Next button will be enabled after admin approval.</p>
+              <p class="text-yellow-600 text-sm text-center mt-2">Please attend your interview. The Next button will be enabled after dean approval.</p>
             </div>
           `;
           const approvedElement = document.getElementById('interview_approved_status');
@@ -3062,15 +3069,15 @@ document.addEventListener('DOMContentLoaded', function() {
           if (nextBtn) {
             nextBtn.disabled = true;
             nextBtn.className = 'px-6 py-3 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed';
-            nextBtn.title = 'Wait for admin to approve your demo teaching';
+            nextBtn.title = 'Wait for dean to approve your demo teaching';
           }
           
           const waitingHtml = `
             <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p class="text-yellow-700 font-medium flex items-center justify-center">
-                <i class="ri-time-line mr-2"></i>Demo Teaching scheduled - Waiting for admin approval
+                <i class="ri-time-line mr-2"></i>Demo Teaching scheduled - Waiting for dean approval
               </p>
-              <p class="text-yellow-600 text-sm text-center mt-2">Please attend your demo teaching. The Next button will be enabled after admin approval.</p>
+              <p class="text-yellow-600 text-sm text-center mt-2">Please attend your demo teaching. The Next button will be enabled after dean approval.</p>
             </div>
           `;
           const approvedElement = document.getElementById('demo_approved_status');
@@ -3688,6 +3695,18 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Set body overflow
     document.body.style.overflow = 'hidden';
+    
+    // Hide Save Draft button in view mode (when viewing existing application with uploaded files)
+    const saveDraftBtn = document.getElementById('saveDraftBtn');
+    if (saveDraftBtn) {
+      if (viewMode) {
+        saveDraftBtn.style.display = 'none';
+        console.log('✅ Save Draft button hidden (view mode)');
+      } else {
+        saveDraftBtn.style.display = '';
+        console.log('✅ Save Draft button visible (new application mode)');
+      }
+    }
     
     // Note: Don't automatically set to step 1 - let the caller decide which step to show
     
@@ -4540,10 +4559,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const demoStatusText = document.getElementById('demo_status_text');
     const psychStatusText = document.getElementById('psych_status_text');
     if (interviewStatusText) {
-      interviewStatusText.textContent = 'Your application has been submitted. Please wait while the admin reviews your documents and schedules an interview.';
+      interviewStatusText.textContent = 'Your application has been submitted. Please wait while the dean reviews your documents and schedules an interview.';
     }
     if (demoStatusText) {
-      demoStatusText.textContent = 'Your interview has been completed. Please wait while the admin schedules your demo teaching session.';
+      demoStatusText.textContent = 'Your interview has been completed. Please wait while the dean schedules your demo teaching session.';
     }
     if (psychStatusText) {
       psychStatusText.textContent = 'Please take your psychological exam and upload your receipt/proof of completion.';
@@ -4904,15 +4923,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const hiddenInput = container.querySelector('.existing-draft-input');
             if (hiddenInput) hiddenInput.remove();
             
-            // Restore container styling
+            // Restore container styling - remove ALL inline styles
             if (container) {
-              container.style.border = '';
-              container.style.padding = '';
-              container.style.background = '';
+              container.removeAttribute('style');
             }
             
             if (input) {
-              input.style.display = 'block';
+              input.removeAttribute('style');
               // Only add required for non-optional fields
               if (!['license', 'masteral_cert'].includes(field)) {
                 input.setAttribute('required', 'required');
@@ -5123,12 +5140,10 @@ document.addEventListener('DOMContentLoaded', function() {
                   const hiddenInput = container.querySelector('.existing-draft-input');
                   if (hiddenInput) hiddenInput.remove();
                   
-                  // Restore container styling
-                  container.style.border = '';
-                  container.style.padding = '';
-                  container.style.background = '';
+                  // Restore container styling - remove ALL inline styles
+                  container.removeAttribute('style');
                   
-                  input.style.display = 'block';
+                  input.removeAttribute('style');
                   input.setAttribute('required', 'required');
                   
                   const notif = document.createElement('div');
@@ -5453,31 +5468,19 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
   
-  // Add Work Experience button - redirect to profile
+  // Add Work Experience button - show custom modal
   document.getElementById('addWorkExpBtn').addEventListener('click', () => {
-    if (confirm('You will be redirected to your Profile page to add work experience. Your application progress will be saved. Continue?')) {
-      // Close wizard and go to profile
-      hideWizard();
-      showProfile(); // This function should exist in your navigation
-    }
+    openAddWorkExpModal();
   });
   
-  // Add Skills button - redirect to profile
+  // Add Skills button - show custom modal
   document.getElementById('addSkillsBtn').addEventListener('click', () => {
-    if (confirm('You will be redirected to your Profile page to add skills. Your application progress will be saved. Continue?')) {
-      // Close wizard and go to profile
-      hideWizard();
-      showProfile(); // This function should exist in your navigation
-    }
+    openAddSkillsModal();
   });
   
-  // Add Education button - redirect to profile
+  // Add Education button - show custom modal
   document.getElementById('addEducationBtn').addEventListener('click', () => {
-    if (confirm('You will be redirected to your Profile page to add education. Your application progress will be saved. Continue?')) {
-      // Close wizard and go to profile
-      hideWizard();
-      showProfile(); // This function should exist in your navigation
-    }
+    openAddEducationModal();
   });
   
   // File upload visual indicators for Step 2
@@ -6236,6 +6239,7 @@ const metaHTML = `
 <i class="ri-map-pin-line mr-2"></i>
 <span>${job.locations || 'Not specified'}</span>
 </div>
+${ job.subject ? `<div class="flex items-center"><i class="ri-book-2-line mr-2"></i><span>${job.subject}</span></div>` : '' }
 `;
 document.getElementById('detailJobMeta').innerHTML = metaHTML;
 
@@ -7756,6 +7760,15 @@ function loadJobs(page = 1, filters = {}) {
     });
 }
 
+// Truncate text to specified length with ellipsis
+function truncateText(text, maxLength = 600) {
+  if (!text) return '';
+  // Remove newlines and extra spaces first
+  const cleanText = text.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+  if (cleanText.length <= maxLength) return cleanText;
+  return cleanText.substring(0, maxLength) + '...';
+}
+
 // Display jobs in the container
 function displayJobs(jobs) {
   const container = document.getElementById('jobsContainer');
@@ -7773,7 +7786,7 @@ function displayJobs(jobs) {
       <div class="flex justify-between items-start mb-4">
         <div>
           <h3 class="text-2xl font-semibold text-gray-900 mb-3">${escapeHtml(job.job_title)}</h3>
-          <div class="flex items-center text-base text-gray-600 space-x-5">
+          <div class="flex items-center text-base text-gray-600 space-x-5 flex-wrap gap-y-2">
             <span class="flex items-center">
               <div class="w-5 h-5 flex items-center justify-center mr-2">
                 <i class="ri-building-line text-lg"></i>
@@ -7789,11 +7802,16 @@ function displayJobs(jobs) {
                 <i class="ri-map-pin-line text-lg"></i>
               </div>${escapeHtml(job.locations)}
             </span>
+            ${job.subject ? `<span class="flex items-center">
+              <div class="w-5 h-5 flex items-center justify-center mr-2">
+                <i class="ri-book-2-line text-lg"></i>
+              </div>${escapeHtml(job.subject)}
+            </span>` : ''}
           </div>
         </div>
         <span class="bg-green-100 text-green-800 px-4 py-1.5 rounded-full text-base font-medium">Open</span>
       </div>
-      <p class="text-base text-gray-700 mb-5 leading-relaxed">${escapeHtml(job.job_description).replace(/\n/g, '<br>')}</p>
+      <p class="text-base text-gray-700 mb-5 leading-relaxed">${escapeHtml(truncateText(job.job_description, 600))}</p>
       <div class="flex items-center justify-between">
         <div class="text-xl font-semibold text-gray-900">${escapeHtml(job.salary_range)}</div>
         <div class="flex space-x-3">
@@ -7927,7 +7945,7 @@ function attachJobEventListeners() {
       if (this.disabled) return;
       
       const jobId = this.getAttribute('data-job-id');
-      const applicationId = this.getAttribute('data-application-id');
+      let applicationId = this.getAttribute('data-application-id');
       const applicationStatus = this.getAttribute('data-application-status');
       const buttonText = this.textContent.trim();
       
@@ -8469,7 +8487,7 @@ function attachJobEventListeners() {
               if (!existingNotice) {
                 const docLabels = {
                   'application_letter': 'Application Letter',
-                  'resume': 'Resume',
+                  'resume': 'Updated and Comprehensive Resume',
                   'letter_of_intent': 'Letter of Intent',
                   'tor': 'Transcript of Records (TOR)',
                   'diploma': 'Diploma',
@@ -8642,6 +8660,7 @@ function populateJobDetails(job) {
       <i class="ri-map-pin-line mr-2"></i>
       ${job.locations || 'Location'}
     </span>
+    ${ job.subject ? `<div class="flex items-center"><i class="ri-book-2-line mr-2"></i><span>${job.subject}</span></div>` : '' }
   `;
   
   // Update salary
@@ -8664,6 +8683,7 @@ function populateJobDetails(job) {
   document.getElementById('highlightJobType').textContent = job.job_type || 'Not specified';
   document.getElementById('highlightLocation').textContent = job.locations || 'Not specified';
   document.getElementById('highlightDepartment').textContent = job.department_role || 'Not specified';
+  document.getElementById('highlightSubject').textContent = job.subject || 'Not specified';
   
   // Update Job Description (Position Overview)
   const descriptionContainer = document.getElementById('detailJobDescription');
@@ -9121,24 +9141,33 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   
   // Department filter
-  document.getElementById('departmentFilter').addEventListener('change', function() {
-    currentFilters.department = this.value;
-    loadJobs(1, currentFilters);
-    updateActiveFilters();
-  });
+  const departmentFilter = document.getElementById('departmentFilter');
+  if (departmentFilter) {
+    departmentFilter.addEventListener('change', function() {
+      currentFilters.department = this.value;
+      loadJobs(1, currentFilters);
+      updateActiveFilters();
+    });
+  }
   
   // Job type filter
-  document.getElementById('jobTypeFilter').addEventListener('change', function() {
-    currentFilters.job_type = this.value;
-    loadJobs(1, currentFilters);
-    updateActiveFilters();
-  });
+  const jobTypeFilter = document.getElementById('jobTypeFilter');
+  if (jobTypeFilter) {
+    jobTypeFilter.addEventListener('change', function() {
+      currentFilters.job_type = this.value;
+      loadJobs(1, currentFilters);
+      updateActiveFilters();
+    });
+  }
   
   // Sort functionality
-  document.getElementById('sortSelect').addEventListener('change', function() {
-    currentFilters.sort = this.value;
-    loadJobs(currentPage, currentFilters); // Keep current page when sorting
-  });
+  const sortSelect = document.getElementById('sortSelect');
+  if (sortSelect) {
+    sortSelect.addEventListener('change', function() {
+      currentFilters.sort = this.value;
+      loadJobs(currentPage, currentFilters); // Keep current page when sorting
+    });
+  }
   
   // Check if there's a pending application to open (from My Applications page)
   // Do this BEFORE loading jobs to prevent dashboard flash
@@ -9297,6 +9326,14 @@ document.addEventListener('DOMContentLoaded', function() {
     function preventDefaults(e) {
       e.preventDefault();
       e.stopPropagation();
+    }
+    
+    function highlight(e) {
+      dropZone.classList.add('border-primary', 'bg-blue-50');
+    }
+    
+    function unhighlight(e) {
+      dropZone.classList.remove('border-primary', 'bg-blue-50');
     }
     
     ['dragenter', 'dragover'].forEach(eventName => {
@@ -9496,6 +9533,69 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 </div>
 
+<!-- Add Work Experience Confirmation Modal -->
+<div id="addWorkExpModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 transform transition-all">
+        <div class="p-6">
+            <div class="flex items-center justify-center w-12 h-12 mx-auto bg-blue-100 rounded-full mb-4">
+                <i class="ri-briefcase-line text-blue-600 text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 text-center mb-2">Add Work Experience</h3>
+            <p class="text-sm text-gray-600 text-center mb-6">You will be redirected to your Profile page to add work experience. Your application progress will be saved. Continue?</p>
+            <div class="flex gap-3">
+                <button onclick="closeAddWorkExpModal()" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                    Cancel
+                </button>
+                <button onclick="proceedAddWorkExp()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                    Continue
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Skills Confirmation Modal -->
+<div id="addSkillsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 transform transition-all">
+        <div class="p-6">
+            <div class="flex items-center justify-center w-12 h-12 mx-auto bg-green-100 rounded-full mb-4">
+                <i class="ri-lightbulb-line text-green-600 text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 text-center mb-2">Add Skills</h3>
+            <p class="text-sm text-gray-600 text-center mb-6">You will be redirected to your Profile page to add skills. Your application progress will be saved. Continue?</p>
+            <div class="flex gap-3">
+                <button onclick="closeAddSkillsModal()" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                    Cancel
+                </button>
+                <button onclick="proceedAddSkills()" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium">
+                    Continue
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Education Confirmation Modal -->
+<div id="addEducationModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 transform transition-all">
+        <div class="p-6">
+            <div class="flex items-center justify-center w-12 h-12 mx-auto bg-purple-100 rounded-full mb-4">
+                <i class="ri-graduation-cap-line text-purple-600 text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 text-center mb-2">Add Education</h3>
+            <p class="text-sm text-gray-600 text-center mb-6">You will be redirected to your Profile page to add education. Your application progress will be saved. Continue?</p>
+            <div class="flex gap-3">
+                <button onclick="closeAddEducationModal()" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                    Cancel
+                </button>
+                <button onclick="proceedAddEducation()" class="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium">
+                    Continue
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 // Note: Application progress modal functionality is now handled in user_application.php
 // to avoid conflicts with the main application wizard
@@ -9514,6 +9614,57 @@ function closeLogoutModal() {
 
 function proceedLogout() {
     window.location.href = '../index.php?logout=1';
+}
+
+// Add Work Experience modal
+function openAddWorkExpModal() {
+    document.getElementById('addWorkExpModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeAddWorkExpModal() {
+    document.getElementById('addWorkExpModal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function proceedAddWorkExp() {
+    closeAddWorkExpModal();
+    hideWizard();
+    showProfile();
+}
+
+// Add Skills modal
+function openAddSkillsModal() {
+    document.getElementById('addSkillsModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeAddSkillsModal() {
+    document.getElementById('addSkillsModal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function proceedAddSkills() {
+    closeAddSkillsModal();
+    hideWizard();
+    showProfile();
+}
+
+// Add Education modal
+function openAddEducationModal() {
+    document.getElementById('addEducationModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeAddEducationModal() {
+    document.getElementById('addEducationModal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function proceedAddEducation() {
+    closeAddEducationModal();
+    hideWizard();
+    showProfile();
 }
 </script>
 

@@ -4,7 +4,7 @@ header('Content-Type: application/json');
 // Database connection
 $host = "127.0.0.1";
 $user = "root";
-$pass = "12345678";
+$pass = "";
 $dbname = "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
@@ -158,6 +158,7 @@ try {
             'department_role' => $row['department_role'],
             'job_type' => $row['job_type'],
             'locations' => $row['locations'],
+            'subject' => $row['subject'] ?? '',
             'job_description' => $row['job_description'],
             'salary_range' => $formattedSalary,
             'application_deadline' => $row['application_deadline']

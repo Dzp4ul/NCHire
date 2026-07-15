@@ -16,7 +16,7 @@ if (isset($_SESSION['password_change_required']) && $_SESSION['password_change_r
 // Database connection
 $host = "127.0.0.1";
 $user = "root";
-$pass = "12345678";
+$pass = "";
 $dbname = "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
@@ -102,15 +102,15 @@ if ($show_applicant_stats && !empty($department_params)) {
     $stats['active_users'] = 0;
 }
 
-// Pending Reviews (Under Review)
+// Demo Scheduled
 if ($show_applicant_stats && !empty($department_params)) {
-    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status = 'Pending'" . $department_filter);
+    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status = 'Demo Scheduled'" . $department_filter);
     $stmt->bind_param("s", ...$department_params);
     $stmt->execute();
     $result = $stmt->get_result();
-    $stats['pending_reviews'] = $result->fetch_assoc()['count'];
+    $stats['demo_scheduled'] = $result->fetch_assoc()['count'];
 } else {
-    $stats['pending_reviews'] = 0;
+    $stats['demo_scheduled'] = 0;
 }
 
 // Interview Scheduled
@@ -124,9 +124,9 @@ if ($show_applicant_stats && !empty($department_params)) {
     $stats['interview_scheduled'] = 0;
 }
 
-// Hired
+// Hired (includes Initially Hired, Permanently Hired, and Hired)
 if ($show_applicant_stats && !empty($department_params)) {
-    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status = 'Hired'" . $department_filter);
+    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Initially Hired', 'Permanently Hired', 'Hired')" . $department_filter);
     $stmt->bind_param("s", ...$department_params);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -862,12 +862,8 @@ $recent_activity = $conn->query($recent_activity_query);
 
             <!-- Applicants Section -->
             <div id="applicantsSection" class="section hidden">
-                <div class="flex items-center justify-between mb-6">
+                <div class="mb-6">
                     <h1 class="text-3xl font-bold text-gray-900">Applicants</h1>
-                    <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2">
-                        <i class="fas fa-download"></i>
-                        Export Data
-                    </button>
                 </div>
 
                 <!-- Stats Cards -->
@@ -884,19 +880,19 @@ $recent_activity = $conn->query($recent_activity_query);
                     <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm font-medium text-gray-600">Under Review</p>
-                                <p class="text-2xl font-bold text-gray-900"><?php echo $stats['pending_reviews']; ?></p>
+                                <p class="text-sm font-medium text-gray-600">Interviews Scheduled</p>
+                                <p class="text-2xl font-bold text-gray-900"><?php echo $stats['interview_scheduled']; ?></p>
                             </div>
-                            <i class="fas fa-clock text-2xl text-yellow-500"></i>
+                            <i class="fas fa-calendar text-2xl text-blue-500"></i>
                         </div>
                     </div>
                     <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm font-medium text-gray-600">Interviews Scheduled</p>
-                                <p class="text-2xl font-bold text-gray-900"><?php echo $stats['interview_scheduled']; ?></p>
+                                <p class="text-sm font-medium text-gray-600">Demo Scheduled</p>
+                                <p class="text-2xl font-bold text-gray-900"><?php echo $stats['demo_scheduled']; ?></p>
                             </div>
-                            <i class="fas fa-calendar text-2xl text-blue-500"></i>
+                            <i class="fas fa-chalkboard-teacher text-2xl text-indigo-500"></i>
                         </div>
                     </div>
                     <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
@@ -929,9 +925,14 @@ $recent_activity = $conn->query($recent_activity_query);
                                 <option value="all">All Applicants</option>
                                 <option value="Pending">Pending</option>
                                 <option value="Interview Scheduled">Interview Scheduled</option>
+                                <option value="Interview Passed">Interview Passed</option>
+                                <option value="Demo Scheduled">Demo Scheduled</option>
+                                <option value="Demo Passed">Demo Passed</option>
+                                <option value="Psychological Exam">Psychological Exam</option>
                                 <option value="Resubmission Required">Resubmission Required</option>
-                                <option value="Rejected">Rejected</option>
+                                <option value="Initially Hired">Initially Hired</option>
                                 <option value="Hired">Hired</option>
+                                <option value="Rejected">Rejected</option>
                             </select>
                         </div>
                         
@@ -3878,6 +3879,98 @@ function closeLogoutModal() {
 function proceedLogout() {
     window.location.href = 'logout.php';
 }
+
+// Real-time stats update
+let statsUpdateInterval = null;
+
+function updateStatsCards() {
+    fetch('api/get_stats.php', {
+        cache: 'no-store',
+        headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.stats) {
+            // Update each stat with smooth animation
+            updateStatWithAnimation('total_applicants', data.stats.total_applicants);
+            updateStatWithAnimation('demo_scheduled', data.stats.demo_scheduled);
+            updateStatWithAnimation('interview_scheduled', data.stats.interview_scheduled);
+            updateStatWithAnimation('hired', data.stats.hired);
+        }
+    })
+    .catch(error => {
+        console.error('Error updating stats:', error);
+    });
+}
+
+function updateStatWithAnimation(statKey, newValue) {
+    // Find the stat element by looking for the parent div that contains the stat
+    const statElements = document.querySelectorAll('.text-2xl.font-bold.text-gray-900');
+    
+    statElements.forEach(element => {
+        const currentValue = parseInt(element.textContent) || 0;
+        
+        // Check which stat this is by looking at the previous sibling (label)
+        const label = element.previousElementSibling;
+        if (!label) return;
+        
+        const labelText = label.textContent.trim().toLowerCase();
+        let shouldUpdate = false;
+        
+        if (statKey === 'total_applicants' && labelText.includes('total applicants')) {
+            shouldUpdate = true;
+        } else if (statKey === 'demo_scheduled' && labelText.includes('demo scheduled')) {
+            shouldUpdate = true;
+        } else if (statKey === 'interview_scheduled' && labelText.includes('interviews scheduled')) {
+            shouldUpdate = true;
+        } else if (statKey === 'hired' && labelText.includes('hired')) {
+            shouldUpdate = true;
+        }
+        
+        if (shouldUpdate && currentValue !== newValue) {
+            // Add pulse animation
+            element.parentElement.parentElement.parentElement.classList.add('animate-pulse');
+            
+            // Update the value
+            element.textContent = newValue;
+            
+            // Remove animation after 1 second
+            setTimeout(() => {
+                element.parentElement.parentElement.parentElement.classList.remove('animate-pulse');
+            }, 1000);
+        }
+    });
+}
+
+// Start auto-updating stats every 5 seconds
+function startStatsAutoUpdate() {
+    // Update immediately on page load
+    updateStatsCards();
+    
+    // Then update every 5 seconds
+    statsUpdateInterval = setInterval(updateStatsCards, 5000);
+}
+
+// Stop auto-updating stats
+function stopStatsAutoUpdate() {
+    if (statsUpdateInterval) {
+        clearInterval(statsUpdateInterval);
+        statsUpdateInterval = null;
+    }
+}
+
+// Start stats auto-update when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    startStatsAutoUpdate();
+});
+
+// Stop updating when user leaves the page
+window.addEventListener('beforeunload', function() {
+    stopStatsAutoUpdate();
+});
 </script>
 </body>
 </html>

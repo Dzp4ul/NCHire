@@ -5,7 +5,7 @@ header('Content-Type: application/json');
 // Database connection
 $host = "127.0.0.1";
 $user = "root";
-$pass = "12345678";
+$pass = "";
 $dbname = "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
@@ -27,7 +27,7 @@ if ($admin_role === 'Admin') {
 }
 
 // Secretary, Department Heads, HR Managers, and Recruiters can see archived applications
-// Secretary sees all rejected, others filtered by department
+// Secretary sees all rejected and cancelled, others filtered by department
 if ($admin_role === 'Secretary') {
     $query = "SELECT 
                 ja.id,
@@ -43,7 +43,7 @@ if ($admin_role === 'Secretary') {
                 a.profile_picture
               FROM job_applicants ja
               LEFT JOIN applicants a ON ja.user_id = a.id
-              WHERE ja.workflow_stage = 'rejected'
+              WHERE ja.workflow_stage IN ('rejected', 'cancelled')
               ORDER BY ja.rejected_date DESC";
     
     $result = $conn->query($query);
@@ -71,7 +71,7 @@ if ($admin_role === 'Secretary') {
                 a.profile_picture
               FROM job_applicants ja
               LEFT JOIN applicants a ON ja.user_id = a.id
-              WHERE ja.workflow_stage = 'rejected'
+              WHERE ja.workflow_stage IN ('rejected', 'cancelled')
               AND ja.assigned_to_department = ?
               ORDER BY ja.rejected_date DESC";
     

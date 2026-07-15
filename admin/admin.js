@@ -327,6 +327,60 @@ function showSection(sectionName) {
     try {
         console.log('Showing section:', sectionName);
         
+        // Clear all search inputs and filters when changing sections
+        const searchInputs = [
+            // Job Postings filters
+            { id: 'jobSearchInput', type: 'text', callback: 'filterJobs' },
+            { id: 'jobStatusFilter', type: 'select', defaultValue: 'all', callback: 'filterJobs' },
+            { id: 'jobDepartmentFilter', type: 'select', defaultValue: 'all', callback: 'filterJobs' },
+            { id: 'jobTypeFilter', type: 'select', defaultValue: 'all', callback: 'filterJobs' },
+            { id: 'jobDeadlineFrom', type: 'date', callback: 'filterJobs' },
+            { id: 'jobDeadlineTo', type: 'date', callback: 'filterJobs' },
+            
+            // Applicants filters
+            { id: 'nameSearch', type: 'text', callback: 'applyAllFilters' },
+            { id: 'statusFilter', type: 'select', defaultValue: 'all', callback: 'applyAllFilters' },
+            { id: 'fromDate', type: 'date', callback: 'applyAllFilters' },
+            { id: 'toDate', type: 'date', callback: 'applyAllFilters' },
+            
+            // Archive search
+            { id: 'archiveSearch', type: 'text', callback: null },
+            
+            // Users search
+            { id: 'userSearch', type: 'text', callback: 'filterUsers' }
+        ];
+        
+        let shouldTriggerCallbacks = {};
+        
+        searchInputs.forEach(inputConfig => {
+            const input = document.getElementById(inputConfig.id);
+            if (input) {
+                const hasValue = input.value && input.value !== (inputConfig.defaultValue || '');
+                
+                if (hasValue) {
+                    // Reset to default value or empty
+                    if (inputConfig.type === 'select' && inputConfig.defaultValue) {
+                        input.value = inputConfig.defaultValue;
+                    } else {
+                        input.value = '';
+                    }
+                    console.log(`Cleared input: ${inputConfig.id}`);
+                    
+                    // Track which callbacks need to be triggered
+                    if (inputConfig.callback) {
+                        shouldTriggerCallbacks[inputConfig.callback] = true;
+                    }
+                }
+            }
+        });
+        
+        // Trigger filter callbacks once per unique function (avoid duplicate calls)
+        Object.keys(shouldTriggerCallbacks).forEach(callbackName => {
+            if (typeof window[callbackName] === 'function') {
+                window[callbackName]();
+            }
+        });
+        
         // Hide all sections
         document.querySelectorAll('.section').forEach(section => {
             section.classList.add('hidden');
@@ -384,11 +438,37 @@ function showSection(sectionName) {
 }
 
 // Load Applicants
+// Load and update dynamic applicants stats
+async function loadApplicantsStats() {
+    try {
+        const response = await fetch('api/get_applicants_stats.php');
+        if (!response.ok) throw new Error('Network response was not ok');
+
+        const stats = await response.json();
+        
+        // Update stat cards with data-stat attributes
+        document.querySelectorAll('[data-stat]').forEach(element => {
+            const statKey = element.getAttribute('data-stat');
+            if (stats[statKey] !== undefined) {
+                element.textContent = stats[statKey];
+            }
+        });
+        
+        console.log('Applicants stats updated:', stats);
+        
+    } catch (error) {
+        console.error('Error loading applicants stats:', error);
+    }
+}
+
 async function loadApplicants() {
     const tbody = document.getElementById('applicantsTableBody');
     tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4">Loading...</td></tr>';
 
     try {
+        // Load dynamic stats
+        await loadApplicantsStats();
+        
         const response = await fetch('gets_applicants.php');
         if (!response.ok) throw new Error('Network response was not ok');
 
@@ -411,11 +491,12 @@ async function loadApplicants() {
 
 // Global variable to store all archived applicants for search
 let allArchivedData = [];
+let currentArchiveFilter = 'all';
 
-// Load Archive (Rejected Applicants)
+// Load Archive (Rejected and Cancelled Applicants)
 async function loadArchive() {
     const tbody = document.getElementById('archiveTableBody');
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4">Loading archived applicants...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4">Loading archived applicants...</td></tr>';
 
     try {
         const response = await fetch('get_archive.php');
@@ -442,7 +523,7 @@ function displayArchivedApplicants(archived) {
     if (!archived || archived.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="text-center py-8 text-gray-500">
+                <td colspan="7" class="text-center py-8 text-gray-500">
                     <i class="fas fa-archive text-4xl text-gray-300 mb-3 block"></i>
                     <p>No archived applicants</p>
                 </td>
@@ -463,12 +544,18 @@ function displayArchivedApplicants(archived) {
             day: 'numeric'
         });
         
-        const rejectedDate = applicant.rejected_date ? 
+        const archiveDate = applicant.rejected_date ? 
             new Date(applicant.rejected_date).toLocaleDateString('en-US', {
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric'
             }) : 'N/A';
+        
+        // Determine status badge color and text
+        const isRejected = applicant.workflow_stage === 'rejected';
+        const statusBadge = isRejected
+            ? '<span class="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">Rejected</span>'
+            : '<span class="px-2 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-800">Cancelled</span>';
         
         // Create profile picture HTML
         const profilePictureHTML = applicant.profile_picture 
@@ -488,8 +575,9 @@ function displayArchivedApplicants(archived) {
                 </div>
             </td>
             <td class="px-6 py-4 text-sm text-gray-900">${applicant.position}</td>
+            <td class="px-6 py-4">${statusBadge}</td>
             <td class="px-6 py-4 text-sm text-gray-500">${appliedDate}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${rejectedDate}</td>
+            <td class="px-6 py-4 text-sm text-gray-500">${archiveDate}</td>
             <td class="px-6 py-4">
                 <div class="text-sm text-gray-700 max-w-xs truncate" title="${applicant.rejection_reason || 'No reason provided'}">
                     ${applicant.rejection_reason || 'No reason provided'}
@@ -506,22 +594,46 @@ function displayArchivedApplicants(archived) {
     });
 }
 
+// Filter archive by status
+function filterArchiveByStatus(status) {
+    currentArchiveFilter = status;
+    applyArchiveFilters();
+}
+
 // Search archived applicants
 function searchArchive(searchTerm) {
-    if (!searchTerm) {
-        displayArchivedApplicants(allArchivedData);
-        return;
+    applyArchiveFilters(searchTerm);
+}
+
+// Apply both search and status filters
+function applyArchiveFilters(searchTerm = null) {
+    // Get current search term if not provided
+    if (searchTerm === null) {
+        const searchInput = document.getElementById('archiveSearch');
+        searchTerm = searchInput ? searchInput.value : '';
     }
     
-    const filtered = allArchivedData.filter(applicant => {
-        const name = applicant.full_name.toLowerCase();
-        const email = applicant.applicant_email.toLowerCase();
-        const position = applicant.position.toLowerCase();
-        const reason = (applicant.rejection_reason || '').toLowerCase();
+    let filtered = allArchivedData;
+    
+    // Apply status filter
+    if (currentArchiveFilter !== 'all') {
+        filtered = filtered.filter(applicant => 
+            applicant.workflow_stage === currentArchiveFilter
+        );
+    }
+    
+    // Apply search filter
+    if (searchTerm) {
         const term = searchTerm.toLowerCase();
-        
-        return name.includes(term) || email.includes(term) || position.includes(term) || reason.includes(term);
-    });
+        filtered = filtered.filter(applicant => {
+            const name = applicant.full_name.toLowerCase();
+            const email = applicant.applicant_email.toLowerCase();
+            const position = applicant.position.toLowerCase();
+            const reason = (applicant.rejection_reason || '').toLowerCase();
+            
+            return name.includes(term) || email.includes(term) || position.includes(term) || reason.includes(term);
+        });
+    }
     
     displayArchivedApplicants(filtered);
 }
@@ -593,7 +705,7 @@ function displayUsers(usersToDisplay) {
                     <div class="flex items-center gap-2">
                         ${getRoleIcon(user.role)}
                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.role)}">
-                            ${user.role}
+                            ${displayRoleName(user.role)}
                         </span>
                     </div>
                 </td>
@@ -713,7 +825,7 @@ function toggleDepartmentField(formType, role) {
     if (!container) return;
     
     if (role === 'Department Head') {
-        // Show department field for Department Head
+        // Show department field for Dean
         container.style.display = 'block';
         if (departmentSelect) {
             departmentSelect.required = true;
@@ -769,6 +881,7 @@ async function createJob(event) {
         locations: formData.get('location'),         // ✅ match DB column
         salary_range: formData.get('salary'),
         application_deadline: formData.get('deadline'),
+        subject: formData.get('subject') || '',      // ✅ subject field
         job_description: formData.get('description'),
         // New fields from enhanced form
         education: formData.get('education') || '',
@@ -854,9 +967,9 @@ async function createUser(event) {
         return;
     }
     
-    // Only require department for Department Head role
+    // Only require department for Dean role
     if (role === 'Department Head' && !formData.get('department')) {
-        showToast('Please select a department for Department Head role', 'error');
+        showToast('Please select a department for Dean role', 'error');
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
         return;
@@ -1071,6 +1184,11 @@ function getStatusIcon(status) {
         case 'Pending': return '<i class="fas fa-clock text-yellow-500"></i>';
         default: return '<i class="fas fa-clock text-yellow-500"></i>';
     }
+}
+
+// Convert role name for display (Department Head -> Dean)
+function displayRoleName(role) {
+    return role === 'Department Head' ? 'Dean' : role;
 }
 
 function getInitials(name) {
@@ -1583,9 +1701,9 @@ async function updateUser(event) {
         return;
     }
     
-    // Only require department for Department Head role
+    // Only require department for Dean role
     if (role === 'Department Head' && !department) {
-        showToast('Please select a department for Department Head role', 'error');
+        showToast('Please select a department for Dean role', 'error');
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
         return;
@@ -1762,30 +1880,14 @@ async function loadDashboardData() {
         const data = await response.json();
         
         if (data.success) {
-            // Update dashboard statistics
+            // Update dashboard statistics using data-stat attributes
             if (data.stats) {
-                // Update Total Jobs
-                const totalJobsElement = document.querySelector('[data-stat="total_jobs"]');
-                if (totalJobsElement) {
-                    totalJobsElement.textContent = data.stats.total_jobs;
-                }
-                
-                // Update Total Applications
-                const totalApplicantsElement = document.querySelector('[data-stat="total_applicants"]');
-                if (totalApplicantsElement) {
-                    totalApplicantsElement.textContent = data.stats.total_applicants;
-                }
-                
-                // Update Active Users
-                const activeUsersElement = document.querySelector('[data-stat="active_users"]');
-                if (activeUsersElement) {
-                    activeUsersElement.textContent = data.stats.active_users;
-                }
-                
-                // Update Pending Reviews
-                const pendingReviewsElement = document.querySelector('[data-stat="pending_reviews"]');
-                if (pendingReviewsElement) {
-                    pendingReviewsElement.textContent = data.stats.pending_reviews;
+                // Update each stat by its data-stat attribute
+                for (const [key, value] of Object.entries(data.stats)) {
+                    const statElement = document.querySelector(`[data-stat="${key}"]`);
+                    if (statElement) {
+                        statElement.textContent = value;
+                    }
                 }
             }
             
@@ -1794,9 +1896,14 @@ async function loadDashboardData() {
             if (activityContainer && data.recent_activity) {
                 let activityHTML = '';
                 data.recent_activity.forEach(activity => {
-                    let iconClass = 'fas fa-user-plus text-green-600';
-                    let bgClass = 'bg-green-100';
-                    let activityTitle = 'New application received';
+                    // Skip application and login activities
+                    if (activity.activity_type === 'application' || activity.activity_type === 'admin_login') {
+                        return;
+                    }
+                    
+                    let iconClass = 'fas fa-circle text-gray-600';
+                    let bgClass = 'bg-gray-100';
+                    let activityTitle = 'Activity';
                     
                     switch(activity.activity_type) {
                         case 'application':
@@ -1818,6 +1925,61 @@ async function loadDashboardData() {
                             iconClass = 'fas fa-trash text-red-600';
                             bgClass = 'bg-red-100';
                             activityTitle = 'Job posting deleted';
+                            break;
+                        case 'interview_scheduled':
+                            iconClass = 'fas fa-calendar-check text-blue-600';
+                            bgClass = 'bg-blue-100';
+                            activityTitle = 'Interview scheduled';
+                            break;
+                        case 'demo_scheduled':
+                            iconClass = 'fas fa-chalkboard-teacher text-blue-600';
+                            bgClass = 'bg-blue-100';
+                            activityTitle = 'Demo teaching scheduled';
+                            break;
+                        case 'psych_exam_scheduled':
+                            iconClass = 'fas fa-brain text-purple-600';
+                            bgClass = 'bg-purple-100';
+                            activityTitle = 'Psychological exam scheduled';
+                            break;
+                        case 'interview_approved':
+                            iconClass = 'fas fa-check-circle text-green-600';
+                            bgClass = 'bg-green-100';
+                            activityTitle = 'Interview approved';
+                            break;
+                        case 'demo_approved':
+                            iconClass = 'fas fa-check-double text-green-600';
+                            bgClass = 'bg-green-100';
+                            activityTitle = 'Demo teaching approved';
+                            break;
+                        case 'resubmission_requested':
+                            iconClass = 'fas fa-file-upload text-orange-600';
+                            bgClass = 'bg-orange-100';
+                            activityTitle = 'Resubmission requested';
+                            break;
+                        case 'applicant_rejected':
+                            iconClass = 'fas fa-times-circle text-red-600';
+                            bgClass = 'bg-red-100';
+                            activityTitle = 'Application rejected';
+                            break;
+                        case 'applicant_hired':
+                            iconClass = 'fas fa-user-check text-green-600';
+                            bgClass = 'bg-green-100';
+                            activityTitle = 'Applicant hired';
+                            break;
+                        case 'applicant_transferred':
+                            iconClass = 'fas fa-share text-blue-600';
+                            bgClass = 'bg-blue-100';
+                            activityTitle = 'Application transferred';
+                            break;
+                        case 'applicant_initially_hired':
+                            iconClass = 'fas fa-user-plus text-green-600';
+                            bgClass = 'bg-green-100';
+                            activityTitle = 'Applicant initially hired';
+                            break;
+                        case 'user_created':
+                            iconClass = 'fas fa-user-shield text-purple-600';
+                            bgClass = 'bg-purple-100';
+                            activityTitle = 'Admin user created';
                             break;
                         case 'admin_login':
                             iconClass = 'fas fa-sign-in-alt text-indigo-600';
@@ -1895,6 +2057,68 @@ async function loadDashboardData() {
                     }
                     
                     jobsContainer.innerHTML = jobsHTML;
+                }
+            }
+            
+            // Update recent applicants
+            if (data.recent_applicants) {
+                const applicantsContainer = document.querySelector('#recentApplicantsContainer');
+                if (applicantsContainer) {
+                    let applicantsHTML = '';
+                    data.recent_applicants.forEach(applicant => {
+                        // Determine status badge
+                        let statusClass = '';
+                        let statusText = '';
+                        
+                        switch(applicant.status) {
+                            case 'Approved':
+                            case 'Initially Hired':
+                            case 'Permanently Hired':
+                            case 'Hired':
+                                statusClass = 'bg-green-100 text-green-800';
+                                statusText = applicant.status;
+                                break;
+                            case 'Rejected':
+                                statusClass = 'bg-red-100 text-red-800';
+                                statusText = 'Rejected';
+                                break;
+                            case 'Interview Scheduled':
+                            case 'Demo Scheduled':
+                            case 'Psych Scheduled':
+                                statusClass = 'bg-blue-100 text-blue-800';
+                                statusText = applicant.status;
+                                break;
+                            case 'Resubmission Required':
+                                statusClass = 'bg-orange-100 text-orange-800';
+                                statusText = 'Resubmission Required';
+                                break;
+                            default:
+                                statusClass = 'bg-yellow-100 text-yellow-800';
+                                statusText = 'Under Review';
+                        }
+                        
+                        applicantsHTML += `
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4">
+                                    <div class="font-medium text-gray-900">${applicant.full_name || 'N/A'}</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-900">${applicant.position || 'N/A'}</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">
+                                        ${statusText}
+                                    </span>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    
+                    if (applicantsHTML === '') {
+                        applicantsHTML = '<tr><td colspan="3" class="px-6 py-4 text-center text-gray-500">No recent applicants</td></tr>';
+                    }
+                    
+                    applicantsContainer.innerHTML = applicantsHTML;
                 }
             }
             
@@ -2210,7 +2434,11 @@ async function viewApplicantDetails(applicantId) {
                         <label class="block text-sm font-medium text-gray-600">Time</label>
                         <p class="text-gray-900">${demoTime}</p>
                     </div>
-                    ${applicant.status === 'Demo Passed' || applicant.workflow_stage === 'demo_completed' ? `
+                    ${applicant.status === 'Demo Passed' || 
+                      applicant.workflow_stage === 'demo_completed' ||
+                      applicant.status === 'Psychological Exam' ||
+                      applicant.status === 'Initially Hired' ||
+                      applicant.status === 'Hired' ? `
                     <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
                         <p class="text-sm font-semibold text-green-800 flex items-center">
                             <i class="fas fa-check-circle mr-2"></i>
@@ -2501,7 +2729,7 @@ function updateActionButtons(status, applicant = null) {
                         <div>
                             <h4 class="font-semibold text-blue-900 text-sm">Application Transferred</h4>
                             <p class="text-xs text-blue-700 mt-1">
-                                This application has been transferred to the Department Head. 
+                                This application has been transferred to the Dean. 
                                 You can view the progress but cannot make changes.
                             </p>
                         </div>
@@ -2517,7 +2745,7 @@ function updateActionButtons(status, applicant = null) {
     if (workflowStage === 'department_head_review') {
         if (scheduleBtn) scheduleBtn.classList.remove('hidden');
         if (rejectBtn) rejectBtn.classList.remove('hidden');
-        // Note: NO resubmitBtn for Department Head
+        // Note: NO resubmitBtn for Dean
         return; // Exit early
     }
     
@@ -2799,7 +3027,7 @@ function closeRejectModal() {
     document.getElementById('rejectForm').reset();
 }
 
-// Transfer to Department Head Modal Functions
+// Transfer to Dean Modal Functions
 function openTransferModal() {
     document.getElementById('transferModal').classList.remove('hidden');
     document.getElementById('transferModal').classList.add('flex');
@@ -3145,7 +3373,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Transfer to Department Head Form
+    // Transfer to Dean Form
     document.getElementById('transferForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
@@ -3166,7 +3394,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 if (result.success) {
                     closeTransferModal();
-                    showToast('Application transferred to Department Head successfully!', 'success');
+                    showToast('Application transferred to Dean successfully!', 'success');
                     
                     // Refresh the current applicant details to show new status
                     // and update the applicants list
@@ -3681,6 +3909,125 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// Applicants Pagination Functions
+
+function showApplicantsPagination() {
+    const paginationContainer = document.getElementById('applicantsPaginationContainer');
+    if (paginationContainer) {
+        paginationContainer.classList.remove('hidden');
+    }
+}
+
+function hideApplicantsPagination() {
+    const paginationContainer = document.getElementById('applicantsPaginationContainer');
+    if (paginationContainer) {
+        paginationContainer.classList.add('hidden');
+    }
+}
+
+function updateApplicantsPaginationInfo(start, end, total) {
+    const infoElement = document.getElementById('applicantsPaginationInfo');
+    if (infoElement) {
+        infoElement.textContent = `Showing ${start}-${end} of ${total} applicants`;
+    }
+}
+
+function updateApplicantsPaginationButtons() {
+    const prevBtn = document.getElementById('applicantsPrevBtn');
+    const nextBtn = document.getElementById('applicantsNextBtn');
+    
+    if (prevBtn) {
+        prevBtn.disabled = currentApplicantsPage === 1;
+    }
+    
+    if (nextBtn) {
+        nextBtn.disabled = currentApplicantsPage >= totalApplicantsPages;
+    }
+    
+    // Update page numbers
+    updateApplicantsPageNumbers();
+}
+
+function updateApplicantsPageNumbers() {
+    const pageNumbersContainer = document.getElementById('applicantsPageNumbers');
+    if (!pageNumbersContainer) return;
+    
+    pageNumbersContainer.innerHTML = '';
+    
+    // Calculate which pages to show
+    let startPage = Math.max(1, currentApplicantsPage - 2);
+    let endPage = Math.min(totalApplicantsPages, currentApplicantsPage + 2);
+    
+    // Adjust if we're near the beginning or end
+    if (currentApplicantsPage <= 3) {
+        endPage = Math.min(5, totalApplicantsPages);
+    }
+    if (currentApplicantsPage >= totalApplicantsPages - 2) {
+        startPage = Math.max(1, totalApplicantsPages - 4);
+    }
+    
+    // Add first page if not visible
+    if (startPage > 1) {
+        addApplicantsPageButton(1);
+        if (startPage > 2) {
+            addApplicantsEllipsis();
+        }
+    }
+    
+    // Add visible page numbers
+    for (let i = startPage; i <= endPage; i++) {
+        addApplicantsPageButton(i, i === currentApplicantsPage);
+    }
+    
+    // Add last page if not visible
+    if (endPage < totalApplicantsPages) {
+        if (endPage < totalApplicantsPages - 1) {
+            addApplicantsEllipsis();
+        }
+        addApplicantsPageButton(totalApplicantsPages);
+    }
+}
+
+function addApplicantsPageButton(pageNum, isActive = false) {
+    const pageNumbersContainer = document.getElementById('applicantsPageNumbers');
+    if (!pageNumbersContainer) return;
+    
+    const button = document.createElement('button');
+    button.className = `px-3 py-2 text-sm rounded-lg transition-colors ${
+        isActive 
+            ? 'bg-primary text-white' 
+            : 'border border-gray-300 hover:bg-gray-50'
+    }`;
+    button.textContent = pageNum;
+    button.onclick = () => goToApplicantsPage(pageNum);
+    pageNumbersContainer.appendChild(button);
+}
+
+function addApplicantsEllipsis() {
+    const pageNumbersContainer = document.getElementById('applicantsPageNumbers');
+    if (!pageNumbersContainer) return;
+    
+    const ellipsis = document.createElement('span');
+    ellipsis.className = 'px-2 text-gray-500';
+    ellipsis.textContent = '...';
+    pageNumbersContainer.appendChild(ellipsis);
+}
+
+function goToApplicantsPage(pageNum) {
+    currentApplicantsPage = pageNum;
+    displayFilteredApplicants();
+}
+
+function changeApplicantsPage(direction) {
+    if (direction === 'prev' && currentApplicantsPage > 1) {
+        currentApplicantsPage--;
+        displayFilteredApplicants();
+    } else if (direction === 'next' && currentApplicantsPage < totalApplicantsPages) {
+        currentApplicantsPage++;
+        displayFilteredApplicants();
+    }
+}
+
 // Document viewer function
 function viewDocument(filePath, documentName, isImage) {
     const modal = document.getElementById('documentViewerModal');
@@ -3751,6 +4098,11 @@ let currentFromDate = '';
 let currentToDate = '';
 let allApplicantsData = [];
 
+// Global variables for applicant pagination
+let currentApplicantsPage = 1;
+let applicantsPerPage = 5;
+let totalApplicantsPages = 1;
+
 // Apply all filters combined
 function applyAllFilters() {
     // Get filter values
@@ -3764,6 +4116,9 @@ function applyAllFilters() {
     currentStatusFilter = statusFilter;
     currentFromDate = fromDate;
     currentToDate = toDate;
+    
+    // Reset to page 1 when filters change
+    currentApplicantsPage = 1;
     
     // Apply filters
     displayFilteredApplicants();
@@ -3853,10 +4208,26 @@ function displayFilteredApplicants() {
     
     if (filteredApplicants.length === 0) {
         tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-gray-500">No applicants found matching your filters</td></tr>`;
+        hideApplicantsPagination();
         return;
     }
     
-    tbody.innerHTML = filteredApplicants.map(applicant => {
+    // Calculate pagination
+    totalApplicantsPages = Math.ceil(filteredApplicants.length / applicantsPerPage);
+    const startIndex = (currentApplicantsPage - 1) * applicantsPerPage;
+    const endIndex = startIndex + applicantsPerPage;
+    const paginatedApplicants = filteredApplicants.slice(startIndex, endIndex);
+    
+    // Show/hide pagination based on total applicants
+    if (filteredApplicants.length > applicantsPerPage) {
+        showApplicantsPagination();
+        updateApplicantsPaginationInfo(startIndex + 1, Math.min(endIndex, filteredApplicants.length), filteredApplicants.length);
+        updateApplicantsPaginationButtons();
+    } else {
+        hideApplicantsPagination();
+    }
+    
+    tbody.innerHTML = paginatedApplicants.map(applicant => {
         const profilePictureHTML = applicant.profile_picture 
             ? `<img src="../user/uploads/profile_pictures/${applicant.profile_picture}" alt="Profile" class="w-10 h-10 rounded-full object-cover mr-3">`
             : `<div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
@@ -3867,7 +4238,7 @@ function displayFilteredApplicants() {
         let departmentBadge = '';
         if (applicant.assigned_to_department) {
             let deptColor = 'bg-gray-100 text-gray-800';
-            if (applicant.assigned_to_department === 'Computer Science') {
+            if (applicant.assigned_to_department === 'Computing Studies') {
                 deptColor = 'bg-blue-100 text-blue-800';
             } else if (applicant.assigned_to_department === 'Education') {
                 deptColor = 'bg-green-100 text-green-800';

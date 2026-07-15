@@ -170,8 +170,8 @@ function handleTransferToDeptHead($conn, $application_id, $application, $secreta
                 if (!$notif_stmt) {
                     throw new Exception("Prepare failed: " . $conn->error);
                 }
-                $notif_title = "Application Transferred to Department Head";
-                $notif_message = "Your application for {$application['position']} has been reviewed and forwarded to the department head for evaluation. You will be notified of the next steps.";
+                $notif_title = "Application Transferred to Dean";
+                $notif_message = "Your application for {$application['position']} has been reviewed and forwarded to the dean for evaluation. You will be notified of the next steps.";
                 $notif_type = "info";
                 $notif_stmt->bind_param("sssss", $applicant_email, $applicant_name, $notif_title, $notif_message, $notif_type);
                 
@@ -199,9 +199,9 @@ function handleTransferToDeptHead($conn, $application_id, $application, $secreta
                 $email_result = sendEmailNotification(
                     $applicant_email,
                     $applicant_name,
-                    'Application Transferred to Department Head',
+                    'Application Transferred to Dean',
                     'Application Under Review',
-                    'Your application for ' . $application['position'] . ' has been reviewed by our secretary and forwarded to the department head for further evaluation. You will be notified of the next steps.',
+                    'Your application for ' . $application['position'] . ' has been reviewed by our secretary and forwarded to the dean for further evaluation. You will be notified of the next steps.',
                     'info'
                 );
                 if ($email_result) {
@@ -316,7 +316,7 @@ function handleTransferToDeptHead($conn, $application_id, $application, $secreta
         
         echo json_encode([
             'success' => true, 
-            'message' => 'Application successfully transferred to Department Head'
+            'message' => 'Application successfully transferred to Dean'
         ]);
         
     } catch (Exception $e) {

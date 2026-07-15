@@ -16,7 +16,7 @@ if (!isset($_SESSION['password_change_required']) || $_SESSION['password_change_
 // Database connection
 $host = "127.0.0.1";
 $user = "root";
-$pass = "12345678";
+$pass = "";
 $dbname = "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
@@ -94,7 +94,7 @@ $conn->close();
         }
     </script>
 </head>
-<body class="relative min-h-screen flex items-center justify-center p-4" style="background-image: url('../assets/images/520382375_1065446909052636_3412465913398569974_n.jpg'); background-size: cover; background-position: center; background-attachment: fixed;">
+<body class="relative min-h-screen flex items-center justify-center p-4" style="background-image: url('../public/assets/images/520382375_1065446909052636_3412465913398569974_n.jpg'); background-size: cover; background-position: center; background-attachment: fixed;">
     <!-- Dark Overlay -->
     <div class="absolute inset-0 bg-primary bg-opacity-80"></div>
     
@@ -102,7 +102,7 @@ $conn->close();
     <div class="relative z-10 max-w-md w-full">
         <!-- Logo -->
         <div class="text-center mb-8">
-            <img src="../assets/images/image-removebg-preview (1).png" 
+            <img src="../public/assets/images/image-removebg-preview (1).png" 
                  alt="NCHire Logo" class="w-20 h-20 mx-auto mb-4">
             <h1 class="text-3xl font-bold text-white">NCHire</h1>
             <p class="text-gray-200 mt-2">Norzagaray College</p>

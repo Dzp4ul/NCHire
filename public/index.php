@@ -4,7 +4,7 @@ session_start(); // Must be first line
 // Database connection
 $host = "127.0.0.1"; // XAMPP default host
 $user = "root"; // XAMPP default MySQL username
-$pass = "12345678"; // leave empty unless you set a password
+$pass = ""; // leave empty unless you set a password
 $dbname = "nchire"; // change to your DB name
 
 $conn = new mysqli($host, $user, $pass, $dbname);
@@ -24,7 +24,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login_submit'])) {
     $login_found = false;
 
     // Check admin_users table first (new admin system)
-    $stmt = $conn->prepare("SELECT id, full_name, email, password, role, department, profile_picture, password_change_required FROM admin_users WHERE email = ?");
+    $stmt = $conn->prepare("SELECT id, full_name, email, password, role, department, profile_picture, password_change_required, status FROM admin_users WHERE email = ?");
     $stmt->bind_param("s", $email);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -34,7 +34,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login_submit'])) {
         $stmt->close();
 
         // Check password with hash verification
-        if (password_verify($password, $row['password'])) { 
+        if (password_verify($password, $row['password'])) {
+            // Check if account is active
+            if ($row['status'] !== 'Active') {
+                $_SESSION['signin_error'] = 'Your account has been deactivated. Please contact the administrator.';
+                header("Location: index.php");
+                exit();
+            } 
             // Set session variables for admin
             $_SESSION['admin_logged_in'] = true;
             $_SESSION['admin_id'] = $row['id'];
@@ -873,6 +879,27 @@ window.addEventListener('DOMContentLoaded', function() {
   const signInModal = document.getElementById('signInModal');
   const signUpModal = document.getElementById('signUpModal');
   const verifyModal = document.getElementById('verifyModal');
+  
+  // Check for inactive account parameter
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('inactive') === '1') {
+    showToast('Your account has been deactivated. Please contact the administrator.', 'error', 5000);
+    if (signInModal) {
+      signInModal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+    // Clean URL
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+  
+  <?php if (isset($_SESSION['signin_error'])): ?>
+  showToast('<?php echo addslashes($_SESSION['signin_error']); ?>', 'error', 5000);
+  if (signInModal) {
+    signInModal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  }
+  <?php unset($_SESSION['signin_error']); ?>
+  <?php endif; ?>
   
   <?php if (isset($login_error)): ?>
   if (signInModal) {
@@ -1721,21 +1748,21 @@ At NCHire, we connect talented individuals with top employers to help you take t
 </div>
 
 <!-- Jobs Carousel -->
-<div id="jobsCarousel" class="hidden relative px-0 md:px-0">
+<div id="jobsCarousel" class="hidden relative px-12 md:px-16 lg:px-20">
 <!-- Left Arrow -->
-<button id="carouselPrev" class="carousel-arrow-left absolute left-2 md:-left-16 lg:-left-24 top-1/2 -translate-y-1/2 z-20 bg-primary shadow-2xl rounded-full p-2 md:p-3 hover:bg-secondary hover:scale-110 transition-all duration-300 group disabled:opacity-30 disabled:cursor-not-allowed">
+<button id="carouselPrev" class="carousel-arrow-left absolute left-0 md:left-2 top-1/2 -translate-y-1/2 z-20 bg-primary shadow-2xl rounded-full p-2 md:p-3 hover:bg-secondary hover:scale-110 transition-all duration-300 group disabled:opacity-30 disabled:cursor-not-allowed">
 <i class="ri-arrow-left-s-line text-xl md:text-2xl text-white"></i>
 </button>
 
 <!-- Jobs Container -->
-<div class="overflow-visible mx-0 md:mx-0 py-4">
-<div id="jobsTrack" class="flex transition-transform duration-500 ease-in-out gap-4">
+<div class="overflow-hidden mx-0 py-8">
+<div id="jobsTrack" class="flex transition-transform duration-500 ease-in-out gap-6">
 <!-- Job cards will be inserted here dynamically -->
 </div>
 </div>
 
 <!-- Right Arrow -->
-<button id="carouselNext" class="carousel-arrow-right absolute right-2 md:-right-16 lg:-right-24 top-1/2 -translate-y-1/2 z-20 bg-primary shadow-2xl rounded-full p-2 md:p-3 hover:bg-secondary hover:scale-110 transition-all duration-300 group disabled:opacity-30 disabled:cursor-not-allowed">
+<button id="carouselNext" class="carousel-arrow-right absolute right-0 md:right-2 top-1/2 -translate-y-1/2 z-20 bg-primary shadow-2xl rounded-full p-2 md:p-3 hover:bg-secondary hover:scale-110 transition-all duration-300 group disabled:opacity-30 disabled:cursor-not-allowed">
 <i class="ri-arrow-right-s-line text-xl md:text-2xl text-white"></i>
 </button>
 
@@ -1774,7 +1801,7 @@ async function loadJobsCarousel() {
         if (data.success && data.jobs && data.jobs.length > 0) {
             console.log(`Loaded ${data.jobs.length} jobs successfully`);
             jobsData = data.jobs;
-            totalSlides = Math.ceil(jobsData.length / 3);
+            totalSlides = Math.ceil(jobsData.length / 3); // 3 jobs per slide
             
             loading.classList.add('hidden');
             carousel.classList.remove('hidden');
@@ -1807,7 +1834,7 @@ function renderJobs() {
     
     jobsData.forEach((job, index) => {
         const card = document.createElement('div');
-        card.className = 'min-w-full md:min-w-[calc(33.333%-1.33rem)] bg-primary text-white p-6 md:p-8 rounded-2xl relative group hover:transform hover:scale-105 transition-all duration-300 overflow-hidden shadow-lg hover:shadow-2xl';
+        card.className = 'flex-shrink-0 w-[calc(100%-3rem)] md:w-[calc((100%-3rem)/3)] bg-primary text-white p-6 md:p-8 rounded-2xl relative group hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 overflow-hidden shadow-lg';
         
         // Increase border radius on hover to compensate for scale
         card.addEventListener('mouseenter', function() {
@@ -1832,19 +1859,19 @@ function renderJobs() {
                     <i class="${iconClass} text-4xl md:text-6xl text-white opacity-50"></i>
                 </div>
             </div>
-            <div class="flex items-start justify-between mb-2">
-                <h3 class="text-lg md:text-xl lg:text-2xl font-bold flex-1">${escapeHtml(job.title)}</h3>
-                <span class="ml-2 px-2 md:px-3 py-1 bg-secondary text-primary text-xs font-semibold rounded-full whitespace-nowrap">${escapeHtml(job.type)}</span>
+            <div class="flex items-start justify-between gap-2 mb-2">
+                <h3 class="text-lg md:text-xl font-bold flex-1 line-clamp-2">${escapeHtml(job.title)}</h3>
+                <span class="flex-shrink-0 px-2 md:px-3 py-1 bg-secondary text-primary text-xs font-semibold rounded-full whitespace-nowrap">${escapeHtml(job.type)}</span>
             </div>
-            <p class="text-secondary text-xs md:text-sm mb-2 font-semibold">${escapeHtml(job.department)}</p>
+            <p class="text-secondary text-xs md:text-sm mb-2 font-semibold truncate">${escapeHtml(job.department)}</p>
             <p class="text-gray-200 text-xs md:text-sm mb-3 md:mb-4 line-clamp-2">${escapeHtml(job.description)}</p>
-            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-xs md:text-sm text-gray-300 mb-4">
-                <div class="flex items-center gap-1">
-                    <i class="ri-map-pin-line"></i>
+            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 text-xs md:text-sm text-gray-300 mb-12 md:mb-16">
+                <div class="flex items-center gap-1 min-w-0">
+                    <i class="ri-map-pin-line flex-shrink-0"></i>
                     <span class="truncate">${escapeHtml(job.location)}</span>
                 </div>
-                <div class="flex items-center gap-1">
-                    <i class="ri-calendar-line"></i>
+                <div class="flex items-center gap-1 min-w-0">
+                    <i class="ri-calendar-line flex-shrink-0"></i>
                     <span class="truncate">${escapeHtml(job.deadline)}</span>
                 </div>
             </div>
@@ -1872,8 +1899,11 @@ function renderIndicators() {
 function goToSlide(index) {
     currentSlide = index;
     const track = document.getElementById('jobsTrack');
-    const slideWidth = track.offsetWidth;
-    track.style.transform = `translateX(-${currentSlide * slideWidth}px)`;
+    const container = track.parentElement;
+    const containerWidth = container.offsetWidth;
+    // Calculate offset: 3 cards per slide
+    const offset = currentSlide * containerWidth;
+    track.style.transform = `translateX(-${offset}px)`;
     updateCarouselButtons();
     updateIndicators();
 }

@@ -20,7 +20,7 @@ session_start();
       // Immediate server-side rendering for zero perceived loading
       $host = "127.0.0.1";
       $user = "root";
-      $pass = "12345678";
+      $pass = "";
       $dbname = "nchire";
       $conn = @new mysqli($host, $user, $pass, $dbname);
       if ($conn && !$conn->connect_error) {
@@ -55,6 +55,9 @@ session_start();
                       else if (strpos($status_l, 'reject') !== false) $status_class = 'bg-red-100 text-red-800';
                       else if (strpos($status_l, 'accept') !== false || strpos($status_l, 'hired') !== false) $status_class = 'bg-green-100 text-green-800';
                       $applied_pretty = $row['applied_date'] ? date('m/d/Y', strtotime($row['applied_date'])) : '';
+                      // Check if cancel button should be shown
+                      $show_cancel_btn = !(strpos($status_l, 'cancel') !== false || strpos($status_l, 'hired') !== false);
+                      
                       echo '<div class="grid grid-cols-[1fr,auto,auto,auto] gap-4 p-4 items-center" data-id="'.$id.'">'
                         .'<div>'
                         .'<h3 class="font-semibold text-gray-900">'.$position.'</h3>'
@@ -68,9 +71,7 @@ session_start();
                         .'<button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-primary rounded-lg hover:bg-gray-100 !rounded-button" data-action="view">'
                         .'<i class="ri-eye-line"></i>'
                         .'</button>'
-                        .'<button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-orange-600 rounded-lg hover:bg-gray-100 !rounded-button" data-action="cancel">'
-                        .'<i class="ri-close-circle-line"></i>'
-                        .'</button>'
+                        .($show_cancel_btn ? '<button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-orange-600 rounded-lg hover:bg-gray-100 !rounded-button" data-action="cancel"><i class="ri-close-circle-line"></i></button>' : '')
                         .'</div>'
                         .'</div>';
                   }
@@ -282,7 +283,11 @@ session_start();
       return;
     }
 
-    container.innerHTML = apps.map(app => `
+    container.innerHTML = apps.map(app => {
+      const status = (app.status || '').toLowerCase();
+      const showCancelBtn = !(status.includes('cancel') || status.includes('hired'));
+      
+      return `
       <div class="grid grid-cols-[1fr,auto,auto,auto] gap-4 p-4 items-center" data-id="${app.id}">
         <div>
           <h3 class="font-semibold text-gray-900">${escapeHtml(app.position || 'Unknown Position')}</h3>
@@ -296,12 +301,13 @@ session_start();
           <button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-primary rounded-lg hover:bg-gray-100 !rounded-button" data-action="view">
             <i class="ri-eye-line"></i>
           </button>
-          <button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-orange-600 rounded-lg hover:bg-gray-100 !rounded-button" data-action="cancel">
+          ${showCancelBtn ? `<button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-orange-600 rounded-lg hover:bg-gray-100 !rounded-button" data-action="cancel">
             <i class="ri-close-circle-line"></i>
-          </button>
+          </button>` : ''}
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
   }
 
   function escapeHtml(str) {

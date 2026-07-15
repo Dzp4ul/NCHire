@@ -6,7 +6,7 @@ ini_set('display_errors', 0);
 
 $host = "127.0.0.1";
 $user = "root";
-$pass = "12345678";
+$pass = "";
 $dbname = "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
@@ -33,6 +33,7 @@ $type = $data["job_type"] ?? '';
 $location = $data["locations"] ?? '';
 $salary = $data["salary_range"] ?? '';
 $deadline = $data["application_deadline"] ?? '';
+$subject = $data["subject"] ?? '';
 $description = $data["job_description"] ?? '';
 $requirements = $data["job_requirements"] ?? '';
 
@@ -45,15 +46,15 @@ $competency = $data["competency"] ?? '';
 
 try {
     // Use prepared statements with new fields
-    $sql = "INSERT INTO job (job_title, department_role, job_type, locations, salary_range, application_deadline, job_description, job_requirements, education, experience, training, eligibility, competency) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    $sql = "INSERT INTO job (job_title, department_role, job_type, locations, salary_range, application_deadline, subject, job_description, job_requirements, education, experience, training, eligibility, competency) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     $stmt = $conn->prepare($sql);
     if (!$stmt) {
         echo json_encode(["success" => false, "message" => "Prepare failed: " . $conn->error]);
         $conn->close();
         exit;
     }
-    $stmt->bind_param("sssssssssssss", $title, $department, $type, $location, $salary, $deadline, $description, $requirements, $education, $experience, $training, $eligibility, $competency);
+    $stmt->bind_param("ssssssssssssss", $title, $department, $type, $location, $salary, $deadline, $subject, $description, $requirements, $education, $experience, $training, $eligibility, $competency);
     $ok = $stmt->execute();
     if ($ok) {
         $job_id = $conn->insert_id;

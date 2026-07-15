@@ -6,7 +6,7 @@ header('Content-Type: application/json');
 $host = 'localhost';
 $dbname = 'nchire';
 $username = 'root';
-$password = '12345678';
+$password = '';
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);

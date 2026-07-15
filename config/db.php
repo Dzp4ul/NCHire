@@ -2,7 +2,7 @@
 // Database connection configuration
 $host = "127.0.0.1"; // or localhost
 $user = "root"; // your MySQL username
-$pass = "12345678"; // your MySQL password
+$pass = ""; // your MySQL password
 $dbname = "nchire"; // your database name
 
 // Create connection

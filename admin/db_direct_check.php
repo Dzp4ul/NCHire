@@ -1,5 +1,5 @@
 <?php
-$conn = new mysqli("127.0.0.1", "root", "12345678", "nchire");
+$conn = new mysqli("127.0.0.1", "root", "", "nchire");
 
 echo "<pre style='font-family: monospace; background: #000; color: #0f0; padding: 20px;'>";
 echo "=== DATABASE DIRECT CHECK ===\n\n";

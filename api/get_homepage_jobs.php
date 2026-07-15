@@ -6,7 +6,7 @@ ini_set('display_errors', 0); // Don't display errors in output
 // Database connection
 $host = "127.0.0.1";
 $user = "root";
-$pass = "12345678";
+$pass = "";
 $dbname = "nchire";
 
 try {
@@ -32,14 +32,14 @@ try {
                   FROM job 
                   WHERE status = 'active' 
                   ORDER BY id DESC 
-                  LIMIT 10";
+                  LIMIT 6";
     } else {
         // Status column doesn't exist, fetch all jobs
         $query = "SELECT id, job_title, department_role, job_type, locations, salary_range, 
                          application_deadline, job_description 
                   FROM job 
                   ORDER BY id DESC 
-                  LIMIT 10";
+                  LIMIT 6";
     }
 
     $result = $conn->query($query);

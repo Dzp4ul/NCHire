@@ -8,7 +8,7 @@ header('Access-Control-Allow-Headers: Content-Type');
 // Database connection
 $host = "127.0.0.1";
 $user = "root";
-$pass = "12345678";
+$pass = "";
 $dbname = "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
@@ -29,11 +29,13 @@ function loadApplicants() {
     $params = [];
     $types = '';
     
-    // Secretary: Only see applications in secretary_review stage
+    // Secretary: Only see applications in secretary_review stage (excluding rejected)
     if ($admin_role === 'Secretary') {
         $where_conditions[] = "workflow_stage = ?";
+        $where_conditions[] = "status != ?";
         $params[] = 'secretary_review';
-        $types .= 's';
+        $params[] = 'Rejected';
+        $types .= 'ss';
     }
     // Department Head: Only see applications transferred to them (department_head_review and beyond)
     elseif ($admin_role === 'Department Head') {

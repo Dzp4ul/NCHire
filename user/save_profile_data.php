@@ -23,7 +23,7 @@ if (!isset($_SESSION['user_id']) && !isset($_SESSION['user_email'])) {
 // Database connection
 $servername = "localhost";
 $username = "root";
-$password = "12345678";
+$password = "";
 $dbname = "nchire";
 
 $conn = new mysqli($servername, $username, $password, $dbname);
@@ -105,6 +105,75 @@ if (isset($_POST['saveEducation'])) {
     exit();
 }
 
+// Handle Personal Information Save
+if (isset($_POST['savePersonal'])) {
+    error_log("=== PERSONAL INFO SAVE START ===");
+    
+    $first_name = $conn->real_escape_string($_POST['applicant_fname'] ?? '');
+    $last_name = $conn->real_escape_string($_POST['applicant_lname'] ?? '');
+    $email = $conn->real_escape_string($_POST['applicant_email'] ?? '');
+    $phone = $conn->real_escape_string($_POST['applicant_num'] ?? '');
+    $address = $conn->real_escape_string($_POST['applicant_address'] ?? '');
+    
+    error_log("User ID: $user_id, Name: $first_name $last_name, Email: $email");
+    
+    // Validate required fields
+    if (empty($first_name) || empty($last_name) || empty($email)) {
+        error_log("ERROR: Missing required fields (first name, last name, or email)");
+        echo json_encode(['success' => false, 'message' => 'First name, last name, and email are required']);
+        exit();
+    }
+    
+    // Validate email format
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        error_log("ERROR: Invalid email format");
+        echo json_encode(['success' => false, 'message' => 'Please enter a valid email address']);
+        exit();
+    }
+    
+    // Validate phone number format if provided
+    if (!empty($phone)) {
+        if (!preg_match('/^09[0-9]{9}$/', $phone)) {
+            error_log("ERROR: Invalid phone number format");
+            echo json_encode(['success' => false, 'message' => 'Invalid phone number format. Please use Philippine mobile format (e.g., 09123456789)']);
+            exit();
+        }
+    }
+    
+    // Update applicants table with correct column names
+    $sql = "UPDATE applicants SET 
+            first_name = ?, 
+            last_name = ?, 
+            applicant_email = ?, 
+            contact_number = ?, 
+            address = ? 
+            WHERE id = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("sssssi", $first_name, $last_name, $email, $phone, $address, $user_id);
+    
+    if ($stmt->execute()) {
+        error_log("SUCCESS: Personal information updated for user_id: $user_id");
+        
+        // Update session data
+        $_SESSION['first_name'] = $first_name;
+        if (isset($_SESSION['user_email']) && $_SESSION['user_email'] !== $email) {
+            $_SESSION['user_email'] = $email;
+            error_log("Session email updated to: $email");
+        }
+        
+        echo json_encode([
+            'success' => true, 
+            'message' => 'Personal information saved successfully'
+        ]);
+    } else {
+        error_log("ERROR: Failed to update personal information: " . $stmt->error);
+        echo json_encode(['success' => false, 'message' => 'Error saving personal information: ' . $stmt->error]);
+    }
+    $stmt->close();
+    error_log("=== PERSONAL INFO SAVE END ===");
+    exit();
+}
+
 // Handle Work Experience Save
 if (isset($_POST['saveExperience'])) {
     $edit_id = isset($_POST['edit_id']) && !empty($_POST['edit_id']) ? (int)$_POST['edit_id'] : 0;
@@ -146,7 +215,7 @@ if (isset($_POST['saveExperience'])) {
         $stmt->bind_param("issssssi", $user_id, $job_title, $work_comp, $work_loc, $start_date_formatted, $end_date_formatted, $work_descript, $is_current);
         
         if ($stmt->execute()) {
-            echo json_encode(['success' => true, 'message' => 'Work experience added successfully']);
+            echo json_encode(['success' => true, 'message' => 'Work experience added successfully', 'id' => $stmt->insert_id]);
         } else {
             error_log("Experience insert error: " . $stmt->error);
             echo json_encode(['success' => false, 'message' => 'Error adding experience: ' . $stmt->error]);
@@ -194,7 +263,7 @@ if (isset($_POST['saveSkill'])) {
         $stmt->bind_param("issi", $user_id, $skill_name, $skill_category, $skill_level);
         
         if ($stmt->execute()) {
-            echo json_encode(['success' => true, 'message' => 'Skill added successfully']);
+            echo json_encode(['success' => true, 'message' => 'Skill added successfully', 'id' => $stmt->insert_id]);
         } else {
             error_log("Skill insert error: " . $stmt->error);
             echo json_encode(['success' => false, 'message' => 'Error adding skill: ' . $stmt->error]);
@@ -360,6 +429,18 @@ if (isset($_POST['updatePassword'])) {
     // Validate new password length
     if (strlen($new_password) < 8) {
         echo json_encode(['success' => false, 'message' => 'New password must be at least 8 characters long']);
+        exit();
+    }
+    
+    // Validate password contains at least one number
+    if (!preg_match('/[0-9]/', $new_password)) {
+        echo json_encode(['success' => false, 'message' => 'Password must contain at least one number']);
+        exit();
+    }
+    
+    // Validate password contains at least one symbol
+    if (!preg_match('/[^A-Za-z0-9]/', $new_password)) {
+        echo json_encode(['success' => false, 'message' => 'Password must contain at least one symbol (e.g., !@#$%^&*)']);
         exit();
     }
     

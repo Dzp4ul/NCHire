@@ -116,7 +116,7 @@
                     <p>Your information is shared with authorized personnel within Norzagaray College, including:</p>
                     <ul class="list-disc ml-6 mt-2 space-y-1">
                         <li>Human Resources Department staff</li>
-                        <li>Department Heads and academic administrators</li>
+                        <li>Deans and academic administrators</li>
                         <li>Selection committee members</li>
                         <li>Administrative secretaries involved in recruitment</li>
                     </ul>

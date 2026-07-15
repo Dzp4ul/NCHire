@@ -8,7 +8,7 @@ header('Access-Control-Allow-Headers: Content-Type');
 // Database connection
 $host = "127.0.0.1";
 $user = "root";
-$pass = "12345678";
+$pass = "";
 $dbname = "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
@@ -344,6 +344,11 @@ switch ($method) {
             $types .= "s";
         }
         if (isset($input['status']) && !empty($input['status'])) {
+            // Prevent admin from deactivating their own account
+            if (isset($_SESSION['admin_id']) && $_SESSION['admin_id'] == $user_id && $input['status'] === 'Inactive') {
+                echo json_encode(['success' => false, 'message' => 'You cannot deactivate your own account']);
+                break;
+            }
             $updates[] = "status = ?";
             $params[] = $input['status'];
             $types .= "s";

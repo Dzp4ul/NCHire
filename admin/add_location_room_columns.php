@@ -4,7 +4,7 @@
 $host = 'localhost';
 $dbname = 'nchire';
 $username = 'root';
-$password = '12345678';
+$password = '';
 
 try {
     $conn = new mysqli($host, $username, $password, $dbname);

@@ -2,7 +2,7 @@
 // Quick diagnostic to check what's in admin_activity table
 $host = "127.0.0.1";
 $user = "root";
-$pass = "12345678";
+$pass = "";
 $dbname = "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);

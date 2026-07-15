@@ -11,7 +11,7 @@ if (!isset($_SESSION['user_id']) && !isset($_SESSION['user_email'])) {
 // Database connection
 $servername = "localhost";
 $username = "root";
-$password = "12345678";
+$password = "";
 $dbname = "nchire";
 
 $conn = new mysqli($servername, $username, $password, $dbname);
@@ -522,6 +522,29 @@ $skills_stmt->close();
         padding-left: 2rem !important;
         padding-right: 2rem !important;
     }
+}
+
+/* Real-time update animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Smooth transitions for delete operations */
+#educationList > div,
+#experienceList > div,
+#skillsList > div {
+    transition: opacity 0.3s ease-out, transform 0.3s ease-out;
 }
 </style>
 <script>
@@ -1068,6 +1091,15 @@ echo $levels[$skill['skill_level']];
 <i class="ri-eye-line text-lg"></i>
 </button>
 </div>
+</div>
+<div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+<p class="text-xs text-amber-800">
+<i class="ri-shield-check-line mr-1"></i>
+<strong>Password Requirements:</strong><br>
+• At least 8 characters long<br>
+• Must contain at least one number<br>
+• Must contain at least one symbol (!@#$%^&*)
+</p>
 </div>
 <div class="flex items-center gap-3 pt-2">
 <button type="button" id="updatePasswordBtn" class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium !rounded-button">
@@ -1788,7 +1820,7 @@ document.addEventListener('DOMContentLoaded', function() {
       .catch(error => console.error('Error reloading skills:', error));
   }
 
-  // Helper function to escape HTML
+  // Helper function to escape HTML - make it globally available
   function escapeHtml(text) {
     const map = {
       '&': '&amp;',
@@ -1799,6 +1831,9 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     return String(text).replace(/[&<>"']/g, m => map[m]);
   }
+  
+  // Expose to global scope for inline onclick handlers
+  window.escapeHtml = escapeHtml;
 
   // Handle form submissions with AJAX
   const educationForm = document.getElementById('educationForm');
@@ -1828,10 +1863,82 @@ document.addEventListener('DOMContentLoaded', function() {
       })
       .then(text => {
         console.log('Raw response:', text);
+        alert('Backend Response: ' + text); // POPUP to force you to see the response
         try {
           const data = JSON.parse(text);
+          console.log('Parsed data:', data);
+          alert('Success: ' + data.success + ', ID: ' + data.id); // POPUP
+          
           if (data.success) {
-            // Close the modal first
+            // Get form data for immediate display
+            const formData = new FormData(educationForm);
+            const degree = formData.get('ed_degree');
+            const institution = formData.get('ed_ins');
+            const startYear = formData.get('ed_sy');
+            const endYear = formData.get('ed_ey');
+            const gpa = formData.get('ed_gpa');
+            
+            console.log('📝 Form values - Degree:', degree, 'Institution:', institution);
+            
+            // Immediately add to list for instant feedback (optimistic update)
+            const educationList = document.getElementById('educationList');
+            console.log('Education list element:', educationList);
+            console.log('Data ID:', data.id);
+            
+            alert('About to add item. List exists: ' + (educationList ? 'YES' : 'NO') + ', ID: ' + data.id); // POPUP
+            
+            if (educationList && data.id) {
+              // Create HTML-safe versions
+              const safeDegree = degree ? String(degree).replace(/[&<>"']/g, function(m) {
+                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m];
+              }) : '';
+              const safeInstitution = institution ? String(institution).replace(/[&<>"']/g, function(m) {
+                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m];
+              }) : '';
+              const safeYears = String(startYear) + ' - ' + String(endYear);
+              const safeGpa = gpa ? String(gpa).replace(/[&<>"']/g, function(m) {
+                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m];
+              }) : '';
+              
+              const newItem = document.createElement('div');
+              newItem.className = 'bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow animate-fade-in';
+              newItem.innerHTML = `
+                <div class="flex items-start justify-between">
+                  <div class="flex-1">
+                    <h4 class="font-semibold text-gray-900 text-base">${safeDegree}</h4>
+                    <p class="text-gray-600 mt-1 text-sm">${safeInstitution}</p>
+                    <p class="text-gray-500 text-sm mt-1">
+                      ${safeYears}
+                      ${gpa ? ' | GPA: ' + safeGpa : ''}
+                    </p>
+                  </div>
+                  <div class="flex space-x-1 ml-4">
+                    <button onclick="editEducation(${data.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
+                      <i class="ri-edit-line text-sm"></i>
+                    </button>
+                    <button onclick="deleteEducation(${data.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors" title="Delete">
+                      <i class="ri-delete-bin-line text-sm"></i>
+                    </button>
+                  </div>
+                </div>
+              `;
+              
+              // Remove "no records" message if it exists
+              const noRecordsMsg = educationList.querySelector('.text-center.py-12');
+              if (noRecordsMsg) {
+                noRecordsMsg.remove();
+              }
+              
+              // Add new item at the top
+              educationList.insertBefore(newItem, educationList.firstChild);
+              console.log('✅ Education item added to DOM successfully!');
+              alert('✅ SUCCESS! Item added to DOM! Check the Education section now!'); // POPUP
+            } else {
+              console.log('❌ Could not add education: educationList=' + educationList + ', data.id=' + data.id);
+              alert('❌ FAILED! List: ' + (educationList ? 'exists' : 'null') + ', ID: ' + data.id); // POPUP
+            }
+            
+            // Close the modal
             const educationModal = document.getElementById('educationModal');
             if (educationModal) {
               educationModal.classList.add('hidden');
@@ -1841,9 +1948,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (typeof showNotification === 'function') {
               showNotification(data.message || 'Education saved successfully', 'success');
             }
-            
-            // Reload the education list to show the new item immediately
-            reloadEducationList();
             
             // Reset the form
             educationForm.reset();
@@ -1894,7 +1998,70 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
           const data = JSON.parse(text);
           if (data.success) {
-            // Close the modal first
+            // Get form data for immediate display
+            const formData = new FormData(experienceForm);
+            const jobTitle = formData.get('job_title');
+            const company = formData.get('work_comp');
+            const location = formData.get('work_loc');
+            const startDate = formData.get('start_date');
+            const endDate = formData.get('end_date');
+            const isCurrent = formData.get('is_current');
+            
+            // Immediately add to list for instant feedback
+            const experienceList = document.getElementById('experienceList');
+            console.log('Experience list element:', experienceList);
+            console.log('Data ID:', data.id);
+            
+            if (experienceList && data.id) {
+              // Create HTML-safe versions
+              const safeJobTitle = jobTitle ? String(jobTitle).replace(/[&<>"']/g, function(m) {
+                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m];
+              }) : '';
+              const safeCompany = company ? String(company).replace(/[&<>"']/g, function(m) {
+                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m];
+              }) : '';
+              const safeLocation = location ? String(location).replace(/[&<>"']/g, function(m) {
+                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m];
+              }) : '';
+              
+              const startDateFormatted = new Date(startDate + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+              const endDateFormatted = isCurrent ? 'Present' : (endDate ? new Date(endDate + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : 'Present');
+              const locationText = location ? ' | ' + safeLocation : '';
+              
+              const newItem = document.createElement('div');
+              newItem.className = 'bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow animate-fade-in';
+              newItem.innerHTML = `
+                <div class="flex items-start justify-between">
+                  <div class="flex-1">
+                    <h4 class="font-semibold text-gray-900 text-base">${safeJobTitle}</h4>
+                    <p class="text-gray-600 mt-1 text-sm">${safeCompany}</p>
+                    <p class="text-gray-500 text-sm mt-1">${startDateFormatted} - ${endDateFormatted}${locationText}</p>
+                  </div>
+                  <div class="flex space-x-1 ml-4">
+                    <button onclick="editExperience(${data.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
+                      <i class="ri-edit-line text-sm"></i>
+                    </button>
+                    <button onclick="deleteExperience(${data.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors" title="Delete">
+                      <i class="ri-delete-bin-line text-sm"></i>
+                    </button>
+                  </div>
+                </div>
+              `;
+              
+              // Remove "no records" message if it exists
+              const noRecordsMsg = experienceList.querySelector('.text-center.py-12');
+              if (noRecordsMsg) {
+                noRecordsMsg.remove();
+              }
+              
+              // Add new item at the top
+              experienceList.insertBefore(newItem, experienceList.firstChild);
+              console.log('✅ Experience item added to DOM successfully!');
+            } else {
+              console.log('❌ Could not add experience: experienceList=' + experienceList + ', data.id=' + data.id);
+            }
+            
+            // Close the modal
             const experienceModal = document.getElementById('experienceModal');
             if (experienceModal) {
               experienceModal.classList.add('hidden');
@@ -1904,9 +2071,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (typeof showNotification === 'function') {
               showNotification(data.message || 'Work experience saved successfully', 'success');
             }
-            
-            // Reload the experience list to show the new item immediately
-            reloadExperienceList();
             
             // Reset the form
             experienceForm.reset();
@@ -1957,7 +2121,58 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
           const data = JSON.parse(text);
           if (data.success) {
-            // Close the modal first
+            // Get form data for immediate display
+            const formData = new FormData(skillForm);
+            const skillName = formData.get('skill_name');
+            const skillLevel = parseInt(formData.get('skill_level'));
+            
+            // Immediately add to list for instant feedback
+            const skillsList = document.getElementById('skillsList');
+            console.log('Skills list element:', skillsList);
+            console.log('Data ID:', data.id);
+            console.log('Skill level:', skillLevel);
+            
+            if (skillsList && data.id && skillLevel > 0) {
+              // Create HTML-safe version
+              const safeSkillName = skillName ? String(skillName).replace(/[&<>"']/g, function(m) {
+                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m];
+              }) : '';
+              
+              const stars = '★'.repeat(skillLevel) + '☆'.repeat(5 - skillLevel);
+              
+              const newItem = document.createElement('div');
+              newItem.className = 'bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow animate-fade-in';
+              newItem.innerHTML = `
+                <div class="flex items-start justify-between">
+                  <div class="flex-1">
+                    <h4 class="font-semibold text-gray-900 text-base">${safeSkillName}</h4>
+                    <p class="text-secondary text-sm mt-1">${stars}</p>
+                  </div>
+                  <div class="flex space-x-1 ml-4">
+                    <button onclick="editSkill(${data.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
+                      <i class="ri-edit-line text-sm"></i>
+                    </button>
+                    <button onclick="deleteSkill(${data.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors" title="Delete">
+                      <i class="ri-delete-bin-line text-sm"></i>
+                    </button>
+                  </div>
+                </div>
+              `;
+              
+              // Remove "no records" message if it exists
+              const noRecordsMsg = skillsList.querySelector('.text-center.py-12');
+              if (noRecordsMsg) {
+                noRecordsMsg.remove();
+              }
+              
+              // Add new item at the top
+              skillsList.insertBefore(newItem, skillsList.firstChild);
+              console.log('✅ Skill item added to DOM successfully!');
+            } else {
+              console.log('❌ Could not add skill: skillsList=' + skillsList + ', data.id=' + data.id + ', skillLevel=' + skillLevel);
+            }
+            
+            // Close the modal
             const skillModal = document.getElementById('skillModal');
             if (skillModal) {
               skillModal.classList.add('hidden');
@@ -1968,11 +2183,13 @@ document.addEventListener('DOMContentLoaded', function() {
               showNotification(data.message || 'Skill saved successfully', 'success');
             }
             
-            // Reload the skills list to show the new item immediately
-            reloadSkillsList();
-            
-            // Reset the form
+            // Reset the form and skill level buttons
             skillForm.reset();
+            const skillLevelButtons = document.querySelectorAll('[data-level]');
+            skillLevelButtons.forEach(btn => {
+              btn.classList.remove('bg-primary');
+              btn.classList.add('bg-gray-300');
+            });
           } else {
             if (typeof showNotification === 'function') {
               showNotification(data.message || 'Error saving skill', 'error');
@@ -2079,6 +2296,35 @@ window.showNotification = showNotification;
 </script>
 
 <?php $conn->close(); ?>
+
+<!-- Custom Delete Confirmation Modal -->
+<div id="deleteConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" style="display: none;">
+  <div class="bg-white rounded-xl max-w-md w-full mx-4 p-6 relative z-50" onclick="event.stopPropagation()">
+    <div class="text-center">
+      <!-- Icon -->
+      <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
+        <i class="ri-delete-bin-line text-3xl text-red-600"></i>
+      </div>
+      
+      <!-- Title -->
+      <h3 class="text-xl font-semibold text-gray-900 mb-2">Confirm Delete</h3>
+      
+      <!-- Message -->
+      <p class="text-gray-600 mb-6" id="deleteConfirmMessage">Are you sure you want to delete this item? This action cannot be undone.</p>
+      
+      <!-- Buttons -->
+      <div class="flex gap-3">
+        <button type="button" id="cancelDeleteBtn" onclick="window.handleCancelDelete(event)" class="flex-1 px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium" style="cursor: pointer; z-index: 100; position: relative;">
+          Cancel
+        </button>
+        <button type="button" id="confirmDeleteBtn" onclick="window.handleConfirmDelete(event)" class="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium" style="cursor: pointer; z-index: 100; position: relative;">
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Education Modal -->
 <div id="educationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
   <div class="bg-white rounded-xl max-w-md w-full mx-4">
@@ -2238,29 +2484,35 @@ function editEducation(id) {
 }
 
 function deleteEducation(id) {
-  if (!confirm('Are you sure you want to delete this education record?')) {
-    return;
-  }
-  
-  fetch('save_profile_data.php', {
-    method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: 'delete_education=1&id=' + id
-  })
-  .then(response => response.json())
-  .then(data => {
-    if (data.success) {
-      showNotification(data.message, 'success');
-      reloadEducationList();
-    } else {
-      showNotification('Error: ' + data.message, 'error');
-    }
-  })
-  .catch(error => {
-    console.error('Error:', error);
-    showNotification('Error deleting education record', 'error');
+  showDeleteConfirm('Are you sure you want to delete this education record? This action cannot be undone.', function() {
+    fetch('save_profile_data.php', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'delete_education=1&id=' + id
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        showNotification(data.message, 'success');
+        // Remove item from DOM immediately
+        const educationItems = document.querySelectorAll('#educationList > div');
+        educationItems.forEach(item => {
+          if (item.querySelector(`button[onclick="deleteEducation(${id})"]`)) {
+            item.style.opacity = '0';
+            item.style.transform = 'translateX(-20px)';
+            setTimeout(() => item.remove(), 300);
+          }
+        });
+      } else {
+        showNotification('Error: ' + data.message, 'error');
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      showNotification('Error deleting education record', 'error');
+    });
   });
 }
 
@@ -2302,29 +2554,35 @@ function editExperience(id) {
 }
 
 function deleteExperience(id) {
-  if (!confirm('Are you sure you want to delete this work experience?')) {
-    return;
-  }
-  
-  fetch('save_profile_data.php', {
-    method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: 'delete_experience=1&id=' + id
-  })
-  .then(response => response.json())
-  .then(data => {
-    if (data.success) {
-      showNotification(data.message, 'success');
-      reloadExperienceList();
-    } else {
-      showNotification('Error: ' + data.message, 'error');
-    }
-  })
-  .catch(error => {
-    console.error('Error:', error);
-    showNotification('Error deleting experience record', 'error');
+  showDeleteConfirm('Are you sure you want to delete this work experience? This action cannot be undone.', function() {
+    fetch('save_profile_data.php', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'delete_experience=1&id=' + id
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        showNotification(data.message, 'success');
+        // Remove item from DOM immediately
+        const experienceItems = document.querySelectorAll('#experienceList > div');
+        experienceItems.forEach(item => {
+          if (item.querySelector(`button[onclick="deleteExperience(${id})"]`)) {
+            item.style.opacity = '0';
+            item.style.transform = 'translateX(-20px)';
+            setTimeout(() => item.remove(), 300);
+          }
+        });
+      } else {
+        showNotification('Error: ' + data.message, 'error');
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      showNotification('Error deleting experience record', 'error');
+    });
   });
 }
 
@@ -2366,29 +2624,35 @@ function editSkill(id) {
 }
 
 function deleteSkill(id) {
-  if (!confirm('Are you sure you want to delete this skill?')) {
-    return;
-  }
-  
-  fetch('save_profile_data.php', {
-    method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: 'delete_skill=1&id=' + id
-  })
-  .then(response => response.json())
-  .then(data => {
-    if (data.success) {
-      showNotification(data.message, 'success');
-      reloadSkillsList();
-    } else {
-      showNotification('Error: ' + data.message, 'error');
-    }
-  })
-  .catch(error => {
-    console.error('Error:', error);
-    showNotification('Error deleting skill record', 'error');
+  showDeleteConfirm('Are you sure you want to delete this skill? This action cannot be undone.', function() {
+    fetch('save_profile_data.php', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'delete_skill=1&id=' + id
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        showNotification(data.message, 'success');
+        // Remove item from DOM immediately
+        const skillItems = document.querySelectorAll('#skillsList > div');
+        skillItems.forEach(item => {
+          if (item.querySelector(`button[onclick="deleteSkill(${id})"]`)) {
+            item.style.opacity = '0';
+            item.style.transform = 'translateX(-20px)';
+            setTimeout(() => item.remove(), 300);
+          }
+        });
+      } else {
+        showNotification('Error: ' + data.message, 'error');
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      showNotification('Error deleting skill record', 'error');
+    });
   });
 }
 
@@ -2433,6 +2697,144 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 });
+</script>
+
+<script id="deleteConfirmModal">
+// Custom delete confirmation modal functionality
+let deleteCallback = null;
+
+function showDeleteConfirm(message, callback) {
+  console.log('🚨 showDeleteConfirm called');
+  console.log('Message:', message);
+  console.log('Callback type:', typeof callback);
+  
+  const modal = document.getElementById('deleteConfirmModal');
+  const messageElement = document.getElementById('deleteConfirmMessage');
+  
+  console.log('Modal element:', modal);
+  console.log('Message element:', messageElement);
+  
+  if (modal && messageElement) {
+    messageElement.textContent = message;
+    deleteCallback = callback;
+    
+    // Use both class and inline style for maximum compatibility
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    
+    console.log('✅ Modal should now be visible');
+    console.log('Modal display style:', modal.style.display);
+    console.log('Modal classes:', modal.className);
+  } else {
+    console.error('❌ Modal or message element not found!');
+  }
+}
+
+function hideDeleteConfirm() {
+  console.log('🚪 hideDeleteConfirm called');
+  const modal = document.getElementById('deleteConfirmModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    modal.style.display = 'none';
+    document.body.style.overflow = 'auto';
+    deleteCallback = null;
+    console.log('✅ Modal hidden');
+  } else {
+    console.error('❌ Modal not found in hideDeleteConfirm');
+  }
+}
+
+// Set up event listeners for delete modal - with debugging
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('🔧 Setting up delete modal event listeners...');
+  
+  const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+  const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+  const modal = document.getElementById('deleteConfirmModal');
+  
+  console.log('Cancel button:', cancelDeleteBtn);
+  console.log('Confirm button:', confirmDeleteBtn);
+  console.log('Modal:', modal);
+  
+  if (cancelDeleteBtn) {
+    cancelDeleteBtn.addEventListener('click', function(e) {
+      console.log('❌ Cancel button clicked');
+      e.preventDefault();
+      e.stopPropagation();
+      hideDeleteConfirm();
+    });
+    console.log('✅ Cancel listener added');
+  } else {
+    console.error('❌ Cancel button not found!');
+  }
+  
+  if (confirmDeleteBtn) {
+    confirmDeleteBtn.addEventListener('click', function(e) {
+      console.log('✅ Confirm button clicked');
+      e.preventDefault();
+      e.stopPropagation();
+      if (deleteCallback && typeof deleteCallback === 'function') {
+        console.log('🗑️ Executing delete callback...');
+        deleteCallback();
+      } else {
+        console.error('❌ No delete callback function!');
+      }
+      hideDeleteConfirm();
+    });
+    console.log('✅ Confirm listener added');
+  } else {
+    console.error('❌ Confirm button not found!');
+  }
+  
+  // Close modal when clicking outside
+  if (modal) {
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) {
+        console.log('🚪 Clicked outside modal, closing...');
+        hideDeleteConfirm();
+      }
+    });
+    console.log('✅ Backdrop click listener added');
+  } else {
+    console.error('❌ Modal not found!');
+  }
+  
+  console.log('✅ Delete modal setup complete');
+});
+
+// Inline onclick handlers for buttons
+window.handleCancelDelete = function(event) {
+  console.log('🔴 handleCancelDelete called via onclick');
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  hideDeleteConfirm();
+};
+
+window.handleConfirmDelete = function(event) {
+  console.log('🔴 handleConfirmDelete called via onclick');
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  
+  if (deleteCallback && typeof deleteCallback === 'function') {
+    console.log('🗑️ Executing delete callback...');
+    deleteCallback();
+  } else {
+    console.error('❌ No delete callback function!');
+  }
+  
+  hideDeleteConfirm();
+};
+
+// Make functions globally available
+window.showDeleteConfirm = showDeleteConfirm;
+window.hideDeleteConfirm = hideDeleteConfirm;
 </script>
 
 <script id="passwordVisibilityToggle">
@@ -2497,6 +2899,20 @@ function togglePasswordVisibility(inputId, button) {
       if (newPwd.length < 8) {
         console.log('Validation failed: Password too short');
         showToast('New password must be at least 8 characters long', 'error');
+        return;
+      }
+      
+      // Validate password contains numbers
+      if (!/[0-9]/.test(newPwd)) {
+        console.log('Validation failed: Password must contain numbers');
+        showToast('Password must contain at least one number', 'error');
+        return;
+      }
+      
+      // Validate password contains symbols
+      if (!/[^A-Za-z0-9]/.test(newPwd)) {
+        console.log('Validation failed: Password must contain symbols');
+        showToast('Password must contain at least one symbol (e.g., !@#$%^&*)', 'error');
         return;
       }
       

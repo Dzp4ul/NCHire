@@ -16,12 +16,30 @@ if (!isset($_SESSION['password_change_required']) || $_SESSION['password_change_
 // Database connection
 $host = "127.0.0.1";
 $user = "root";
-$pass = "12345678";
+$pass = "";
 $dbname = "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
+}
+
+// Ensure admin_name and admin_role are in session
+if (!isset($_SESSION['admin_name']) || !isset($_SESSION['admin_role'])) {
+    // Fetch from database using admin_id
+    if (isset($_SESSION['admin_id'])) {
+        $fetch_stmt = $conn->prepare("SELECT full_name, role FROM admin_users WHERE id = ?");
+        $fetch_stmt->bind_param("i", $_SESSION['admin_id']);
+        $fetch_stmt->execute();
+        $fetch_result = $fetch_stmt->get_result();
+        
+        if ($fetch_result->num_rows > 0) {
+            $admin_data = $fetch_result->fetch_assoc();
+            $_SESSION['admin_name'] = $admin_data['full_name'];
+            $_SESSION['admin_role'] = $admin_data['role'];
+        }
+        $fetch_stmt->close();
+    }
 }
 
 $error = '';
@@ -60,8 +78,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Log the activity
             $activity_stmt = $conn->prepare("INSERT INTO admin_activity (activity_type, description, user_name, created_at) VALUES (?, ?, ?, NOW())");
             $activity_type = "password_changed";
-            $activity_desc = "{$_SESSION['admin_name']} changed their password";
-            $activity_stmt->bind_param("sss", $activity_type, $activity_desc, $_SESSION['admin_name']);
+            $admin_name = $_SESSION['admin_name'] ?? 'Unknown Admin';
+            $activity_desc = "{$admin_name} changed their password";
+            $activity_stmt->bind_param("sss", $activity_type, $activity_desc, $admin_name);
             $activity_stmt->execute();
             
             // Clear only admin session (keep applicant login if exists)
@@ -107,7 +126,7 @@ $conn->close();
         }
     </script>
 </head>
-<body class="relative min-h-screen flex items-center justify-center p-4" style="background-image: url('../assets/images/520382375_1065446909052636_3412465913398569974_n.jpg'); background-size: cover; background-position: center; background-attachment: fixed;">
+<body class="relative min-h-screen flex items-center justify-center p-4" style="background-image: url('../public/assets/images/520382375_1065446909052636_3412465913398569974_n.jpg'); background-size: cover; background-position: center; background-attachment: fixed;">
     <!-- Dark Overlay -->
     <div class="absolute inset-0 bg-primary bg-opacity-80"></div>
     
@@ -115,7 +134,7 @@ $conn->close();
     <div class="relative z-10 max-w-md w-full">
         <!-- Logo -->
         <div class="text-center mb-8">
-            <img src="../assets/images/image-removebg-preview (1).png" 
+            <img src="../public/assets/images/image-removebg-preview (1).png" 
                  alt="NCHire Logo" class="w-20 h-20 mx-auto mb-4">
             <h1 class="text-3xl font-bold text-white">NCHire Admin</h1>
             <p class="text-gray-200 mt-2">Norzagaray College</p>
@@ -139,8 +158,8 @@ $conn->close();
                     </div>
                     <div class="ml-3">
                         <p class="text-sm text-gray-700">
-                            <strong>Logged in as:</strong> <?php echo htmlspecialchars($_SESSION['admin_name']); ?><br>
-                            <strong>Role:</strong> <?php echo htmlspecialchars($_SESSION['admin_role']); ?>
+                            <strong>Logged in as:</strong> <?php echo htmlspecialchars($_SESSION['admin_name'] ?? 'Unknown'); ?><br>
+                            <strong>Role:</strong> <?php echo htmlspecialchars($_SESSION['admin_role'] ?? 'Unknown'); ?>
                         </p>
                     </div>
                 </div>
@@ -184,7 +203,7 @@ $conn->close();
                                    placeholder="Enter new password (min. 8 characters)">
                             <button type="button" onclick="togglePassword('newPassword', 'newPasswordIcon')"
                                     class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700">
-                                <i id="newPasswordIcon" class="fas fa-eye"></i>
+                                <i id="newPasswordIcon" class="fas fa-eye-slash"></i>
                             </button>
                         </div>
                     </div>
@@ -199,7 +218,7 @@ $conn->close();
                                    placeholder="Confirm your new password">
                             <button type="button" onclick="togglePassword('confirmPassword', 'confirmPasswordIcon')"
                                     class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700">
-                                <i id="confirmPasswordIcon" class="fas fa-eye"></i>
+                                <i id="confirmPasswordIcon" class="fas fa-eye-slash"></i>
                             </button>
                         </div>
                     </div>
@@ -242,12 +261,12 @@ $conn->close();
             
             if (input.type === 'password') {
                 input.type = 'text';
-                icon.classList.remove('fa-eye');
-                icon.classList.add('fa-eye-slash');
-            } else {
-                input.type = 'password';
                 icon.classList.remove('fa-eye-slash');
                 icon.classList.add('fa-eye');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
             }
         }
     </script>
