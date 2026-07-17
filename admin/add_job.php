@@ -44,6 +44,10 @@ $training = $data["training"] ?? '';
 $eligibility = $data["eligibility"] ?? '';
 $competency = $data["competency"] ?? '';
 
+if ($department === 'Computer Science') {
+    $department = 'Computing Studies';
+}
+
 try {
     // Use prepared statements with new fields
     $sql = "INSERT INTO job (job_title, department_role, job_type, locations, salary_range, application_deadline, subject, job_description, job_requirements, education, experience, training, eligibility, competency) 

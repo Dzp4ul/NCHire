@@ -3995,7 +3995,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                 <select name="department_role" id="editDepartment" required
                                         class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
                                     <option value="">Select department</option>
-                                    <option value="Computer Science">Computer Science</option>
+                                    <option value="Computing Studies">Computing Studies</option>
                                     <option value="Hospitality Management">Hospitality Management</option>
                                     <option value="Education">Education</option>
                                 </select>
@@ -4304,7 +4304,7 @@ $recent_activity = $conn->query($recent_activity_query);
                 <label class="block text-sm font-medium text-gray-700 mb-2">Department</label>
                 <select id="jobDepartmentFilter" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                     <option value="all">All Departments</option>
-                    <option value="Computer Science">Computer Science</option>
+                    <option value="Computing Studies">Computing Studies</option>
                     <option value="Hospitality Management">Hospitality Management</option>
                     <option value="Education">Education</option>
                 </select>

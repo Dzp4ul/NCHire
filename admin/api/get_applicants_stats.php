@@ -15,6 +15,7 @@ try {
     // Get admin role and department from session
     $admin_role = $_SESSION['admin_role'] ?? 'Admin';
     $admin_department = $_SESSION['admin_department'] ?? '';
+    $department_alias = $admin_department === 'Computing Studies' ? 'Computer Science' : ($admin_department === 'Computer Science' ? 'Computing Studies' : $admin_department);
     $admin_id = $_SESSION['admin_id'] ?? 1;
 
     $stats = [
@@ -81,9 +82,10 @@ try {
                 WHERE workflow_stage IN ('department_head_review', 'interview_scheduled', 'interview_completed',
                                         'demo_scheduled', 'demo_completed', 'psych_scheduled', 'psych_completed',
                                         'initially_hired', 'permanently_hired', 'hired')
-                AND assigned_to_department = :department";
+                AND assigned_to_department IN (:department, :department_alias)";
         $stmt = $pdo->prepare($sql);
         $stmt->bindValue(':department', $admin_department);
+        $stmt->bindValue(':department_alias', $department_alias);
         $stmt->execute();
         $stats['total_applicants'] = $stmt->fetchColumn();
 
@@ -91,9 +93,10 @@ try {
         $sql = "SELECT COUNT(*) as count 
                 FROM job_applicants 
                 WHERE status = 'Interview Scheduled'
-                AND assigned_to_department = :department";
+                AND assigned_to_department IN (:department, :department_alias)";
         $stmt = $pdo->prepare($sql);
         $stmt->bindValue(':department', $admin_department);
+        $stmt->bindValue(':department_alias', $department_alias);
         $stmt->execute();
         $stats['interview_scheduled'] = $stmt->fetchColumn();
 
@@ -101,9 +104,10 @@ try {
         $sql = "SELECT COUNT(*) as count 
                 FROM job_applicants 
                 WHERE status = 'Demo Scheduled'
-                AND assigned_to_department = :department";
+                AND assigned_to_department IN (:department, :department_alias)";
         $stmt = $pdo->prepare($sql);
         $stmt->bindValue(':department', $admin_department);
+        $stmt->bindValue(':department_alias', $department_alias);
         $stmt->execute();
         $stats['demo_scheduled'] = $stmt->fetchColumn();
 
@@ -111,9 +115,10 @@ try {
         $sql = "SELECT COUNT(*) as count 
                 FROM job_applicants 
                 WHERE status IN ('Initially Hired', 'Permanently Hired', 'Hired')
-                AND assigned_to_department = :department";
+                AND assigned_to_department IN (:department, :department_alias)";
         $stmt = $pdo->prepare($sql);
         $stmt->bindValue(':department', $admin_department);
+        $stmt->bindValue(':department_alias', $department_alias);
         $stmt->execute();
         $stats['hired'] = $stmt->fetchColumn();
     }
@@ -123,9 +128,10 @@ try {
         $sql = "SELECT COUNT(*) as count 
                 FROM job_applicants 
                 WHERE status != 'Rejected'
-                AND assigned_to_department = :department";
+                AND assigned_to_department IN (:department, :department_alias)";
         $stmt = $pdo->prepare($sql);
         $stmt->bindValue(':department', $admin_department);
+        $stmt->bindValue(':department_alias', $department_alias);
         $stmt->execute();
         $stats['total_applicants'] = $stmt->fetchColumn();
 
@@ -133,9 +139,10 @@ try {
         $sql = "SELECT COUNT(*) as count 
                 FROM job_applicants 
                 WHERE status = 'Interview Scheduled'
-                AND assigned_to_department = :department";
+                AND assigned_to_department IN (:department, :department_alias)";
         $stmt = $pdo->prepare($sql);
         $stmt->bindValue(':department', $admin_department);
+        $stmt->bindValue(':department_alias', $department_alias);
         $stmt->execute();
         $stats['interview_scheduled'] = $stmt->fetchColumn();
 
@@ -143,9 +150,10 @@ try {
         $sql = "SELECT COUNT(*) as count 
                 FROM job_applicants 
                 WHERE status = 'Demo Scheduled'
-                AND assigned_to_department = :department";
+                AND assigned_to_department IN (:department, :department_alias)";
         $stmt = $pdo->prepare($sql);
         $stmt->bindValue(':department', $admin_department);
+        $stmt->bindValue(':department_alias', $department_alias);
         $stmt->execute();
         $stats['demo_scheduled'] = $stmt->fetchColumn();
 
@@ -153,9 +161,10 @@ try {
         $sql = "SELECT COUNT(*) as count 
                 FROM job_applicants 
                 WHERE status IN ('Initially Hired', 'Permanently Hired', 'Hired')
-                AND assigned_to_department = :department";
+                AND assigned_to_department IN (:department, :department_alias)";
         $stmt = $pdo->prepare($sql);
         $stmt->bindValue(':department', $admin_department);
+        $stmt->bindValue(':department_alias', $department_alias);
         $stmt->execute();
         $stats['hired'] = $stmt->fetchColumn();
     }

@@ -22,7 +22,11 @@ if (!isset($data['id'])) {
 
 $id = (int)$data['id'];
 $title = $conn->real_escape_string($data['job_title']);
-$dept  = $conn->real_escape_string($data['department_role']);
+$department = $data['department_role'] ?? '';
+if ($department === 'Computer Science') {
+    $department = 'Computing Studies';
+}
+$dept  = $conn->real_escape_string($department);
 $type  = $conn->real_escape_string($data['job_type']);
 $loc   = $conn->real_escape_string($data['locations']);
 $salary= $conn->real_escape_string($data['salary_range']);

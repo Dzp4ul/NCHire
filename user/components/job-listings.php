@@ -26,7 +26,7 @@
         </div>
         <select id="departmentFilter" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
             <option value="">All Departments</option>
-            <option value="Computer Science">Computer Science</option>
+            <option value="Computing Studies">Computing Studies</option>
             <option value="Education">Education</option>
             <option value="Hospitality Management">Hospitality Management</option>
         </select>

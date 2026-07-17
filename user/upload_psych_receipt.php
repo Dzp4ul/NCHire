@@ -87,7 +87,8 @@ try {
     // Update database - set receipt filename and change status to "Psychological Exam"
     $update_stmt = $conn->prepare("UPDATE job_applicants SET 
                                     psych_exam_receipt = ?,
-                                    status = 'Psychological Exam'
+                                    status = 'Psychological Exam',
+                                    workflow_stage = 'psych_completed'
                                     WHERE id = ?");
     $update_stmt->bind_param("si", $filename, $application_id);
 

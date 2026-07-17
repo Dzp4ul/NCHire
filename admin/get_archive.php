@@ -18,6 +18,7 @@ if ($conn->connect_error) {
 // Get admin role and department from session
 $admin_role = $_SESSION['admin_role'] ?? 'Admin';
 $admin_department = $_SESSION['admin_department'] ?? '';
+$department_alias = $admin_department === 'Computing Studies' ? 'Computer Science' : ($admin_department === 'Computer Science' ? 'Computing Studies' : $admin_department);
 
 // Admin role should NOT see archived applications - return empty array
 if ($admin_role === 'Admin') {
@@ -72,11 +73,11 @@ if ($admin_role === 'Secretary') {
               FROM job_applicants ja
               LEFT JOIN applicants a ON ja.user_id = a.id
               WHERE ja.workflow_stage IN ('rejected', 'cancelled')
-              AND ja.assigned_to_department = ?
+              AND ja.assigned_to_department IN (?, ?)
               ORDER BY ja.rejected_date DESC";
     
     $stmt = $conn->prepare($query);
-    $stmt->bind_param("s", $admin_department);
+    $stmt->bind_param("ss", $admin_department, $department_alias);
     $stmt->execute();
     $result = $stmt->get_result();
     

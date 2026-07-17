@@ -2628,6 +2628,7 @@ function updateActionButtons(status, applicant = null) {
     if (approveDemoBtn) approveDemoBtn.classList.add('hidden');
     if (rescheduleDemoBtn) rescheduleDemoBtn.classList.add('hidden');
     if (hireBtn) hireBtn.classList.add('hidden');
+    if (permanentHireBtn) permanentHireBtn.classList.add('hidden');
     if (resubmitBtn) resubmitBtn.classList.add('hidden');
     if (rejectBtn) rejectBtn.classList.add('hidden');
     
@@ -2717,7 +2718,9 @@ function updateActionButtons(status, applicant = null) {
         if (workflowStage && (workflowStage.startsWith('department_head') || 
             workflowStage === 'interview_scheduled' || workflowStage === 'interview_completed' ||
             workflowStage === 'demo_scheduled' || workflowStage === 'demo_completed' ||
-            workflowStage === 'hired' || workflowStage === 'initially_hired')) {
+            workflowStage === 'psych_scheduled' || workflowStage === 'psych_completed' ||
+            workflowStage === 'hired' || workflowStage === 'initially_hired' ||
+            workflowStage === 'permanently_hired')) {
             // Show info message for Secretary viewing transferred application
             const actionButtonsContainer = document.getElementById('actionButtons');
             if (actionButtonsContainer && !actionButtonsContainer.querySelector('.transfer-info')) {
@@ -2811,6 +2814,52 @@ function updateActionButtons(status, applicant = null) {
             }
         }
         
+        if (rejectBtn) rejectBtn.classList.remove('hidden');
+        return;
+    }
+
+    // PSYCH EXAM: Wait for receipt, then allow Dean to hire.
+    if (workflowStage === 'psych_scheduled' || workflowStage === 'psych_completed') {
+        const actionButtonsContainer = document.getElementById('actionButtons');
+
+        if (hireBtn) {
+            hireBtn.classList.remove('hidden');
+
+            if (!hasPsychReceipt) {
+                hireBtn.disabled = true;
+                hireBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                hireBtn.title = 'Waiting for psychological exam receipt';
+
+                if (actionButtonsContainer && !actionButtonsContainer.querySelector('.psych-indicator')) {
+                    const indicatorDiv = document.createElement('div');
+                    indicatorDiv.className = 'psych-indicator bg-yellow-50 border border-yellow-300 rounded-lg p-4 mb-3';
+                    indicatorDiv.innerHTML = `
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-hourglass-half text-yellow-600 mt-1"></i>
+                            <div>
+                                <h4 class="font-semibold text-yellow-900 text-sm">Waiting for Psychological Exam Receipt</h4>
+                                <p class="text-xs text-yellow-700 mt-1">
+                                    The applicant must upload the psychological exam receipt before hiring can proceed.
+                                </p>
+                            </div>
+                        </div>
+                    `;
+                    actionButtonsContainer.prepend(indicatorDiv);
+                }
+            } else {
+                hireBtn.disabled = false;
+                hireBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                hireBtn.title = '';
+            }
+        }
+
+        if (rejectBtn) rejectBtn.classList.remove('hidden');
+        return;
+    }
+
+    // INITIALLY HIRED: Allow final hiring confirmation.
+    if (workflowStage === 'initially_hired') {
+        if (permanentHireBtn) permanentHireBtn.classList.remove('hidden');
         if (rejectBtn) rejectBtn.classList.remove('hidden');
         return;
     }

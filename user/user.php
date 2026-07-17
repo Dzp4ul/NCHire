@@ -545,6 +545,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         $job_dept_result = $job_dept_stmt->get_result();
         if ($job_dept_row = $job_dept_result->fetch_assoc()) {
             $job_department = $job_dept_row['department_role'];
+            if ($job_department === 'Computer Science') {
+                $job_department = 'Computing Studies';
+            }
         }
         $job_dept_stmt->close();
     }

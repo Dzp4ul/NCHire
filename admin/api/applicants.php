@@ -23,6 +23,7 @@ function loadApplicants() {
     // Get admin role and department from session
     $admin_role = $_SESSION['admin_role'] ?? '';
     $admin_department = $_SESSION['admin_department'] ?? '';
+    $department_alias = $admin_department === 'Computing Studies' ? 'Computer Science' : ($admin_department === 'Computer Science' ? 'Computing Studies' : $admin_department);
     
     // Build query based on role and workflow stage
     $where_conditions = [];
@@ -43,17 +44,19 @@ function loadApplicants() {
                                                      'demo_scheduled', 'demo_completed', 'psych_scheduled', 'psych_completed',
                                                      'initially_hired', 'permanently_hired', 'hired')";
         if (!empty($admin_department)) {
-            $where_conditions[] = "assigned_to_department = ?";
+            $where_conditions[] = "assigned_to_department IN (?, ?)";
             $params[] = $admin_department;
-            $types .= 's';
+            $params[] = $department_alias;
+            $types .= 'ss';
         }
     }
     // HR Manager and Recruiter: See all applications in their department
     elseif ($admin_role === 'HR Manager' || $admin_role === 'Recruiter') {
         if (!empty($admin_department)) {
-            $where_conditions[] = "assigned_to_department = ?";
+            $where_conditions[] = "assigned_to_department IN (?, ?)";
             $params[] = $admin_department;
-            $types .= 's';
+            $params[] = $department_alias;
+            $types .= 'ss';
         }
     }
     
