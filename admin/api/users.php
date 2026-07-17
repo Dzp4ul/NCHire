@@ -428,14 +428,14 @@ switch ($method) {
         }
         
         // Prevent deleting the last admin
-        $count_admins = $conn->query("SELECT COUNT(*) as count FROM admin_users WHERE role = 'Admin'");
+        $count_admins = $conn->query("SELECT COUNT(*) as count FROM admin_users WHERE role = 'SuperAdmin'");
         $admin_count = $count_admins->fetch_assoc()['count'];
         
         if ($admin_count <= 1) {
             $check_role = $conn->query("SELECT role FROM admin_users WHERE id = $id");
             if ($check_role && $check_role->num_rows > 0) {
                 $user_role = $check_role->fetch_assoc()['role'];
-                if ($user_role === 'Admin') {
+                if ($user_role === 'SuperAdmin') {
                     echo json_encode(['success' => false, 'message' => 'Cannot delete the last admin user']);
                     break;
                 }

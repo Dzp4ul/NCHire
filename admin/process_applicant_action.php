@@ -234,8 +234,8 @@ try {
                                                    banned_by = ?,
                                                    rejection_count = rejection_count + 1
                                                WHERE id = ?");
-                    $ban_by = "Department Head: $admin_name";
-                    $ban_reason = "Application rejected by Department Head. Reason: $rejection_reason";
+                    $ban_by = "Dean: $admin_name";
+                    $ban_reason = "Application rejected by Dean. Reason: $rejection_reason";
                     $ban_stmt->bind_param("sssi", $ban_expires, $ban_reason, $ban_by, $user_id);
                     $ban_stmt->execute();
                     $ban_stmt->close();
@@ -245,7 +245,7 @@ try {
                                                (applicant_id, applicant_email, application_id, banned_date, 
                                                 ban_expires, ban_reason, banned_by_id, banned_by_name, 
                                                 banned_by_role, rejection_reason, position_applied)
-                                               VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, 'Department Head', ?, ?)");
+                                               VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, 'Dean', ?, ?)");
                     $position = $applicant_data['position'] ?? 'Unknown Position';
                     $log_stmt->bind_param("isisissss", $user_id, $applicant_data['applicant_email'], 
                                          $applicant_id, $ban_expires, $ban_reason, 

@@ -16,19 +16,19 @@ if ($conn->connect_error) {
 }
 
 // Get admin role and department from session
-$admin_role = $_SESSION['admin_role'] ?? 'Admin';
+$admin_role = $_SESSION['admin_role'] ?? 'SuperAdmin';
 $admin_department = $_SESSION['admin_department'] ?? '';
 $department_alias = $admin_department === 'Computing Studies' ? 'Computer Science' : ($admin_department === 'Computer Science' ? 'Computing Studies' : $admin_department);
 
-// Admin role should NOT see archived applications - return empty array
-if ($admin_role === 'Admin') {
+// SuperAdmin role should NOT see archived applications - return empty array
+if ($admin_role === 'SuperAdmin') {
     echo json_encode([]);
     $conn->close();
     exit();
 }
 
-// Secretary, Department Heads, HR Managers, and Recruiters can see archived applications
-// Secretary sees all rejected and cancelled, others filtered by department
+// Secretary, Deans can see archived applications
+// Secretary sees all rejected and cancelled, Deans filtered by department
 if ($admin_role === 'Secretary') {
     $query = "SELECT 
                 ja.id,
@@ -57,7 +57,7 @@ if ($admin_role === 'Secretary') {
     }
     
     echo json_encode($archived);
-} elseif (($admin_role === 'Department Head' || $admin_role === 'HR Manager' || $admin_role === 'Recruiter') && !empty($admin_department)) {
+} elseif ($admin_role === 'Dean' && !empty($admin_department)) {
     $query = "SELECT 
                 ja.id,
                 ja.full_name,

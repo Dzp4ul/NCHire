@@ -13,12 +13,12 @@ try {
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
     // Get admin role and department from session
-    $admin_role = $_SESSION['admin_role'] ?? 'Admin';
+    $admin_role = $_SESSION['admin_role'] ?? 'SuperAdmin';
     $admin_department = $_SESSION['admin_department'] ?? '';
     $department_alias = $admin_department === 'Computing Studies' ? 'Computer Science' : ($admin_department === 'Computer Science' ? 'Computing Studies' : $admin_department);
 
-    // Admin role should NOT see applications - return empty array
-    if ($admin_role === 'Admin') {
+    // SuperAdmin role should NOT see applications - return empty array
+    if ($admin_role === 'SuperAdmin') {
         echo json_encode([]);
         exit();
     }
@@ -56,8 +56,8 @@ try {
                 ja.applied_date DESC";
         $params['secretary_id'] = $_SESSION['admin_id'] ?? 1;
     }
-    // Department Head: Only see applications transferred to them
-    elseif ($admin_role === 'Department Head' && !empty($admin_department)) {
+    // Dean: Only see applications transferred to them
+    elseif ($admin_role === 'Dean' && !empty($admin_department)) {
         $sql = "
             SELECT 
                 ja.id, 
@@ -80,29 +80,6 @@ try {
         $params['department'] = $admin_department;
         $params['department_alias'] = $department_alias;
     }
-    // HR Manager and Recruiter: See all applications in their department (except rejected)
-    elseif (($admin_role === 'HR Manager' || $admin_role === 'Recruiter') && !empty($admin_department)) {
-        $sql = "
-            SELECT 
-                ja.id, 
-                ja.full_name, 
-                ja.position, 
-                ja.applied_date, 
-                ja.status, 
-                ja.applicant_email, 
-                ja.contact_num,
-                ja.assigned_to_department,
-                ja.workflow_stage,
-                a.profile_picture
-            FROM job_applicants ja
-            LEFT JOIN applicants a ON ja.user_id = a.id
-            WHERE ja.status != 'Rejected'
-            AND ja.assigned_to_department IN (:department, :department_alias)
-            ORDER BY ja.applied_date DESC";
-        $params['department'] = $admin_department;
-        $params['department_alias'] = $department_alias;
-    }
-    
     // Execute query if SQL was built
     if (!empty($sql)) {
         $stmt = $pdo->prepare($sql);

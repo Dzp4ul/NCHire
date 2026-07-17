@@ -22,7 +22,7 @@ if ($conn->connect_error) {
 }
 
 // Get admin info from session
-$admin_role = $_SESSION['admin_role'] ?? 'Admin';
+$admin_role = $_SESSION['admin_role'] ?? 'SuperAdmin';
 $admin_department = $_SESSION['admin_department'] ?? '';
 
 // Get filters from URL parameters
@@ -33,7 +33,7 @@ $semester = isset($_GET['semester']) ? $_GET['semester'] : '';
 $department_filter = "";
 $department_params = [];
 
-if (($admin_role === 'Department Head' || $admin_role === 'HR Manager' || $admin_role === 'Recruiter') && !empty($admin_department)) {
+if ($admin_role === 'Dean' && !empty($admin_department)) {
     $department_filter = " AND assigned_to_department = ?";
     $department_params[] = $admin_department;
 }

@@ -251,7 +251,7 @@ function handleTransferToDeptHead($conn, $application_id, $application, $secreta
         if ($department) {
             try {
                 $department_alias = departmentAlias($department);
-                $dept_head_stmt = $conn->prepare("SELECT id, full_name, email, department FROM admin_users WHERE role = 'Department Head' AND department IN (?, ?) AND status = 'Active' LIMIT 1");
+                $dept_head_stmt = $conn->prepare("SELECT id, full_name, email, department FROM admin_users WHERE role = 'Dean' AND department IN (?, ?) AND status = 'Active' LIMIT 1");
                 $dept_head_stmt->bind_param("ss", $department, $department_alias);
                 $dept_head_stmt->execute();
                 $dept_head_result = $dept_head_stmt->get_result();
@@ -317,7 +317,7 @@ function handleTransferToDeptHead($conn, $application_id, $application, $secreta
                 } else {
                     error_log("❌ No active department head found for department: $department");
                     // Show available department heads for debugging
-                    $all_dept_heads = $conn->query("SELECT id, full_name, department, role, status FROM admin_users WHERE role = 'Department Head'");
+                    $all_dept_heads = $conn->query("SELECT id, full_name, department, role, status FROM admin_users WHERE role = 'Dean'");
                     if ($all_dept_heads && $all_dept_heads->num_rows > 0) {
                         error_log("Available department heads:");
                         while ($dh = $all_dept_heads->fetch_assoc()) {

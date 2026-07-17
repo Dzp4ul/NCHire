@@ -45,14 +45,14 @@ if (isset($_SESSION['admin_id'])) {
 
 // Get admin info from session
 $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
-$admin_role = $_SESSION['admin_role'] ?? 'Admin';
+$admin_role = $_SESSION['admin_role'] ?? 'SuperAdmin';
 $admin_profile_picture = $_SESSION['admin_profile_picture'] ?? '';
 $admin_email = $_SESSION['admin_email'] ?? '';
 $admin_department = $_SESSION['admin_department'] ?? '';
 
-// Helper function to display role name (converts Department Head to Dean for display)
+// Helper function to display role name
 function displayRoleName($role) {
-    return $role === 'Department Head' ? 'Dean' : $role;
+    return $role;
 }
 $admin_role_display = displayRoleName($admin_role);
 
@@ -75,13 +75,13 @@ $show_applicant_stats = false;
 $department_filter = "";
 $department_params = [];
 
-// Admin and Secretary see all departments
-if ($admin_role === 'Admin' || $admin_role === 'Secretary') {
+// SuperAdmin and Secretary see all departments
+if ($admin_role === 'SuperAdmin' || $admin_role === 'Secretary') {
     $show_applicant_stats = true;
     // No department filter - they see everything
 }
-// Department Head, HR, Recruiter see only their department
-else if (($admin_role === 'Department Head' || $admin_role === 'HR Manager' || $admin_role === 'Recruiter') && !empty($admin_department)) {
+// Deans see only their department
+else if ($admin_role === 'Dean' && !empty($admin_department)) {
     $show_applicant_stats = true;
     $department_filter = " AND assigned_to_department = ?";
     $department_params[] = $admin_department;
@@ -235,12 +235,12 @@ if ($show_applicant_stats) {
 
 // Get recent applications (last 5)
 if ($show_applicant_stats && !empty($department_params)) {
-    // Department-filtered view for Department Heads/HR/Recruiters
+    // Department-filtered view for Deans
     $stmt = $conn->prepare("SELECT * FROM job_applicants WHERE 1=1" . $department_filter . " ORDER BY applied_date DESC LIMIT 5");
     $stmt->bind_param("s", ...$department_params);
     $stmt->execute();
     $recent_applicants = $stmt->get_result();
-} else if ($admin_role === 'Admin' || $admin_role === 'Secretary') {
+} else if ($admin_role === 'SuperAdmin' || $admin_role === 'Secretary') {
     // Admin and Secretary see ALL applications from all departments
     $recent_applicants = $conn->query("SELECT * FROM job_applicants ORDER BY applied_date DESC LIMIT 5");
 } else {
@@ -559,13 +559,13 @@ $recent_activity = $conn->query($recent_activity_query);
                 <i class="fas fa-chart-line w-5 h-5"></i>
                 Dashboard
             </button>
-            <?php if ($admin_role !== 'Admin'): ?>
+            <?php if ($admin_role !== 'SuperAdmin'): ?>
             <button onclick="showSection('jobs')" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg mb-2 text-gray-700 hover:bg-gray-100">
                 <i class="fas fa-briefcase w-5 h-5"></i>
                 Job Postings
             </button>
             <?php endif; ?>
-            <?php if ($admin_role === 'Secretary' || $admin_role === 'Department Head' || $admin_role === 'HR Manager' || $admin_role === 'Recruiter'): ?>
+            <?php if ($admin_role === 'Secretary' || $admin_role === 'Dean'): ?>
             <button onclick="showSection('applicants')" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg mb-2 text-gray-700 hover:bg-gray-100">
                 <i class="fas fa-user-check w-5 h-5"></i>
                 Applicants
@@ -575,7 +575,7 @@ $recent_activity = $conn->query($recent_activity_query);
                 Archive
             </button>
             <?php endif; ?>
-            <?php if ($admin_role === 'Admin'): ?>
+            <?php if ($admin_role === 'SuperAdmin'): ?>
             <button onclick="showSection('users')" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg mb-2 text-gray-700 hover:bg-gray-100">
                 <i class="fas fa-users w-5 h-5"></i>
                 Users
@@ -723,7 +723,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                     <?php 
                                     if ($admin_role === 'Secretary') {
                                         echo 'Pending Review';
-                                    } else if ($admin_role === 'Department Head') {
+                                    } else if ($admin_role === 'Dean') {
                                         echo 'Dept. Pending';
                                     } else {
                                         echo 'Pending Reviews';
@@ -734,7 +734,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                     <?php 
                                     if ($admin_role === 'Secretary') {
                                         echo $stats['secretary_pending'];
-                                    } else if ($admin_role === 'Department Head') {
+                                    } else if ($admin_role === 'Dean') {
                                         echo $stats['dept_pending'];
                                     } else {
                                         echo ($stats['secretary_pending'] + $stats['dept_pending']);
@@ -956,7 +956,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                     text.includes('logged in') || 
                                     text.includes('Admin logged') ||
                                     text.includes('Secretary logged') ||
-                                    text.includes('Department Head logged')) {
+                                    text.includes('Dean logged')) {
                                     item.style.display = 'none';
                                 }
                             }
@@ -1532,7 +1532,7 @@ $recent_activity = $conn->query($recent_activity_query);
             </div>
 
             <!-- Users Section (Admin Only) -->
-            <?php if ($admin_role === 'Admin'): ?>
+            <?php if ($admin_role === 'SuperAdmin'): ?>
             <div id="usersSection" class="section hidden">
                 <div class="flex items-center justify-between mb-6">
                     <h1 class="text-3xl font-bold text-gray-900">Users</h1>
@@ -1561,8 +1561,8 @@ $recent_activity = $conn->query($recent_activity_query);
                                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                                     onchange="filterUsers()">
                                 <option value="">All Roles</option>
-                                <option value="Admin">Admin</option>
-                                <option value="Department Head">Dean</option>
+                                <option value="SuperAdmin">Admin</option>
+                                <option value="Dean">Dean</option>
                                 <option value="Secretary">Secretary</option>
                             </select>
                         </div>
@@ -2619,8 +2619,8 @@ $recent_activity = $conn->query($recent_activity_query);
                             <select name="role" id="createUserRole" required
                                     class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                                 <option value="">Select role</option>
-                                <option value="Admin">Admin</option>
-                                <option value="Department Head">Dean</option>
+                                <option value="SuperAdmin">Admin</option>
+                                <option value="Dean">Dean</option>
                                 <option value="Secretary">Secretary</option>
                             </select>
                         </div>
@@ -2738,8 +2738,8 @@ $recent_activity = $conn->query($recent_activity_query);
                             <select name="role" id="editUserRole" required
                                     class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                                 <option value="">Select role</option>
-                                <option value="Admin">Admin</option>
-                                <option value="Department Head">Dean</option>
+                                <option value="SuperAdmin">Admin</option>
+                                <option value="Dean">Dean</option>
                                 <option value="Secretary">Secretary</option> 
                             </select>
                         </div>
@@ -3328,7 +3328,7 @@ $recent_activity = $conn->query($recent_activity_query);
                         text.includes('logged in') || 
                         text.includes('Admin logged') ||
                         text.includes('Secretary logged') ||
-                        text.includes('Department Head logged')) {
+                        text.includes('Dean logged')) {
                         item.remove(); // Remove the entire activity item
                     }
                 }
