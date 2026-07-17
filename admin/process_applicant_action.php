@@ -9,7 +9,7 @@ require_once __DIR__ . '/admin_notification_helper.php';
 // Database connection
 $servername = "127.0.0.1";
 $username = "root";
-$password = "12345678";
+$password = "";
 $dbname = "nchire";
 
 $conn = new mysqli($servername, $username, $password, $dbname);
@@ -502,9 +502,11 @@ try {
             // Update applicant record
             $stmt = $conn->prepare("UPDATE job_applicants SET 
                                     status = 'Psychological Exam',
-                                    psych_exam_date = ?
+                                    workflow_stage = 'psych_scheduled',
+                                    psych_exam_date = ?,
+                                    psych_exam_notes = ?
                                     WHERE id = ?");
-            $stmt->bind_param("si", $psych_exam_datetime, $applicant_id);
+            $stmt->bind_param("ssi", $psych_exam_datetime, $psych_exam_notes, $applicant_id);
             
             if ($stmt->execute()) {
                 // Create notification
@@ -547,12 +549,12 @@ try {
         case 'mark_initially_hired':
             $initially_hired_notes = $_POST['initially_hired_notes'] ?? '';
             
-            // Update applicant record - mark as Hired (final status)
+            // Update applicant record - mark as initially hired, not final hired yet.
             $stmt = $conn->prepare("UPDATE job_applicants SET 
-                                    status = 'Hired',
-                                    workflow_stage = 'hired',
-                                    hired_date = NOW(),
-                                    hire_notes = ?
+                                    status = 'Initially Hired',
+                                    workflow_stage = 'initially_hired',
+                                    initially_hired_date = NOW(),
+                                    initially_hired_notes = ?
                                     WHERE id = ?");
             $stmt->bind_param("si", $initially_hired_notes, $applicant_id);
             
@@ -570,29 +572,29 @@ try {
                     $position = $applicant_data['position'];
                     
                     $notif_stmt = $conn->prepare("INSERT INTO notifications (user_email, user_name, title, message, type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-                    $title = "Congratulations! You're Hired!";
-                    $message = "Congratulations! We are pleased to inform you that you have been hired for the position. " . ($initially_hired_notes ? "Notes: " . $initially_hired_notes : "Please wait for onboarding instructions.");
+                    $title = "Marked as Initially Hired";
+                    $message = "Congratulations! You have been marked as initially hired for the position. " . ($initially_hired_notes ? "Notes: " . $initially_hired_notes : "Please wait for the final hiring update.");
                     $type = "success";
                     $notif_stmt->bind_param("sssss", $applicant_email, $applicant_name, $title, $message, $type);
                     $notif_stmt->execute();
                     
                     // Send email notification
-                    if (function_exists('sendHiredEmail')) {
-                        sendHiredEmail($applicant_email, $applicant_name, $initially_hired_notes);
+                    if (function_exists('sendInitiallyHiredEmail')) {
+                        sendInitiallyHiredEmail($applicant_email, $applicant_name, $initially_hired_notes);
                     }
                     
                     // Log admin activity
                     $activity_stmt = $conn->prepare("INSERT INTO admin_activity (activity_type, description, user_name, related_table, related_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-                    $activity_type = "applicant_hired";
-                    $activity_desc = "$admin_name hired $applicant_name for $position";
+                    $activity_type = "applicant_initially_hired";
+                    $activity_desc = "$admin_name marked $applicant_name as initially hired for $position";
                     $related_table = "job_applicants";
                     $activity_stmt->bind_param("ssssi", $activity_type, $activity_desc, $admin_name, $related_table, $applicant_id);
                     $activity_stmt->execute();
                 }
                 
-                echo json_encode(['success' => true, 'message' => 'Applicant hired successfully']);
+                echo json_encode(['success' => true, 'message' => 'Applicant marked as initially hired successfully']);
             } else {
-                echo json_encode(['success' => false, 'error' => 'Failed to hire applicant']);
+                echo json_encode(['success' => false, 'error' => 'Failed to mark applicant as initially hired']);
             }
             break;
             
@@ -653,6 +655,7 @@ try {
             $stmt = $conn->prepare("UPDATE job_applicants SET 
                                     status = 'Hired',
                                     workflow_stage = 'hired',
+                                    hired_date = NOW(),
                                     hire_notes = ?
                                     WHERE id = ?");
             $stmt->bind_param("si", $hire_notes, $applicant_id);

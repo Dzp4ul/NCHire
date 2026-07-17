@@ -2,7 +2,7 @@
 error_reporting(0);
 ini_set('display_errors', 0);
 
-$conn = new mysqli("127.0.0.1", "root", "12345678", "nchire");
+$conn = new mysqli("127.0.0.1", "root", "", "nchire");
 if ($conn->connect_error) die("Connection failed");
 
 echo "<!DOCTYPE html><html><head><style>

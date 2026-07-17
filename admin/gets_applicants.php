@@ -6,7 +6,7 @@ header('Content-Type: application/json');
 $host = 'localhost';
 $dbname = 'nchire';
 $username = 'root';
-$password = '12345678';
+$password = '';
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
@@ -15,6 +15,7 @@ try {
     // Get admin role and department from session
     $admin_role = $_SESSION['admin_role'] ?? 'Admin';
     $admin_department = $_SESSION['admin_department'] ?? '';
+    $department_alias = $admin_department === 'Computing Studies' ? 'Computer Science' : ($admin_department === 'Computer Science' ? 'Computing Studies' : $admin_department);
 
     // Admin role should NOT see applications - return empty array
     if ($admin_role === 'Admin') {
@@ -74,9 +75,10 @@ try {
             WHERE ja.workflow_stage IN ('department_head_review', 'interview_scheduled', 'interview_completed',
                                         'demo_scheduled', 'demo_completed', 'psych_scheduled', 'psych_completed',
                                         'initially_hired', 'permanently_hired', 'hired')
-            AND ja.assigned_to_department = :department
+            AND ja.assigned_to_department IN (:department, :department_alias)
             ORDER BY ja.applied_date DESC";
         $params['department'] = $admin_department;
+        $params['department_alias'] = $department_alias;
     }
     // HR Manager and Recruiter: See all applications in their department (except rejected)
     elseif (($admin_role === 'HR Manager' || $admin_role === 'Recruiter') && !empty($admin_department)) {
@@ -95,9 +97,10 @@ try {
             FROM job_applicants ja
             LEFT JOIN applicants a ON ja.user_id = a.id
             WHERE ja.status != 'Rejected'
-            AND ja.assigned_to_department = :department
+            AND ja.assigned_to_department IN (:department, :department_alias)
             ORDER BY ja.applied_date DESC";
         $params['department'] = $admin_department;
+        $params['department_alias'] = $department_alias;
     }
     
     // Execute query if SQL was built

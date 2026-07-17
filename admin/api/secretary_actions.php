@@ -111,12 +111,33 @@ switch ($action) {
         exit();
 }
 
+function normalizeDepartment($department) {
+    $department = trim((string)$department);
+    return $department === 'Computer Science' ? 'Computing Studies' : $department;
+}
+
+function departmentAlias($department) {
+    return $department === 'Computing Studies' ? 'Computer Science' : $department;
+}
+
 /**
  * Transfer application to Department Head
  */
 function handleTransferToDeptHead($conn, $application_id, $application, $secretary_id, $secretary_name) {
     try {
         $notes = $_POST['notes'] ?? '';
+        $department = normalizeDepartment($application['assigned_to_department'] ?? '');
+
+        if (!$department && !empty($application['job_id'])) {
+            $job_stmt = $conn->prepare("SELECT department_role FROM job WHERE id = ? LIMIT 1");
+            if ($job_stmt) {
+                $job_stmt->bind_param("i", $application['job_id']);
+                $job_stmt->execute();
+                $job_row = $job_stmt->get_result()->fetch_assoc();
+                $job_stmt->close();
+                $department = normalizeDepartment($job_row['department_role'] ?? '');
+            }
+        }
         
         // Update application workflow
         $stmt = $conn->prepare("UPDATE job_applicants 
@@ -124,6 +145,7 @@ function handleTransferToDeptHead($conn, $application_id, $application, $secreta
                                    secretary_id = ?,
                                    secretary_review_date = NOW(),
                                    secretary_notes = ?,
+                                   assigned_to_department = ?,
                                    transferred_to_dept_head_date = NOW()
                                WHERE id = ?");
         
@@ -131,7 +153,7 @@ function handleTransferToDeptHead($conn, $application_id, $application, $secreta
             throw new Exception("Prepare failed: " . $conn->error);
         }
         
-        $stmt->bind_param("isi", $secretary_id, $notes, $application_id);
+        $stmt->bind_param("issi", $secretary_id, $notes, $department, $application_id);
         
         if (!$stmt->execute()) {
             throw new Exception("Execute failed: " . $stmt->error);
@@ -170,8 +192,8 @@ function handleTransferToDeptHead($conn, $application_id, $application, $secreta
                 if (!$notif_stmt) {
                     throw new Exception("Prepare failed: " . $conn->error);
                 }
-                $notif_title = "Application Transferred to Department Head";
-                $notif_message = "Your application for {$application['position']} has been reviewed and forwarded to the department head for evaluation. You will be notified of the next steps.";
+                $notif_title = "Application Transferred to Dean";
+                $notif_message = "Your application for {$application['position']} has been reviewed and forwarded to the dean for evaluation. You will be notified of the next steps.";
                 $notif_type = "info";
                 $notif_stmt->bind_param("sssss", $applicant_email, $applicant_name, $notif_title, $notif_message, $notif_type);
                 
@@ -199,9 +221,9 @@ function handleTransferToDeptHead($conn, $application_id, $application, $secreta
                 $email_result = sendEmailNotification(
                     $applicant_email,
                     $applicant_name,
-                    'Application Transferred to Department Head',
+                    'Application Transferred to Dean',
                     'Application Under Review',
-                    'Your application for ' . $application['position'] . ' has been reviewed by our secretary and forwarded to the department head for further evaluation. You will be notified of the next steps.',
+                    'Your application for ' . $application['position'] . ' has been reviewed by our secretary and forwarded to the dean for further evaluation. You will be notified of the next steps.',
                     'info'
                 );
                 if ($email_result) {
@@ -223,15 +245,14 @@ function handleTransferToDeptHead($conn, $application_id, $application, $secreta
         }
         
         // Get department head for this application's department
-        $department = $application['assigned_to_department'] ?? '';
-        
         error_log("=== DEPARTMENT HEAD NOTIFICATION DEBUG ===");
         error_log("Department: " . ($department ?: 'EMPTY'));
         
         if ($department) {
             try {
-                $dept_head_stmt = $conn->prepare("SELECT id, full_name, email, department FROM admin_users WHERE role = 'Department Head' AND department = ? AND status = 'Active' LIMIT 1");
-                $dept_head_stmt->bind_param("s", $department);
+                $department_alias = departmentAlias($department);
+                $dept_head_stmt = $conn->prepare("SELECT id, full_name, email, department FROM admin_users WHERE role = 'Department Head' AND department IN (?, ?) AND status = 'Active' LIMIT 1");
+                $dept_head_stmt->bind_param("ss", $department, $department_alias);
                 $dept_head_stmt->execute();
                 $dept_head_result = $dept_head_stmt->get_result();
                 
@@ -316,7 +337,7 @@ function handleTransferToDeptHead($conn, $application_id, $application, $secreta
         
         echo json_encode([
             'success' => true, 
-            'message' => 'Application successfully transferred to Department Head'
+            'message' => 'Application successfully transferred to Dean'
         ]);
         
     } catch (Exception $e) {
@@ -343,13 +364,13 @@ function handleRequestResubmission($conn, $application_id, $application, $secret
     
     // Update application status
     $stmt = $conn->prepare("UPDATE job_applicants 
-                           SET status = 'Resubmission Required',
-                               workflow_stage = 'secretary_review',
-                               resubmission_documents = ?,
-                               resubmission_reason = ?,
-                               secretary_id = ?,
-                               secretary_review_date = NOW(),
-                               secretary_notes = ?
+                               SET status = 'Resubmission Required',
+                                   workflow_stage = 'secretary_review',
+                                   resubmission_documents = ?,
+                                   resubmission_notes = ?,
+                                   secretary_id = ?,
+                                   secretary_review_date = NOW(),
+                                   secretary_notes = ?
                            WHERE id = ?");
     $stmt->bind_param("ssisi", $documents_json, $reason, $secretary_id, $reason, $application_id);
     

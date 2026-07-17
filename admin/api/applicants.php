@@ -8,7 +8,7 @@ header('Access-Control-Allow-Headers: Content-Type');
 // Database connection
 $host = "127.0.0.1";
 $user = "root";
-$pass = "12345678";
+$pass = "";
 $dbname = "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
@@ -23,17 +23,20 @@ function loadApplicants() {
     // Get admin role and department from session
     $admin_role = $_SESSION['admin_role'] ?? '';
     $admin_department = $_SESSION['admin_department'] ?? '';
+    $department_alias = $admin_department === 'Computing Studies' ? 'Computer Science' : ($admin_department === 'Computer Science' ? 'Computing Studies' : $admin_department);
     
     // Build query based on role and workflow stage
     $where_conditions = [];
     $params = [];
     $types = '';
     
-    // Secretary: Only see applications in secretary_review stage
+    // Secretary: Only see applications in secretary_review stage (excluding rejected)
     if ($admin_role === 'Secretary') {
         $where_conditions[] = "workflow_stage = ?";
+        $where_conditions[] = "status != ?";
         $params[] = 'secretary_review';
-        $types .= 's';
+        $params[] = 'Rejected';
+        $types .= 'ss';
     }
     // Department Head: Only see applications transferred to them (department_head_review and beyond)
     elseif ($admin_role === 'Department Head') {
@@ -41,17 +44,19 @@ function loadApplicants() {
                                                      'demo_scheduled', 'demo_completed', 'psych_scheduled', 'psych_completed',
                                                      'initially_hired', 'permanently_hired', 'hired')";
         if (!empty($admin_department)) {
-            $where_conditions[] = "assigned_to_department = ?";
+            $where_conditions[] = "assigned_to_department IN (?, ?)";
             $params[] = $admin_department;
-            $types .= 's';
+            $params[] = $department_alias;
+            $types .= 'ss';
         }
     }
     // HR Manager and Recruiter: See all applications in their department
     elseif ($admin_role === 'HR Manager' || $admin_role === 'Recruiter') {
         if (!empty($admin_department)) {
-            $where_conditions[] = "assigned_to_department = ?";
+            $where_conditions[] = "assigned_to_department IN (?, ?)";
             $params[] = $admin_department;
-            $types .= 's';
+            $params[] = $department_alias;
+            $types .= 'ss';
         }
     }
     

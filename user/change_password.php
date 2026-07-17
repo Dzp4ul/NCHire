@@ -16,7 +16,7 @@ if (!isset($_SESSION['password_change_required']) || $_SESSION['password_change_
 // Database connection
 $host = "127.0.0.1";
 $user = "root";
-$pass = "12345678";
+$pass = "";
 $dbname = "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
@@ -35,8 +35,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Validation
     if (empty($new_password) || empty($confirm_password)) {
         $error = 'Please fill in all fields.';
-    } elseif (strlen($new_password) < 6) {
-        $error = 'Password must be at least 6 characters long.';
+    } elseif (strlen($new_password) < 8) {
+        $error = 'Password must be at least 8 characters long.';
+    } elseif (!preg_match('/[A-Za-z]/', $new_password)) {
+        $error = 'Password must contain at least one letter.';
+    } elseif (!preg_match('/[0-9]/', $new_password)) {
+        $error = 'Password must contain at least one number.';
+    } elseif (!preg_match('/[^A-Za-z0-9]/', $new_password)) {
+        $error = 'Password must contain at least one symbol (e.g., !@#$%^&*).';
     } elseif ($new_password !== $confirm_password) {
         $error = 'Passwords do not match.';
     } else {
@@ -88,7 +94,7 @@ $conn->close();
         }
     </script>
 </head>
-<body class="relative min-h-screen flex items-center justify-center p-4" style="background-image: url('../assets/images/520382375_1065446909052636_3412465913398569974_n.jpg'); background-size: cover; background-position: center; background-attachment: fixed;">
+<body class="relative min-h-screen flex items-center justify-center p-4" style="background-image: url('../public/assets/images/520382375_1065446909052636_3412465913398569974_n.jpg'); background-size: cover; background-position: center; background-attachment: fixed;">
     <!-- Dark Overlay -->
     <div class="absolute inset-0 bg-primary bg-opacity-80"></div>
     
@@ -96,7 +102,7 @@ $conn->close();
     <div class="relative z-10 max-w-md w-full">
         <!-- Logo -->
         <div class="text-center mb-8">
-            <img src="../assets/images/image-removebg-preview (1).png" 
+            <img src="../public/assets/images/image-removebg-preview (1).png" 
                  alt="NCHire Logo" class="w-20 h-20 mx-auto mb-4">
             <h1 class="text-3xl font-bold text-white">NCHire</h1>
             <p class="text-gray-200 mt-2">Norzagaray College</p>
@@ -160,9 +166,9 @@ $conn->close();
                             <i class="ri-lock-password-line mr-2"></i>New Password
                         </label>
                         <div class="relative">
-                            <input type="password" name="new_password" id="newPassword" required minlength="6"
+                            <input type="password" name="new_password" id="newPassword" required minlength="8"
                                    class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                   placeholder="Enter new password (min. 6 characters)">
+                                   placeholder="Enter new password (min. 8 characters)">
                             <button type="button" onclick="togglePassword('newPassword', 'newPasswordIcon')"
                                     class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700">
                                 <i id="newPasswordIcon" class="ri-eye-line"></i>
@@ -175,7 +181,7 @@ $conn->close();
                             <i class="ri-lock-password-line mr-2"></i>Confirm New Password
                         </label>
                         <div class="relative">
-                            <input type="password" name="confirm_password" id="confirmPassword" required minlength="6"
+                            <input type="password" name="confirm_password" id="confirmPassword" required minlength="8"
                                    class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                                    placeholder="Confirm your new password">
                             <button type="button" onclick="togglePassword('confirmPassword', 'confirmPasswordIcon')"
@@ -189,9 +195,10 @@ $conn->close();
                         <p class="text-xs text-amber-800">
                             <i class="ri-shield-check-line mr-1"></i>
                             <strong>Password Requirements:</strong><br>
-                            • At least 6 characters long<br>
-                            • Use a mix of letters, numbers, and special characters<br>
-                            • Avoid using easily guessable information
+                            • At least 8 characters long<br>
+                            • Must contain at least one letter<br>
+                            • Must contain at least one number<br>
+                            • Must contain at least one symbol (!@#$%^&*)
                         </p>
                     </div>
 

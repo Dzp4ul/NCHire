@@ -5,7 +5,7 @@ header('Content-Type: application/json');
 // Database connection
 $host = "127.0.0.1";
 $user = "root";
-$pass = "12345678";
+$pass = "";
 $dbname = "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
@@ -56,9 +56,16 @@ try {
         $app_stmt->close();
     }
     
-    // Format salary
-    $salary_parts = explode(' - ', $job['salary_range']);
-    $formatted_salary = '₱' . $salary_parts[0] . ' - ₱' . (isset($salary_parts[1]) ? $salary_parts[1] : $salary_parts[0]);
+    // Format salary - only add ₱ if not already present
+    $salaryRange = $job['salary_range'];
+    
+    if (strpos($salaryRange, '₱') === false) {
+        $salary_parts = explode(' - ', $salaryRange);
+        $formatted_salary = '₱' . $salary_parts[0] . ' - ₱' . (isset($salary_parts[1]) ? $salary_parts[1] : $salary_parts[0]);
+    } else {
+        // Already has peso sign, use as-is
+        $formatted_salary = $salaryRange;
+    }
     
     $response = [
         'success' => true,
@@ -70,8 +77,10 @@ try {
             'locations' => $job['locations'],
             'salary_range' => $formatted_salary,
             'application_deadline' => $job['application_deadline'],
+            'subject' => $job['subject'] ?? '',
             'job_description' => $job['job_description'],
             'job_requirements' => $job['job_requirements'],
+            'duties' => $job['duties'] ?? null,
             'education' => $job['education'],
             'experience' => $job['experience'],
             'training' => $job['training'],

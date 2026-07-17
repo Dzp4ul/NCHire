@@ -8,7 +8,7 @@ header('Access-Control-Allow-Headers: Content-Type');
 // Database connection
 $host = "127.0.0.1";
 $user = "root";
-$pass = "12345678";
+$pass = "";
 $dbname = "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
@@ -106,8 +106,20 @@ switch ($method) {
             }
         }
         
-        // Generate random temporary password (8 characters)
-        $temporaryPassword = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%'), 0, 10);
+        // Generate random temporary password (10 characters: letters, numbers, symbols)
+        $letters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        $numbers = '0123456789';
+        $symbols = '!@#$%^&*';
+        
+        // Ensure password has at least 1 letter, 1 number, 1 symbol
+        $temporaryPassword = 
+            $letters[rand(0, strlen($letters) - 1)] .  // 1 letter
+            $numbers[rand(0, strlen($numbers) - 1)] .  // 1 number
+            $symbols[rand(0, strlen($symbols) - 1)] .  // 1 symbol
+            substr(str_shuffle($letters . $numbers . $symbols), 0, 7); // 7 more random chars
+        
+        // Shuffle the final password to randomize position of required characters
+        $temporaryPassword = str_shuffle($temporaryPassword);
         
         // Hash the temporary password
         $hashed_password = password_hash($temporaryPassword, PASSWORD_DEFAULT);
@@ -332,6 +344,11 @@ switch ($method) {
             $types .= "s";
         }
         if (isset($input['status']) && !empty($input['status'])) {
+            // Prevent admin from deactivating their own account
+            if (isset($_SESSION['admin_id']) && $_SESSION['admin_id'] == $user_id && $input['status'] === 'Inactive') {
+                echo json_encode(['success' => false, 'message' => 'You cannot deactivate your own account']);
+                break;
+            }
             $updates[] = "status = ?";
             $params[] = $input['status'];
             $types .= "s";

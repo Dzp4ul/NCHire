@@ -5,7 +5,7 @@ header('Content-Type: application/json');
 // Database connection
 $host = "127.0.0.1";
 $user = "root";
-$pass = "12345678";
+$pass = "";
 $dbname = "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
@@ -18,6 +18,7 @@ if ($conn->connect_error) {
 // Get admin role and department from session
 $admin_role = $_SESSION['admin_role'] ?? 'Admin';
 $admin_department = $_SESSION['admin_department'] ?? '';
+$department_alias = $admin_department === 'Computing Studies' ? 'Computer Science' : ($admin_department === 'Computer Science' ? 'Computing Studies' : $admin_department);
 
 // Admin role should NOT see archived applications - return empty array
 if ($admin_role === 'Admin') {
@@ -27,7 +28,7 @@ if ($admin_role === 'Admin') {
 }
 
 // Secretary, Department Heads, HR Managers, and Recruiters can see archived applications
-// Secretary sees all rejected, others filtered by department
+// Secretary sees all rejected and cancelled, others filtered by department
 if ($admin_role === 'Secretary') {
     $query = "SELECT 
                 ja.id,
@@ -43,7 +44,7 @@ if ($admin_role === 'Secretary') {
                 a.profile_picture
               FROM job_applicants ja
               LEFT JOIN applicants a ON ja.user_id = a.id
-              WHERE ja.workflow_stage = 'rejected'
+              WHERE ja.workflow_stage IN ('rejected', 'cancelled')
               ORDER BY ja.rejected_date DESC";
     
     $result = $conn->query($query);
@@ -71,12 +72,12 @@ if ($admin_role === 'Secretary') {
                 a.profile_picture
               FROM job_applicants ja
               LEFT JOIN applicants a ON ja.user_id = a.id
-              WHERE ja.workflow_stage = 'rejected'
-              AND ja.assigned_to_department = ?
+              WHERE ja.workflow_stage IN ('rejected', 'cancelled')
+              AND ja.assigned_to_department IN (?, ?)
               ORDER BY ja.rejected_date DESC";
     
     $stmt = $conn->prepare($query);
-    $stmt->bind_param("s", $admin_department);
+    $stmt->bind_param("ss", $admin_department, $department_alias);
     $stmt->execute();
     $result = $stmt->get_result();
     

@@ -16,12 +16,31 @@ if (isset($_SESSION['password_change_required']) && $_SESSION['password_change_r
 // Database connection
 $host = "127.0.0.1";
 $user = "root";
-$pass = "12345678";
+$pass = "";
 $dbname = "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
+}
+
+// Verify user status is still active
+if (isset($_SESSION['admin_id'])) {
+    $status_check = $conn->prepare("SELECT status FROM admin_users WHERE id = ?");
+    $status_check->bind_param("i", $_SESSION['admin_id']);
+    $status_check->execute();
+    $status_result = $status_check->get_result();
+    
+    if ($status_result->num_rows > 0) {
+        $status_row = $status_result->fetch_assoc();
+        if ($status_row['status'] !== 'Active') {
+            // User has been deactivated - log them out
+            session_destroy();
+            header("Location: ../public/index.php?inactive=1");
+            exit();
+        }
+    }
+    $status_check->close();
 }
 
 // Get admin info from session
@@ -30,6 +49,12 @@ $admin_role = $_SESSION['admin_role'] ?? 'Admin';
 $admin_profile_picture = $_SESSION['admin_profile_picture'] ?? '';
 $admin_email = $_SESSION['admin_email'] ?? '';
 $admin_department = $_SESSION['admin_department'] ?? '';
+
+// Helper function to display role name (converts Department Head to Dean for display)
+function displayRoleName($role) {
+    return $role === 'Department Head' ? 'Dean' : $role;
+}
+$admin_role_display = displayRoleName($admin_role);
 
 // Get initials for profile picture fallback
 $initials = 'A';
@@ -45,111 +70,188 @@ if (!empty($admin_name)) {
 // Get dashboard statistics from job_applicants table
 $stats = [];
 
-// Admin role should NOT see application statistics
+// Determine who should see stats and if filtering is needed
 $show_applicant_stats = false;
 $department_filter = "";
 $department_params = [];
 
-if (($admin_role === 'Department Head' || $admin_role === 'HR Manager' || $admin_role === 'Recruiter') && !empty($admin_department)) {
+// Admin and Secretary see all departments
+if ($admin_role === 'Admin' || $admin_role === 'Secretary') {
+    $show_applicant_stats = true;
+    // No department filter - they see everything
+}
+// Department Head, HR, Recruiter see only their department
+else if (($admin_role === 'Department Head' || $admin_role === 'HR Manager' || $admin_role === 'Recruiter') && !empty($admin_department)) {
     $show_applicant_stats = true;
     $department_filter = " AND assigned_to_department = ?";
     $department_params[] = $admin_department;
 }
 
-// Total Applications (excluding rejected/archived)
-if ($show_applicant_stats && !empty($department_params)) {
-    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status != 'Rejected'" . $department_filter);
-    $stmt->bind_param("s", ...$department_params);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $stats['total_applicants'] = $result->fetch_assoc()['count'];
+// NEW ACCURATE STATS
+
+// 1. Pending Secretary Review (applications in secretary_review stage)
+// Only count non-rejected applications that are actually in secretary queue
+if ($show_applicant_stats) {
+    if (!empty($department_params)) {
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE workflow_stage = 'secretary_review' AND status != 'Rejected'" . $department_filter);
+        $stmt->bind_param("s", ...$department_params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $stats['secretary_pending'] = $result->fetch_assoc()['count'];
+    } else {
+        $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE workflow_stage = 'secretary_review' AND status != 'Rejected'");
+        $stats['secretary_pending'] = $result ? $result->fetch_assoc()['count'] : 0;
+    }
 } else {
-    // Admin or users without department see 0
+    $stats['secretary_pending'] = 0;
+}
+
+// 2. Pending Department Review (applications in department_head_review stage)
+// Only count non-rejected applications that are actually in dean/dept head queue
+if ($show_applicant_stats) {
+    if (!empty($department_params)) {
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE workflow_stage = 'department_head_review' AND status != 'Rejected'" . $department_filter);
+        $stmt->bind_param("s", ...$department_params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $stats['dept_pending'] = $result->fetch_assoc()['count'];
+    } else {
+        $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE workflow_stage = 'department_head_review' AND status != 'Rejected'");
+        $stats['dept_pending'] = $result ? $result->fetch_assoc()['count'] : 0;
+    }
+} else {
+    $stats['dept_pending'] = 0;
+}
+
+// 3. Interviews This Week (scheduled interviews in next 7 days)
+if ($show_applicant_stats) {
+    $today = date('Y-m-d');
+    $next_week = date('Y-m-d', strtotime('+7 days'));
+    if (!empty($department_params)) {
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE (status = 'Interview Scheduled' OR workflow_stage = 'interview_scheduled') AND interview_date >= ? AND interview_date <= ?" . $department_filter);
+        $stmt->bind_param("sss", $today, $next_week, ...$department_params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $stats['interviews_this_week'] = $result->fetch_assoc()['count'];
+    } else {
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE (status = 'Interview Scheduled' OR workflow_stage = 'interview_scheduled') AND interview_date >= ? AND interview_date <= ?");
+        $stmt->bind_param("ss", $today, $next_week);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $stats['interviews_this_week'] = $result ? $result->fetch_assoc()['count'] : 0;
+    }
+} else {
+    $stats['interviews_this_week'] = 0;
+}
+
+// 4. Overall Hired (all applicants with hired status)
+if ($show_applicant_stats) {
+    if (!empty($department_params)) {
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Initially Hired', 'Permanently Hired', 'Hired')" . $department_filter);
+        $stmt->bind_param("s", ...$department_params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $stats['overall_hired'] = $result->fetch_assoc()['count'];
+    } else {
+        $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Initially Hired', 'Permanently Hired', 'Hired')");
+        $stats['overall_hired'] = $result ? $result->fetch_assoc()['count'] : 0;
+    }
+} else {
+    $stats['overall_hired'] = 0;
+}
+
+// Keep some old stats for backward compatibility in other sections
+// Total Applications
+if ($show_applicant_stats) {
+    if (!empty($department_params)) {
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status != 'Rejected'" . $department_filter);
+        $stmt->bind_param("s", ...$department_params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $stats['total_applicants'] = $result->fetch_assoc()['count'];
+    } else {
+        $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status != 'Rejected'");
+        $stats['total_applicants'] = $result ? $result->fetch_assoc()['count'] : 0;
+    }
+} else {
     $stats['total_applicants'] = 0;
 }
 
-// Archived (Rejected) Applications
-if ($show_applicant_stats && !empty($department_params)) {
-    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status = 'Rejected'" . $department_filter);
-    $stmt->bind_param("s", ...$department_params);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $stats['archived'] = $result->fetch_assoc()['count'];
-} else {
-    $stats['archived'] = 0;
-}
+// Total Jobs (for stats cards)
+$result = $conn->query("SELECT COUNT(*) as count FROM job");
+$stats['total_jobs'] = $result ? $result->fetch_assoc()['count'] : 0;
 
-// Total Jobs from job table (filter by department for department heads)
-if (!empty($department_params)) {
-    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job WHERE department_role = ?");
-    $stmt->bind_param("s", ...$department_params);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $stats['total_jobs'] = $result->fetch_assoc()['count'];
-} else {
-    $result = $conn->query("SELECT COUNT(*) as count FROM job");
-    $stats['total_jobs'] = $result ? $result->fetch_assoc()['count'] : 0;
-}
+// Active Users (registered applicants who have logged in recently)
+$result = $conn->query("SELECT COUNT(*) as count FROM applicants WHERE is_verified = 1");
+$stats['active_users'] = $result ? $result->fetch_assoc()['count'] : 0;
 
-// Active Users (unique applicants)
-if ($show_applicant_stats && !empty($department_params)) {
-    $stmt = $conn->prepare("SELECT COUNT(DISTINCT full_name) as count FROM job_applicants WHERE 1=1" . $department_filter);
-    $stmt->bind_param("s", ...$department_params);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $stats['active_users'] = $result->fetch_assoc()['count'];
-} else {
-    $stats['active_users'] = 0;
-}
-
-// Pending Reviews (Under Review)
-if ($show_applicant_stats && !empty($department_params)) {
-    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status = 'Pending'" . $department_filter);
-    $stmt->bind_param("s", ...$department_params);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $stats['pending_reviews'] = $result->fetch_assoc()['count'];
-} else {
-    $stats['pending_reviews'] = 0;
-}
-
-// Interview Scheduled
-if ($show_applicant_stats && !empty($department_params)) {
-    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status = 'Interview Scheduled'" . $department_filter);
-    $stmt->bind_param("s", ...$department_params);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $stats['interview_scheduled'] = $result->fetch_assoc()['count'];
+// Interview Scheduled (keep for applicants section)
+if ($show_applicant_stats) {
+    if (!empty($department_params)) {
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status = 'Interview Scheduled'" . $department_filter);
+        $stmt->bind_param("s", ...$department_params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $stats['interview_scheduled'] = $result->fetch_assoc()['count'];
+    } else {
+        $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status = 'Interview Scheduled'");
+        $stats['interview_scheduled'] = $result ? $result->fetch_assoc()['count'] : 0;
+    }
 } else {
     $stats['interview_scheduled'] = 0;
 }
 
-// Hired
-if ($show_applicant_stats && !empty($department_params)) {
-    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status = 'Hired'" . $department_filter);
-    $stmt->bind_param("s", ...$department_params);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $stats['hired'] = $result->fetch_assoc()['count'];
+// Demo Scheduled (keep for applicants section)
+if ($show_applicant_stats) {
+    if (!empty($department_params)) {
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status = 'Demo Scheduled'" . $department_filter);
+        $stmt->bind_param("s", ...$department_params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $stats['demo_scheduled'] = $result->fetch_assoc()['count'];
+    } else {
+        $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status = 'Demo Scheduled'");
+        $stats['demo_scheduled'] = $result ? $result->fetch_assoc()['count'] : 0;
+    }
+} else {
+    $stats['demo_scheduled'] = 0;
+}
+
+// Hired (keep for applicants section)
+if ($show_applicant_stats) {
+    if (!empty($department_params)) {
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Initially Hired', 'Permanently Hired', 'Hired')" . $department_filter);
+        $stmt->bind_param("s", ...$department_params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $stats['hired'] = $result->fetch_assoc()['count'];
+    } else {
+        $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Initially Hired', 'Permanently Hired', 'Hired')");
+        $stats['hired'] = $result ? $result->fetch_assoc()['count'] : 0;
+    }
 } else {
     $stats['hired'] = 0;
 }
 
 // Get recent applications (last 5)
 if ($show_applicant_stats && !empty($department_params)) {
+    // Department-filtered view for Department Heads/HR/Recruiters
     $stmt = $conn->prepare("SELECT * FROM job_applicants WHERE 1=1" . $department_filter . " ORDER BY applied_date DESC LIMIT 5");
     $stmt->bind_param("s", ...$department_params);
     $stmt->execute();
     $recent_applicants = $stmt->get_result();
+} else if ($admin_role === 'Admin' || $admin_role === 'Secretary') {
+    // Admin and Secretary see ALL applications from all departments
+    $recent_applicants = $conn->query("SELECT * FROM job_applicants ORDER BY applied_date DESC LIMIT 5");
 } else {
-    // Admin sees no applications - create empty result
+    // No data for other roles
     $recent_applicants = null;
 }
 
 // Get recent jobs from job table with application counts
 $recent_jobs_query = "SELECT j.*, COUNT(ja.id) as application_count 
                       FROM job j 
-                      LEFT JOIN job_applicants ja ON j.job_title = ja.position 
+                      LEFT JOIN job_applicants ja ON j.id = ja.job_id 
                       GROUP BY j.id 
                       ORDER BY j.id DESC 
                       LIMIT 5";
@@ -175,12 +277,36 @@ $create_activity_table = "CREATE TABLE IF NOT EXISTS admin_activity (
 )";
 $conn->query($create_activity_table);
 
-// Get chart filter from URL parameter (default to weekly)
-$chart_filter = isset($_GET['chart_filter']) ? $_GET['chart_filter'] : 'weekly';
+// Get filters from URL parameters
+$school_year = isset($_GET['school_year']) ? $_GET['school_year'] : '';
+$semester = isset($_GET['semester']) ? $_GET['semester'] : '';
+// Always use weekly view (last 7 days)
+$chart_filter = 'weekly';
 
 // Get chart data based on filter
 $chart_data = [];
 $chart_labels = [];
+
+// Build date range filter for school year and semester
+$date_filter = "";
+$date_params = [];
+if (!empty($school_year) && !empty($semester)) {
+    // Parse school year (e.g., "2024-2025")
+    list($start_year, $end_year) = explode('-', $school_year);
+    
+    if ($semester == 'first') {
+        // First Semester: July 14 to December 31
+        $date_start = "$start_year-07-14";
+        $date_end = "$start_year-12-31 23:59:59";
+    } else {
+        // Second Semester: January 1 to May 31
+        $date_start = "$end_year-01-01";
+        $date_end = "$end_year-05-31 23:59:59";
+    }
+    
+    $date_filter = " AND applied_date >= ? AND applied_date <= ?";
+    $date_params = [$date_start, $date_end];
+}
 
 switch($chart_filter) {
     case 'daily':
@@ -189,13 +315,20 @@ switch($chart_filter) {
             $hour = date('Y-m-d H:00:00', strtotime("-$i hours"));
             $next_hour = date('Y-m-d H:00:00', strtotime("-" . ($i-1) . " hours"));
             if (!empty($department_params)) {
-                $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE applied_date >= ? AND applied_date < ?" . $department_filter);
-                $stmt->bind_param("sss", $hour, $next_hour, ...$department_params);
+                $query = "SELECT COUNT(*) as count FROM job_applicants WHERE applied_date >= ? AND applied_date < ?" . $department_filter . $date_filter;
+                $params = array_merge([$hour, $next_hour], $department_params, $date_params);
+                $types = str_repeat('s', count($params));
+                $stmt = $conn->prepare($query);
+                $stmt->bind_param($types, ...$params);
                 $stmt->execute();
                 $result = $stmt->get_result();
                 $chart_data[] = $result->fetch_assoc()['count'];
             } else {
-                $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE applied_date >= '$hour' AND applied_date < '$next_hour'");
+                $extra_filter = "";
+                if (!empty($date_filter)) {
+                    $extra_filter = " AND applied_date >= '{$date_params[0]}' AND applied_date <= '{$date_params[1]}'";
+                }
+                $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE applied_date >= '$hour' AND applied_date < '$next_hour'" . $extra_filter);
                 $chart_data[] = $result ? $result->fetch_assoc()['count'] : 0;
             }
             $chart_labels[] = date('H:i', strtotime($hour));
@@ -206,13 +339,20 @@ switch($chart_filter) {
         for ($i = 29; $i >= 0; $i--) {
             $date = date('Y-m-d', strtotime("-$i days"));
             if (!empty($department_params)) {
-                $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = ?" . $department_filter);
-                $stmt->bind_param("ss", $date, ...$department_params);
+                $query = "SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = ?" . $department_filter . $date_filter;
+                $params = array_merge([$date], $department_params, $date_params);
+                $types = str_repeat('s', count($params));
+                $stmt = $conn->prepare($query);
+                $stmt->bind_param($types, ...$params);
                 $stmt->execute();
                 $result = $stmt->get_result();
                 $chart_data[] = $result->fetch_assoc()['count'];
             } else {
-                $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = '$date'");
+                $extra_filter = "";
+                if (!empty($date_filter)) {
+                    $extra_filter = " AND applied_date >= '{$date_params[0]}' AND applied_date <= '{$date_params[1]}'";
+                }
+                $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = '$date'" . $extra_filter);
                 $chart_data[] = $result ? $result->fetch_assoc()['count'] : 0;
             }
             $chart_labels[] = date('M j', strtotime($date));
@@ -223,44 +363,108 @@ switch($chart_filter) {
         for ($i = 11; $i >= 0; $i--) {
             $month = date('Y-m', strtotime("-$i months"));
             if (!empty($department_params)) {
-                $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE DATE_FORMAT(applied_date, '%Y-%m') = ?" . $department_filter);
-                $stmt->bind_param("ss", $month, ...$department_params);
+                $query = "SELECT COUNT(*) as count FROM job_applicants WHERE DATE_FORMAT(applied_date, '%Y-%m') = ?" . $department_filter . $date_filter;
+                $params = array_merge([$month], $department_params, $date_params);
+                $types = str_repeat('s', count($params));
+                $stmt = $conn->prepare($query);
+                $stmt->bind_param($types, ...$params);
                 $stmt->execute();
                 $result = $stmt->get_result();
                 $chart_data[] = $result->fetch_assoc()['count'];
             } else {
-                $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE DATE_FORMAT(applied_date, '%Y-%m') = '$month'");
+                $extra_filter = "";
+                if (!empty($date_filter)) {
+                    $extra_filter = " AND applied_date >= '{$date_params[0]}' AND applied_date <= '{$date_params[1]}'";
+                }
+                $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE DATE_FORMAT(applied_date, '%Y-%m') = '$month'" . $extra_filter);
                 $chart_data[] = $result ? $result->fetch_assoc()['count'] : 0;
             }
             $chart_labels[] = date('M Y', strtotime($month . '-01'));
         }
         break;
     default: // weekly
-        // Last 7 days
-        for ($i = 6; $i >= 0; $i--) {
-            $date = date('Y-m-d', strtotime("-$i days"));
-            if (!empty($department_params)) {
-                $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = ?" . $department_filter);
-                $stmt->bind_param("ss", $date, ...$department_params);
-                $stmt->execute();
-                $result = $stmt->get_result();
-                $chart_data[] = $result->fetch_assoc()['count'];
-            } else {
-                $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = '$date'");
-                $chart_data[] = $result ? $result->fetch_assoc()['count'] : 0;
+        // If school year and semester are selected, show weekly data for the entire semester
+        if (!empty($school_year) && !empty($semester)) {
+            // Show weekly data for the entire semester
+            $current_date = new DateTime($date_start);
+            $end_date_obj = new DateTime($date_end);
+            
+            // Calculate weeks in the semester
+            while ($current_date <= $end_date_obj) {
+                $week_start = $current_date->format('Y-m-d');
+                $week_end = (clone $current_date)->modify('+6 days')->format('Y-m-d');
+                
+                // Don't exceed semester end date
+                if ($week_end > $date_end) {
+                    $week_end = $date_end;
+                }
+                
+                // Count applications for this week
+                if (!empty($department_params)) {
+                    $query = "SELECT COUNT(*) as count FROM job_applicants WHERE applied_date >= ? AND applied_date <= ? AND applied_date <= ?" . $department_filter;
+                    $params = array_merge([$week_start, $week_end . ' 23:59:59', $date_end], $department_params);
+                    $types = str_repeat('s', count($params));
+                    $stmt = $conn->prepare($query);
+                    $stmt->bind_param($types, ...$params);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    $count = $result->fetch_assoc()['count'];
+                    $chart_data[] = $count;
+                } else {
+                    $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE applied_date >= '$week_start' AND applied_date <= '$week_end 23:59:59' AND applied_date <= '$date_end'");
+                    $chart_data[] = $result ? $result->fetch_assoc()['count'] : 0;
+                }
+                
+                // Label format: "Jun 1-7" or "Jun 1"
+                $label_start = $current_date->format('M j');
+                $label_end_date = (clone $current_date)->modify('+6 days');
+                if ($label_end_date->format('Y-m-d') > $date_end) {
+                    $label_end_date = new DateTime($date_end);
+                }
+                
+                // Only show end date if it's in a different day
+                if ($current_date->format('j') != $label_end_date->format('j')) {
+                    $chart_labels[] = $label_start . '-' . $label_end_date->format('j');
+                } else {
+                    $chart_labels[] = $label_start;
+                }
+                
+                $current_date->modify('+7 days');
+                
+                // Safety limit: max 30 data points
+                if (count($chart_data) >= 30) break;
             }
-            $chart_labels[] = date('M j', strtotime($date));
+        } else {
+            // Default: Last 7 days
+            for ($i = 6; $i >= 0; $i--) {
+                $date = date('Y-m-d', strtotime("-$i days"));
+                if (!empty($department_params)) {
+                    $query = "SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = ?" . $department_filter;
+                    $params = array_merge([$date], $department_params);
+                    $types = str_repeat('s', count($params));
+                    $stmt = $conn->prepare($query);
+                    $stmt->bind_param($types, ...$params);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    $chart_data[] = $result->fetch_assoc()['count'];
+                } else {
+                    $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE DATE(applied_date) = '$date'");
+                    $chart_data[] = $result ? $result->fetch_assoc()['count'] : 0;
+                }
+                $chart_labels[] = date('M j', strtotime($date));
+            }
         }
 }
 
-// Get recent admin activity only - no job applications
-// Filter out NULL, empty, and 'application' types at database level
+// Get recent admin activity only - no job applications or login activities
+// Filter out NULL, empty, 'application', and 'admin_login' types at database level
 $recent_activity_query = "
     SELECT activity_type, description, user_name, created_at 
     FROM admin_activity 
     WHERE activity_type IS NOT NULL 
     AND activity_type != '' 
     AND activity_type != 'application'
+    AND activity_type != 'admin_login'
     ORDER BY created_at DESC 
     LIMIT 10";
 $recent_activity = $conn->query($recent_activity_query);
@@ -355,10 +559,12 @@ $recent_activity = $conn->query($recent_activity_query);
                 <i class="fas fa-chart-line w-5 h-5"></i>
                 Dashboard
             </button>
+            <?php if ($admin_role !== 'Admin'): ?>
             <button onclick="showSection('jobs')" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg mb-2 text-gray-700 hover:bg-gray-100">
                 <i class="fas fa-briefcase w-5 h-5"></i>
                 Job Postings
             </button>
+            <?php endif; ?>
             <?php if ($admin_role === 'Secretary' || $admin_role === 'Department Head' || $admin_role === 'HR Manager' || $admin_role === 'Recruiter'): ?>
             <button onclick="showSection('applicants')" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg mb-2 text-gray-700 hover:bg-gray-100">
                 <i class="fas fa-user-check w-5 h-5"></i>
@@ -428,7 +634,7 @@ $recent_activity = $conn->query($recent_activity_query);
                             <?php endif; ?>
                             <div class="flex flex-col text-left">
                                 <span class="text-sm font-medium text-gray-700"><?php echo htmlspecialchars($admin_name); ?></span>
-                                <span class="text-xs text-gray-500"><?php echo htmlspecialchars($admin_role); ?></span>
+                                <span class="text-xs text-gray-500"><?php echo htmlspecialchars($admin_role_display); ?></span>
                             </div>
                             <i class="fas fa-chevron-down text-gray-400 text-xs"></i>
                         </button>
@@ -462,55 +668,82 @@ $recent_activity = $conn->query($recent_activity_query);
             <div id="dashboardSection" class="section">
                 <div class="flex items-center justify-between mb-6">
                     <h1 class="text-3xl font-bold text-gray-900">Dashboard</h1>
+                    <div id="filterStatus" class="hidden bg-blue-100 border border-blue-300 text-blue-800 px-4 py-2 rounded-lg text-sm font-medium">
+                        <i class="fas fa-filter mr-2"></i>
+                        <span id="filterStatusText">Filters active</span>
+                    </div>
                 </div>
 
-                <!-- Stats Grid -->
+                <!-- Stats Cards -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                    <!-- Total Jobs Card -->
                     <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm font-medium text-gray-600">Total Jobs</p>
-                                <p class="text-2xl font-bold text-gray-900" data-stat="total_jobs"><?php echo $stats['total_jobs']; ?></p>
-                                
+                                <p class="text-sm font-medium text-gray-600 mb-1">Total Jobs</p>
+                                <p class="text-3xl font-bold text-gray-900" id="totalJobs"><?php echo $stats['total_jobs']; ?></p>
                             </div>
-                            <div class="p-3 rounded-lg bg-blue-500">
+                            <div class="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
                                 <i class="fas fa-briefcase text-white text-xl"></i>
                             </div>
                         </div>
                     </div>
+
+                    <!-- Total Applicants Card -->
                     <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm font-medium text-gray-600">Total Applicants</p>
-                                <p class="text-2xl font-bold text-gray-900" data-stat="total_applicants"><?php echo $stats['total_applicants']; ?></p>
-                                
+                                <p class="text-sm font-medium text-gray-600 mb-1">Total Applicants</p>
+                                <p class="text-3xl font-bold text-gray-900" id="totalApplicants"><?php echo $stats['total_applicants']; ?></p>
                             </div>
-                            <div class="p-3 rounded-lg bg-green-500">
-                                <i class="fas fa-user-check text-white text-xl"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-600">Active Users</p>
-                                <p class="text-2xl font-bold text-gray-900" data-stat="active_users"><?php echo $stats['active_users']; ?></p>
-                                
-                            </div>
-                            <div class="p-3 rounded-lg bg-purple-500">
+                            <div class="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
                                 <i class="fas fa-users text-white text-xl"></i>
                             </div>
                         </div>
                     </div>
+
+                    <!-- Active Users Card -->
                     <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm font-medium text-gray-600">Pending Reviews</p>
-                                <p class="text-2xl font-bold text-gray-900" data-stat="pending_reviews"><?php echo $stats['pending_reviews']; ?></p>
-                                
+                                <p class="text-sm font-medium text-gray-600 mb-1">Active Users</p>
+                                <p class="text-3xl font-bold text-gray-900" id="activeUsers"><?php echo $stats['active_users']; ?></p>
                             </div>
-                            <div class="p-3 rounded-lg bg-orange-500">
-                                <i class="fas fa-eye text-white text-xl"></i>
+                            <div class="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-user-check text-white text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pending Reviews Card -->
+                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600 mb-1" id="pendingReviewsLabel">
+                                    <?php 
+                                    if ($admin_role === 'Secretary') {
+                                        echo 'Pending Review';
+                                    } else if ($admin_role === 'Department Head') {
+                                        echo 'Dept. Pending';
+                                    } else {
+                                        echo 'Pending Reviews';
+                                    }
+                                    ?>
+                                </p>
+                                <p class="text-3xl font-bold text-gray-900" id="pendingReviews">
+                                    <?php 
+                                    if ($admin_role === 'Secretary') {
+                                        echo $stats['secretary_pending'];
+                                    } else if ($admin_role === 'Department Head') {
+                                        echo $stats['dept_pending'];
+                                    } else {
+                                        echo ($stats['secretary_pending'] + $stats['dept_pending']);
+                                    }
+                                    ?>
+                                </p>
+                            </div>
+                            <div class="w-12 h-12 bg-orange-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-clock text-white text-xl"></i>
                             </div>
                         </div>
                     </div>
@@ -522,12 +755,22 @@ $recent_activity = $conn->query($recent_activity_query);
                     <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                         <div class="flex items-center justify-between mb-4">
                             <h2 class="text-lg font-semibold text-gray-900">Applications Overview</h2>
-                            <select id="chartFilter" onchange="updateChart()" class="text-sm border border-gray-300 rounded-md px-3 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <option value="daily" <?php echo $chart_filter == 'daily' ? 'selected' : ''; ?>>Daily (24h)</option>
-                                <option value="weekly" <?php echo $chart_filter == 'weekly' ? 'selected' : ''; ?>>Weekly (7d)</option>
-                                <option value="monthly" <?php echo $chart_filter == 'monthly' ? 'selected' : ''; ?>>Monthly (30d)</option>
-                                <option value="yearly" <?php echo $chart_filter == 'yearly' ? 'selected' : ''; ?>>Yearly (12m)</option>
-                            </select>
+                            <div class="flex gap-2">
+                                <select id="schoolYearFilter" onchange="updateChart()" class="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">All School Years</option>
+                                    <?php
+                                    // Only show 2025-2026 school year
+                                    $sy = '2025-2026';
+                                    $selected = ($school_year == $sy) ? 'selected' : '';
+                                    echo "<option value='$sy' $selected>SY $sy</option>";
+                                    ?>
+                                </select>
+                                <select id="semesterFilter" onchange="updateChart()" class="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">All Semesters</option>
+                                    <option value="first" <?php echo $semester == 'first' ? 'selected' : ''; ?>>First Semester</option>
+                                    <option value="second" <?php echo $semester == 'second' ? 'selected' : ''; ?>>Second Semester</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="h-80 overflow-x-auto overflow-y-hidden flex items-end pb-8" id="chartContainer">
                             <div class="flex items-end justify-start gap-3 h-5/6 min-w-max px-4">
@@ -557,8 +800,8 @@ $recent_activity = $conn->query($recent_activity_query);
                             <?php if ($recent_activity && $recent_activity->num_rows > 0): ?>
                                 <?php while ($activity = $recent_activity->fetch_assoc()): ?>
                                     <?php
-                                    // SKIP entries with NULL, empty, or 'application' activity_type
-                                    if (empty($activity['activity_type']) || $activity['activity_type'] == 'application') {
+                                    // SKIP entries with NULL, empty, 'application', or 'admin_login' activity_type
+                                    if (empty($activity['activity_type']) || $activity['activity_type'] == 'application' || $activity['activity_type'] == 'admin_login') {
                                         continue;
                                     }
                                     
@@ -621,6 +864,11 @@ $recent_activity = $conn->query($recent_activity_query);
                                                 $icon_class = 'fas fa-user-check text-green-600';
                                                 $bg_class = 'bg-green-100';
                                                 $activity_title = 'Applicant hired';
+                                                break;
+                                            case 'applicant_transferred':
+                                                $icon_class = 'fas fa-share text-blue-600';
+                                                $bg_class = 'bg-blue-100';
+                                                $activity_title = 'Application transferred';
                                                 break;
                                             case 'applicant_initially_hired':
                                                 $icon_class = 'fas fa-user-plus text-green-600';
@@ -692,6 +940,30 @@ $recent_activity = $conn->query($recent_activity_query);
                         </div>
                     </div>
                 </div>
+                
+                <!-- Immediate cleanup script for Recent Activity -->
+                <script>
+                (function() {
+                    // Run cleanup immediately as HTML is parsed
+                    const container = document.getElementById('recentActivityContainer');
+                    if (container) {
+                        const items = container.querySelectorAll('.flex.items-center.gap-3');
+                        items.forEach(item => {
+                            const titleEl = item.querySelector('.text-sm.font-medium');
+                            if (titleEl) {
+                                const text = titleEl.textContent;
+                                if (text.includes('New application received') || 
+                                    text.includes('logged in') || 
+                                    text.includes('Admin logged') ||
+                                    text.includes('Secretary logged') ||
+                                    text.includes('Department Head logged')) {
+                                    item.style.display = 'none';
+                                }
+                            }
+                        });
+                    }
+                })();
+                </script>
 
                 <!-- Recent Tables -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -716,7 +988,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                                 <td class="px-6 py-4">
                                                     <div>
                                                         <div class="font-medium text-gray-900"><?php echo htmlspecialchars($job['job_title']); ?></div>
-                                                        <div class="text-sm text-gray-500"><?php echo htmlspecialchars(string: $job['department_role'] ?? 'General'); ?></div>
+                                                        <div class="text-sm text-gray-500"><?php echo htmlspecialchars($job['department_role'] ?? 'General'); ?></div>
                                                     </div>
                                                 </td>
                                                 <td class="px-6 py-4 text-sm text-gray-900"><?php echo $job['application_count']; ?></td>
@@ -751,7 +1023,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-gray-200">
+                                <tbody class="divide-y divide-gray-200" id="recentApplicantsContainer">
                                     <?php if ($recent_applicants && $recent_applicants->num_rows > 0): ?>
                                         <?php while ($applicant = $recent_applicants->fetch_assoc()): ?>
                                             <tr class="hover:bg-gray-50">
@@ -772,13 +1044,41 @@ $recent_activity = $conn->query($recent_activity_query);
                                                             $statusClass = 'bg-green-100 text-green-800';
                                                             $statusText = 'Approved';
                                                             break;
+                                                        case 'Initially Hired':
+                                                            $statusClass = 'bg-green-100 text-green-800';
+                                                            $statusText = 'Initially Hired';
+                                                            break;
+                                                        case 'Permanently Hired':
+                                                            $statusClass = 'bg-green-100 text-green-800';
+                                                            $statusText = 'Permanently Hired';
+                                                            break;
+                                                        case 'Hired':
+                                                            $statusClass = 'bg-green-100 text-green-800';
+                                                            $statusText = 'Hired';
+                                                            break;
                                                         case 'Rejected':
                                                             $statusClass = 'bg-red-100 text-red-800';
                                                             $statusText = 'Rejected';
                                                             break;
-                                                        case 'Interview':
+                                                        case 'Interview Scheduled':
                                                             $statusClass = 'bg-blue-100 text-blue-800';
                                                             $statusText = 'Interview Scheduled';
+                                                            break;
+                                                        case 'Demo Scheduled':
+                                                            $statusClass = 'bg-blue-100 text-blue-800';
+                                                            $statusText = 'Demo Scheduled';
+                                                            break;
+                                                        case 'Psych Scheduled':
+                                                            $statusClass = 'bg-blue-100 text-blue-800';
+                                                            $statusText = 'Psych Scheduled';
+                                                            break;
+                                                        case 'Resubmission Required':
+                                                            $statusClass = 'bg-orange-100 text-orange-800';
+                                                            $statusText = 'Resubmission Required';
+                                                            break;
+                                                        case 'Pending':
+                                                            $statusClass = 'bg-yellow-100 text-yellow-800';
+                                                            $statusText = 'Under Review';
                                                             break;
                                                         default:
                                                             $statusClass = 'bg-yellow-100 text-yellow-800';
@@ -819,18 +1119,20 @@ $recent_activity = $conn->query($recent_activity_query);
                         <div class="flex-1">
                             <div class="relative">
                                 <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                                <input type="text" placeholder="Search jobs..." 
+                                <input type="text" id="jobSearchInput" placeholder="Search jobs..." 
+                                       oninput="filterJobs()" 
                                        class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                             </div>
                         </div>
                         <div class="flex gap-2">
-                            <select class="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                            <select id="jobStatusFilter" onchange="filterJobs()" 
+                                    class="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                                 <option value="all">All Status</option>
                                 <option value="active">Active</option>
-                                <option value="draft">Draft</option>
                                 <option value="closed">Closed</option>
                             </select>
-                            <button class="border border-gray-300 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors flex items-center gap-2">
+                            <button onclick="openMoreFiltersModal()" 
+                                    class="border border-gray-300 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors flex items-center gap-2">
                                 <i class="fas fa-filter"></i>
                                 More Filters
                             </button>
@@ -862,12 +1164,8 @@ $recent_activity = $conn->query($recent_activity_query);
 
             <!-- Applicants Section -->
             <div id="applicantsSection" class="section hidden">
-                <div class="flex items-center justify-between mb-6">
+                <div class="mb-6">
                     <h1 class="text-3xl font-bold text-gray-900">Applicants</h1>
-                    <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2">
-                        <i class="fas fa-download"></i>
-                        Export Data
-                    </button>
                 </div>
 
                 <!-- Stats Cards -->
@@ -876,7 +1174,7 @@ $recent_activity = $conn->query($recent_activity_query);
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-sm font-medium text-gray-600">Total Applicants</p>
-                                <p class="text-2xl font-bold text-gray-900"><?php echo $stats['total_applicants']; ?></p>
+                                <p class="text-2xl font-bold text-gray-900" data-stat="total_applicants"><?php echo $stats['total_applicants']; ?></p>
                             </div>
                             <i class="fas fa-user text-2xl text-blue-500"></i>
                         </div>
@@ -884,17 +1182,8 @@ $recent_activity = $conn->query($recent_activity_query);
                     <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm font-medium text-gray-600">Under Review</p>
-                                <p class="text-2xl font-bold text-gray-900"><?php echo $stats['pending_reviews']; ?></p>
-                            </div>
-                            <i class="fas fa-clock text-2xl text-yellow-500"></i>
-                        </div>
-                    </div>
-                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
-                        <div class="flex items-center justify-between">
-                            <div>
                                 <p class="text-sm font-medium text-gray-600">Interviews Scheduled</p>
-                                <p class="text-2xl font-bold text-gray-900"><?php echo $stats['interview_scheduled']; ?></p>
+                                <p class="text-2xl font-bold text-gray-900" data-stat="interview_scheduled"><?php echo $stats['interview_scheduled']; ?></p>
                             </div>
                             <i class="fas fa-calendar text-2xl text-blue-500"></i>
                         </div>
@@ -902,8 +1191,17 @@ $recent_activity = $conn->query($recent_activity_query);
                     <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
                         <div class="flex items-center justify-between">
                             <div>
+                                <p class="text-sm font-medium text-gray-600">Demo Scheduled</p>
+                                <p class="text-2xl font-bold text-gray-900" data-stat="demo_scheduled"><?php echo $stats['demo_scheduled']; ?></p>
+                            </div>
+                            <i class="fas fa-chalkboard-teacher text-2xl text-indigo-500"></i>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
                                 <p class="text-sm font-medium text-gray-600">Hired</p>
-                                <p class="text-2xl font-bold text-gray-900"><?php echo $stats['hired']; ?></p>
+                                <p class="text-2xl font-bold text-gray-900" data-stat="hired"><?php echo $stats['hired']; ?></p>
                             </div>
                             <i class="fas fa-check-circle text-2xl text-green-500"></i>
                         </div>
@@ -929,9 +1227,14 @@ $recent_activity = $conn->query($recent_activity_query);
                                 <option value="all">All Applicants</option>
                                 <option value="Pending">Pending</option>
                                 <option value="Interview Scheduled">Interview Scheduled</option>
+                                <option value="Interview Passed">Interview Passed</option>
+                                <option value="Demo Scheduled">Demo Scheduled</option>
+                                <option value="Demo Passed">Demo Passed</option>
+                                <option value="Psychological Exam">Psychological Exam</option>
                                 <option value="Resubmission Required">Resubmission Required</option>
-                                <option value="Rejected">Rejected</option>
+                                <option value="Initially Hired">Initially Hired</option>
                                 <option value="Hired">Hired</option>
+                                <option value="Rejected">Rejected</option>
                             </select>
                         </div>
                         
@@ -978,21 +1281,37 @@ $recent_activity = $conn->query($recent_activity_query);
                             </tbody>
                         </table>
                     </div>
+                    
+                    <!-- Pagination Controls -->
+                    <div id="applicantsPaginationContainer" class="hidden px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                        <div class="flex items-center text-sm text-gray-700">
+                            <span id="applicantsPaginationInfo">Showing 1-5 of 10 applicants</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button id="applicantsPrevBtn" onclick="changeApplicantsPage('prev')" 
+                                    class="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled>
+                                <i class="ri-arrow-left-s-line"></i> Previous
+                            </button>
+                            <div id="applicantsPageNumbers" class="flex items-center gap-1">
+                                <!-- Page numbers will be generated here -->
+                            </div>
+                            <button id="applicantsNextBtn" onclick="changeApplicantsPage('next')" 
+                                    class="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                Next <i class="ri-arrow-right-s-line"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Applicant Details Section -->
             <div id="applicantDetailsSection" class="section hidden">
-                <div class="flex items-center justify-between mb-6">
-                    <div class="flex items-center gap-4">
-                        <button onclick="showSection('applicants')" class="text-gray-600 hover:text-gray-800">
-                            <i class="fas fa-arrow-left text-xl"></i>
-                        </button>
-                        <h1 class="text-2xl font-bold text-gray-900">Applicant Details</h1>
-                    </div>
-                    <div id="applicantStatus" class="flex items-center gap-3">
-                        <!-- Status badge will be inserted here -->
-                    </div>
+                <div class="flex items-center gap-4 mb-6">
+                    <button onclick="showSection('applicants')" class="text-gray-600 hover:text-gray-800">
+                        <i class="fas fa-arrow-left text-xl"></i>
+                    </button>
+                    <h1 class="text-2xl font-bold text-gray-900">Applicant Details</h1>
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1045,11 +1364,11 @@ $recent_activity = $conn->query($recent_activity_query);
                         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                             <h2 class="text-lg font-semibold text-gray-900 mb-4">Actions</h2>
                             <div id="actionButtons" class="space-y-3">
-                                <!-- Secretary Action: Transfer to Department Head -->
+                                <!-- Secretary Action: Transfer to Dean -->
                                 <button id="transferToDeptHeadBtn" onclick="openTransferModal()" 
                                         class="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 hidden">
                                     <i class="fas fa-share"></i>
-                                    Transfer to Department Head
+                                    Transfer to Dean
                                 </button>
                                 
                                 <button id="scheduleBtn" onclick="openScheduleModal()" 
@@ -1148,7 +1467,7 @@ $recent_activity = $conn->query($recent_activity_query);
             <div id="archiveSection" class="section hidden">
                 <div class="flex items-center justify-between mb-6">
                     <h1 class="text-3xl font-bold text-gray-900">Archive</h1>
-                    <p class="text-gray-600">Rejected applicants</p>
+                    <p class="text-gray-600">Rejected and Cancelled applicants</p>
                 </div>
 
                 <!-- Archive Stats -->
@@ -1173,6 +1492,14 @@ $recent_activity = $conn->query($recent_activity_query);
                                        class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                             </div>
                         </div>
+                        <div class="w-full md:w-48">
+                            <select id="archiveStatusFilter" onchange="filterArchiveByStatus(this.value)" 
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                                <option value="all">All Status</option>
+                                <option value="rejected">Rejected Only</option>
+                                <option value="cancelled">Cancelled Only</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -1184,15 +1511,16 @@ $recent_activity = $conn->query($recent_activity_query);
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Applicant</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Position</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Applied Date</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rejected Date</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Archive Date</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200" id="archiveTableBody">
                                 <tr>
-                                    <td colspan="6" class="text-center py-8 text-gray-500">
+                                    <td colspan="7" class="text-center py-8 text-gray-500">
                                         <i class="fas fa-archive text-4xl text-gray-300 mb-3"></i>
                                         <p>No archived applicants</p>
                                     </td>
@@ -1212,6 +1540,54 @@ $recent_activity = $conn->query($recent_activity_query);
                         <i class="fas fa-plus"></i>
                         Create User
                     </button>
+                </div>
+
+                <!-- Search and Filters -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <!-- Search Bar -->
+                        <div class="md:col-span-2">
+                            <div class="relative">
+                                <input type="text" id="userSearch" placeholder="Search by name or email..." 
+                                       class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                       oninput="filterUsers()">
+                                <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                            </div>
+                        </div>
+                        
+                        <!-- Role Filter -->
+                        <div>
+                            <select id="roleFilter" 
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                    onchange="filterUsers()">
+                                <option value="">All Roles</option>
+                                <option value="Admin">Admin</option>
+                                <option value="Department Head">Dean</option>
+                                <option value="Secretary">Secretary</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Status Filter -->
+                        <div>
+                            <select id="statusFilter" 
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                    onchange="filterUsers()">
+                                <option value="">All Status</option>
+                                <option value="Active">Active</option>
+                                <option value="Inactive">Inactive</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Results Count and Clear Button -->
+                    <div class="mt-3 flex items-center justify-between">
+                        <span id="userResultsCount" class="text-sm text-gray-600">Loading...</span>
+                        <button onclick="clearUserFilters()" 
+                                class="text-sm text-primary hover:text-blue-800 font-medium flex items-center gap-1">
+                            <i class="fas fa-times-circle"></i>
+                            Clear Filters
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Users Table -->
@@ -1270,8 +1646,8 @@ $recent_activity = $conn->query($recent_activity_query);
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
-                        <input type="text" name="title" value="Instructor" required readonly
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-gray-100 cursor-not-allowed"
+                        <input type="text" name="title" value="Instructor" required 
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent "
                                placeholder="Enter job title">
                     </div>
                     <div>
@@ -1279,7 +1655,7 @@ $recent_activity = $conn->query($recent_activity_query);
                         <select name="department" required
                                 class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                             <option value="">Select department</option>
-                            <option value="Computer Science">Computer Science</option>
+                            <option value="Computing Studies">Computing Studies</option>
                             <option value="Hospitality Management">Hospitality Management</option>
                             <option value="Education">Education</option>
                             
@@ -1307,15 +1683,43 @@ $recent_activity = $conn->query($recent_activity_query);
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Salary Range</label>
-                        <input type="text" name="salary" required
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                               placeholder="e.g., ₱25,000 - ₱35,000">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Minimum</label>
+                                <input type="text" id="salaryMin1" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="25,000">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Maximum</label>
+                                <input type="text" id="salaryMax1" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="35,000">
+                            </div>
+                        </div>
+                        <input type="hidden" name="salary" id="salaryRange1">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Application Deadline</label>
                         <input type="date" name="deadline" required
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                     </div>
+                </div>
+
+                <!-- Subject Field -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Subject <span class="text-red-500">*</span></label>
+                    <select name="subject" required
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                        <option value="">Select subject</option>
+                        <option value="BSEd and BEED Professional Education Subjects">BSEd and BEED Professional Education Subjects</option>
+                        <option value="Computing Studies Professional Subjects">Computing Studies Professional Subjects</option>
+                        <option value="Major Subjects (Biology, Chemistry and Physics)">Major Subjects (Biology, Chemistry and Physics)</option>
+                        <option value="Business Management Subjects">Business Management Subjects</option>
+                        <option value="Social Sciences">Social Sciences</option>
+                        <option value="English">English</option>
+                        <option value="PATHFit">PATHFit</option>
+                    </select>
                 </div>
 
                 <div>
@@ -1437,9 +1841,21 @@ $recent_activity = $conn->query($recent_activity_query);
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Salary Range</label>
-                        <input type="text" name="salary" required
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                               placeholder="e.g., ₱25,000 - ₱35,000">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Minimum</label>
+                                <input type="text" id="salaryMin2" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="15,000">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Maximum</label>
+                                <input type="text" id="salaryMax2" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="20,000">
+                            </div>
+                        </div>
+                        <input type="hidden" name="salary" id="salaryRange2">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Application Deadline</label>
@@ -1564,15 +1980,43 @@ $recent_activity = $conn->query($recent_activity_query);
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Salary Range</label>
-                        <input type="text" name="salary" required
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                               placeholder="e.g., ₱25,000 - ₱35,000">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Minimum</label>
+                                <input type="text" id="salaryMin3" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="18,000">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Maximum</label>
+                                <input type="text" id="salaryMax3" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="25,000">
+                            </div>
+                        </div>
+                        <input type="hidden" name="salary" id="salaryRange3">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Application Deadline</label>
                         <input type="date" name="deadline" required
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                     </div>
+                </div>
+
+                <!-- Subject Field -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Subject <span class="text-red-500">*</span></label>
+                    <select name="subject" required
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                        <option value="">Select subject</option>
+                        <option value="BSEd and BEED Professional Education Subjects">BSEd and BEED Professional Education Subjects</option>
+                        <option value="Computing Studies Professional Subjects">Computing Studies Professional Subjects</option>
+                        <option value="Major Subjects (Biology, Chemistry and Physics)">Major Subjects (Biology, Chemistry and Physics)</option>
+                        <option value="Business Management Subjects">Business Management Subjects</option>
+                        <option value="Social Sciences">Social Sciences</option>
+                        <option value="English">English</option>
+                        <option value="PATHFit">PATHFit</option>
+                    </select>
                 </div>
 
                 <div>
@@ -1670,7 +2114,7 @@ $recent_activity = $conn->query($recent_activity_query);
                         <select name="department" required
                                 class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                             <option value="">Select department</option>
-                            <option value="Computer Science">Computer Science</option>
+                            <option value="Computing Studies">Computing Studies</option>
                             <option value="Hospitality Management">Hospitality Management</option>
                             <option value="Education">Education</option>
                             
@@ -1699,9 +2143,21 @@ $recent_activity = $conn->query($recent_activity_query);
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Salary Range</label>
-                        <input type="text" name="salary" required
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                               placeholder="e.g., ₱25,000 - ₱35,000">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Minimum</label>
+                                <input type="text" id="salaryMin4" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="25,000">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Maximum</label>
+                                <input type="text" id="salaryMax4" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="35,000">
+                            </div>
+                        </div>
+                        <input type="hidden" name="salary" id="salaryRange4">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Application Deadline</label>
@@ -1783,9 +2239,21 @@ $recent_activity = $conn->query($recent_activity_query);
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Salary Range</label>
-                        <input type="text" name="salary" required
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                               placeholder="e.g., ₱25,000 - ₱35,000">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Minimum</label>
+                                <input type="text" id="salaryMin5" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="15,000">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Maximum</label>
+                                <input type="text" id="salaryMax5" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="20,000">
+                            </div>
+                        </div>
+                        <input type="hidden" name="salary" id="salaryRange5">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Application Deadline</label>
@@ -1864,9 +2332,21 @@ $recent_activity = $conn->query($recent_activity_query);
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Salary Range</label>
-                        <input type="text" name="salary" required
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                               placeholder="e.g., ₱25,000 - ₱35,000">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Minimum</label>
+                                <input type="text" id="salaryMin6" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="18,000">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Maximum</label>
+                                <input type="text" id="salaryMax6" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
+                                       placeholder="25,000">
+                            </div>
+                        </div>
+                        <input type="hidden" name="salary" id="salaryRange6">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Application Deadline</label>
@@ -1897,16 +2377,139 @@ $recent_activity = $conn->query($recent_activity_query);
         </div>
     </div>
 
-<div id="viewJobModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-  <div class="bg-white p-6 rounded-lg shadow-lg w-1/3">
-    <h2 class="text-xl font-bold mb-4 job-title"></h2>
-    <p><strong>Department:</strong> <span class="job-dept"></span></p>
-    <p><strong>Type:</strong> <span class="job-type"></span></p>
-    <p><strong>Location:</strong> <span class="job-loc"></span></p>
-    <p><strong>Salary:</strong> <span class="job-salary"></span></p>
-    <p><strong>Deadline:</strong> <span class="job-deadline"></span></p>
-    <p><strong>Description:</strong> <span class="job-desc"></span></p>
-    <button onclick="closeViewJobModal()" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded">Close</button>
+<div id="viewJobModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6 rounded-t-xl sticky top-0 z-10">
+      <div class="flex items-center justify-between">
+        <div class="flex-1">
+          <h2 class="text-2xl font-bold mb-2 job-title"></h2>
+          <div class="flex flex-wrap gap-4 text-sm text-blue-100">
+            <span class="flex items-center"><i class="fas fa-building mr-2"></i><span class="job-dept"></span></span>
+            <span class="flex items-center"><i class="fas fa-clock mr-2"></i><span class="job-type"></span></span>
+            <span class="flex items-center"><i class="fas fa-map-marker-alt mr-2"></i><span class="job-loc"></span></span>
+          </div>
+        </div>
+        <button onclick="closeViewJobModal()" class="text-white hover:text-gray-200 transition-colors">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+      <div class="mt-4 flex items-center justify-between">
+        <div class="text-white text-xl font-semibold">
+          <i class="fas fa-peso-sign mr-2"></i><span class="job-salary"></span>
+        </div>
+        <div class="text-right">
+          <div class="text-blue-100 text-xs font-medium">APPLICATION DEADLINE</div>
+          <div class="text-white text-lg font-bold job-deadline"></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Content -->
+    <div class="p-6 space-y-6">
+      <!-- Job Highlights -->
+      <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-5 border-l-4 border-blue-600">
+        <h3 class="text-lg font-bold text-gray-900 mb-3 flex items-center">
+          <i class="fas fa-star text-blue-600 mr-2"></i>Job Highlights
+        </h3>
+        <div class="grid grid-cols-3 gap-4">
+          <div class="bg-white rounded-lg p-3 shadow-sm">
+            <div class="text-xs text-gray-500 font-semibold mb-1">Job Type</div>
+            <div class="text-gray-900 font-medium job-type-highlight"></div>
+          </div>
+          <div class="bg-white rounded-lg p-3 shadow-sm">
+            <div class="text-xs text-gray-500 font-semibold mb-1">Location</div>
+            <div class="text-gray-900 font-medium job-loc-highlight"></div>
+          </div>
+          <div class="bg-white rounded-lg p-3 shadow-sm">
+            <div class="text-xs text-gray-500 font-semibold mb-1">Department</div>
+            <div class="text-gray-900 font-medium job-dept-highlight"></div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Position Overview -->
+      <div class="bg-white border border-gray-200 rounded-xl p-5">
+        <h3 class="text-lg font-bold text-gray-900 mb-3 flex items-center">
+          <i class="fas fa-file-alt text-blue-600 mr-2"></i>Position Overview
+        </h3>
+        <div class="text-gray-700 space-y-2 job-desc"></div>
+      </div>
+      
+      <!-- Duties & Responsibilities -->
+      <div id="job-duties-section" class="bg-white border border-gray-200 rounded-xl p-5" style="display: none;">
+        <h3 class="text-lg font-bold text-gray-900 mb-3 flex items-center">
+          <i class="fas fa-tasks text-blue-600 mr-2"></i>Duties & Responsibilities
+        </h3>
+        <div class="text-gray-700 space-y-2 job-duties"></div>
+      </div>
+      
+      <!-- Minimum Qualifications -->
+      <div class="bg-white border border-gray-200 rounded-xl p-5">
+        <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
+          <i class="fas fa-check-circle text-blue-600 mr-2"></i>Minimum Qualifications
+        </h3>
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div class="bg-gray-50 rounded-lg p-4">
+            <div class="text-sm font-semibold text-gray-900 mb-2 flex items-center">
+              <i class="fas fa-graduation-cap text-blue-600 mr-2"></i>Education
+            </div>
+            <div class="text-gray-700 job-education"></div>
+          </div>
+          <div class="bg-gray-50 rounded-lg p-4">
+            <div class="text-sm font-semibold text-gray-900 mb-2 flex items-center">
+              <i class="fas fa-briefcase text-blue-600 mr-2"></i>Experience
+            </div>
+            <div class="text-gray-700 job-experience"></div>
+          </div>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-4 mb-4">
+          <div class="text-sm font-semibold text-gray-900 mb-2 flex items-center">
+            <i class="fas fa-book text-blue-600 mr-2"></i>Training
+          </div>
+          <div class="text-gray-700 job-training"></div>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-4">
+          <div class="text-sm font-semibold text-gray-900 mb-2 flex items-center">
+            <i class="fas fa-medal text-blue-600 mr-2"></i>Eligibility
+          </div>
+          <div class="text-gray-700 job-eligibility"></div>
+        </div>
+      </div>
+      
+      <!-- Required Documents -->
+      <div class="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-5 border-l-4 border-amber-500">
+        <h3 class="text-lg font-bold text-amber-800 mb-3 flex items-center">
+          <i class="fas fa-file-alt text-amber-600 mr-2"></i>Required Documents for Application
+        </h3>
+        <p class="text-sm text-amber-700 mb-3">Applicants must submit the following documents:</p>
+        <div class="grid grid-cols-2 gap-2 text-sm">
+          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-check text-green-600 mr-2"></i>Application Letter</div>
+          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-check text-green-600 mr-2"></i>Updated Resume</div>
+          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-check text-green-600 mr-2"></i>Transcript of Record</div>
+          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-check text-green-600 mr-2"></i>Diploma</div>
+          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-info-circle text-blue-600 mr-2"></i>Professional License <span class="text-xs text-gray-500">(Optional)</span></div>
+          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-check text-green-600 mr-2"></i>Certificate of Employment</div>
+          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-check text-green-600 mr-2"></i>Training Certificates</div>
+          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-info-circle text-blue-600 mr-2"></i>Masteral Certificate <span class="text-xs text-gray-500">(Optional)</span></div>
+        </div>
+      </div>
+      
+      <!-- Required Competencies -->
+      <div class="bg-white border border-gray-200 rounded-xl p-5">
+        <h3 class="text-lg font-bold text-gray-900 mb-3 flex items-center">
+          <i class="fas fa-lightbulb text-blue-600 mr-2"></i>Required Competencies
+        </h3>
+        <div class="text-gray-700 space-y-2 job-competency"></div>
+      </div>
+    </div>
+    
+    <!-- Footer -->
+    <div class="bg-gray-50 p-4 rounded-b-xl flex justify-end gap-3 sticky bottom-0">
+      <button onclick="closeViewJobModal()" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium">
+        Close
+      </button>
+    </div>
   </div>
 </div>
 
@@ -2017,7 +2620,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                     class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                                 <option value="">Select role</option>
                                 <option value="Admin">Admin</option>
-                                <option value="Department Head">Department Head</option>
+                                <option value="Department Head">Dean</option>
                                 <option value="Secretary">Secretary</option>
                             </select>
                         </div>
@@ -2027,7 +2630,7 @@ $recent_activity = $conn->query($recent_activity_query);
                             <select name="department" id="createUserDepartment" required
                                     class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                                 <option value="">Select department</option>
-                                <option value="Computer Science">Computer Science</option>
+                                <option value="Computing Studies">Computing Studies</option>
                                 <option value="Education">Education</option>
                                 <option value="Hospitality Management">Hospitality Management</option>
                             </select>
@@ -2094,9 +2697,10 @@ $recent_activity = $conn->query($recent_activity_query);
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Email Address *</label>
-                            <input type="text" name="user_email_edit" id="editUserEmail" required autocomplete="off" autocomplete="nope"
-                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                            <input type="text" name="user_email_edit" id="editUserEmail" required readonly autocomplete="off" autocomplete="nope"
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 cursor-not-allowed"
                                    placeholder="Enter email address">
+                            <p class="text-xs text-gray-500 mt-1">Email cannot be changed after account creation</p>
                         </div>
 
                         <div>
@@ -2135,7 +2739,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                     class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                                 <option value="">Select role</option>
                                 <option value="Admin">Admin</option>
-                                <option value="Department Head">Department Head</option>
+                                <option value="Department Head">Dean</option>
                                 <option value="Secretary">Secretary</option> 
                             </select>
                         </div>
@@ -2145,7 +2749,7 @@ $recent_activity = $conn->query($recent_activity_query);
                             <select name="department" id="editUserDepartment" required
                                     class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                                 <option value="">Select department</option>
-                                <option value="Computer Science">Computer Science</option>
+                                <option value="Computing Studies">Computing Studies</option>
                                 <option value="Education">Education</option>
                                 <option value="Hospitality Management">Hospitality Management</option>
                             </select>
@@ -2157,7 +2761,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                     class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                                 <option value="Active">Active</option>
                                 <option value="Inactive">Inactive</option>
-                                <option value="Suspended">Suspended</option>
+                                
                             </select>
                         </div>
                     </div>
@@ -2266,7 +2870,7 @@ $recent_activity = $conn->query($recent_activity_query);
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                            <input type="text" value="<?php echo htmlspecialchars($admin_role); ?>" readonly
+                            <input type="text" value="<?php echo htmlspecialchars($admin_role_display); ?>" readonly
                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-600 cursor-not-allowed">
                         </div>
 
@@ -2306,8 +2910,86 @@ $recent_activity = $conn->query($recent_activity_query);
         
         // Update chart based on filter selection
         function updateChart() {
-            const filter = document.getElementById('chartFilter').value;
-            window.location.href = `?chart_filter=${filter}`;
+            const schoolYear = document.getElementById('schoolYearFilter').value;
+            const semester = document.getElementById('semesterFilter').value;
+            
+            const params = new URLSearchParams();
+            if (schoolYear) params.append('school_year', schoolYear);
+            if (semester) params.append('semester', semester);
+            
+            // Update filter status indicator
+            updateFilterStatus(schoolYear, semester);
+            
+            // Fetch new chart data via AJAX
+            fetch(`get_chart_data.php?${params.toString()}`)
+                .then(response => response.json())
+                .then(data => {
+                    updateChartDisplay(data.chart_data, data.chart_labels);
+                })
+                .catch(error => {
+                    console.error('Error fetching chart data:', error);
+                });
+            
+            // Also update the stats cards with filtered data
+            fetch(`get_filtered_stats.php?${params.toString()}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateStatistics(data.stats);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching filtered stats:', error);
+                });
+        }
+        
+        // Update filter status indicator
+        function updateFilterStatus(schoolYear, semester) {
+            const filterStatus = document.getElementById('filterStatus');
+            const filterStatusText = document.getElementById('filterStatusText');
+            
+            if (schoolYear && semester) {
+                const semesterText = semester === 'first' ? 'First Semester' : 'Second Semester';
+                filterStatusText.textContent = `Showing data for SY ${schoolYear} - ${semesterText}`;
+                filterStatus.classList.remove('hidden');
+            } else if (schoolYear || semester) {
+                let text = 'Filters active: ';
+                if (schoolYear) text += `SY ${schoolYear}`;
+                if (semester) text += (schoolYear ? ', ' : '') + (semester === 'first' ? 'First Semester' : 'Second Semester');
+                filterStatusText.textContent = text;
+                filterStatus.classList.remove('hidden');
+            } else {
+                filterStatus.classList.add('hidden');
+            }
+        }
+        
+        // Update chart display with new data
+        function updateChartDisplay(chartData, chartLabels) {
+            const chartContainer = document.getElementById('chartContainer');
+            if (!chartContainer) return;
+            
+            const maxValue = Math.max(...chartData) || 1;
+            
+            let html = '<div class="flex items-end justify-start gap-3 h-5/6 min-w-max px-4">';
+            
+            chartData.forEach((value, index) => {
+                let height = (value / maxValue) * 280;
+                height = Math.max(height, 20); // Minimum height
+                
+                html += `
+                    <div class="flex flex-col items-center" style="min-width: 80px;">
+                        <div class="w-16 bg-primary rounded-t chart-bar opacity-80 hover:opacity-100 relative group transition-all duration-200" style="height: ${height}px;">
+                            <div class="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-3 py-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 shadow-lg">
+                                ${value} applications
+                            </div>
+                        </div>
+                        <span class="text-sm text-gray-600 mt-3 text-center font-medium break-words" style="width: 70px;">${chartLabels[index]}</span>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            chartContainer.innerHTML = html;
         }
         
         // Auto-refresh dashboard data
@@ -2340,14 +3022,14 @@ $recent_activity = $conn->query($recent_activity_query);
                 });
         }
         
-        // Update statistics cards
+        // Update statistics cards using data-stat attributes
         function updateStatistics(stats) {
-            const statCards = document.querySelectorAll('.text-2xl.font-bold.text-gray-900');
-            if (statCards.length >= 4) {
-                statCards[0].textContent = stats.total_jobs;
-                statCards[1].textContent = stats.total_applicants;
-                statCards[2].textContent = stats.active_users;
-                statCards[3].textContent = stats.pending_reviews;
+            // Update each stat by its data-stat attribute
+            for (const [key, value] of Object.entries(stats)) {
+                const statElement = document.querySelector(`[data-stat="${key}"]`);
+                if (statElement) {
+                    statElement.textContent = value;
+                }
             }
         }
         
@@ -2361,8 +3043,8 @@ $recent_activity = $conn->query($recent_activity_query);
             
             let html = '';
             activities.forEach(activity => {
-                // SKIP entries with NULL, empty, or 'application' activity_type
-                if (!activity.activity_type || activity.activity_type === 'application') {
+                // SKIP entries with NULL, empty, 'application', or 'admin_login' activity_type
+                if (!activity.activity_type || activity.activity_type === 'application' || activity.activity_type === 'admin_login') {
                     return; // Skip this iteration
                 }
                 
@@ -2385,8 +3067,8 @@ $recent_activity = $conn->query($recent_activity_query);
             
             container.innerHTML = html;
             
-            // After updating, remove any remaining "New application received" entries
-            setTimeout(removeNewApplicationEntries, 100);
+            // After updating, remove any remaining unwanted entries (applications and logins)
+            setTimeout(removeUnwantedActivityEntries, 100);
         }
         
         // Get activity icon and styling
@@ -2447,6 +3129,11 @@ $recent_activity = $conn->query($recent_activity_query);
                     bgClass: 'bg-green-100',
                     title: 'Applicant hired'
                 },
+                'applicant_transferred': {
+                    iconClass: 'fas fa-share text-blue-600',
+                    bgClass: 'bg-blue-100',
+                    title: 'Application transferred'
+                },
                 'applicant_initially_hired': {
                     iconClass: 'fas fa-user-plus text-green-600',
                     bgClass: 'bg-green-100',
@@ -2504,7 +3191,7 @@ $recent_activity = $conn->query($recent_activity_query);
         // Update recent tables
         function updateRecentTables(jobs, applicants) {
             // Update jobs table
-            const jobsTable = document.querySelector('#dashboardSection .grid.grid-cols-1.lg\\:grid-cols-2 .bg-white:first-child tbody');
+            const jobsTable = document.querySelector('#recentJobsContainer');
             if (jobsTable && jobs) {
                 let jobsHtml = '';
                 jobs.forEach(job => {
@@ -2529,7 +3216,7 @@ $recent_activity = $conn->query($recent_activity_query);
             }
             
             // Update applicants table
-            const applicantsTable = document.querySelector('#dashboardSection .grid.grid-cols-1.lg\\:grid-cols-2 .bg-white:last-child tbody');
+            const applicantsTable = document.querySelector('#recentApplicantsContainer');
             if (applicantsTable && applicants) {
                 let applicantsHtml = '';
                 applicants.forEach(applicant => {
@@ -2558,12 +3245,18 @@ $recent_activity = $conn->query($recent_activity_query);
         function getStatusBadge(status) {
             const badges = {
                 'Approved': { class: 'bg-green-100 text-green-800', text: 'Approved' },
+                'Initially Hired': { class: 'bg-green-100 text-green-800', text: 'Initially Hired' },
+                'Permanently Hired': { class: 'bg-green-100 text-green-800', text: 'Permanently Hired' },
+                'Hired': { class: 'bg-green-100 text-green-800', text: 'Hired' },
                 'Rejected': { class: 'bg-red-100 text-red-800', text: 'Rejected' },
-                'Interview': { class: 'bg-blue-100 text-blue-800', text: 'Interview Scheduled' },
+                'Interview Scheduled': { class: 'bg-blue-100 text-blue-800', text: 'Interview Scheduled' },
+                'Demo Scheduled': { class: 'bg-blue-100 text-blue-800', text: 'Demo Scheduled' },
+                'Psych Scheduled': { class: 'bg-blue-100 text-blue-800', text: 'Psych Scheduled' },
+                'Resubmission Required': { class: 'bg-orange-100 text-orange-800', text: 'Resubmission Required' },
                 'Pending': { class: 'bg-yellow-100 text-yellow-800', text: 'Under Review' }
             };
             
-            return badges[status] || badges['Pending'];
+            return badges[status] || { class: 'bg-yellow-100 text-yellow-800', text: 'Under Review' };
         }
         
         // Toggle auto-refresh
@@ -2598,8 +3291,8 @@ $recent_activity = $conn->query($recent_activity_query);
         
         // Initialize dashboard
         document.addEventListener('DOMContentLoaded', function() {
-            // IMMEDIATELY remove any "New application received" entries
-            removeNewApplicationEntries();
+            // IMMEDIATELY remove any unwanted activity entries
+            removeUnwantedActivityEntries();
             
             // Start auto-refresh automatically
             startAutoRefresh();
@@ -2609,10 +3302,17 @@ $recent_activity = $conn->query($recent_activity_query);
                 logActivity('admin_login', 'Admin accessed dashboard');
                 sessionStorage.setItem('adminLoginLogged', 'true');
             }
+            
+            // Initialize filter status display on page load
+            const schoolYear = document.getElementById('schoolYearFilter')?.value;
+            const semester = document.getElementById('semesterFilter')?.value;
+            if (schoolYear || semester) {
+                updateFilterStatus(schoolYear, semester);
+            }
         });
         
-        // Function to remove "New application received" entries
-        function removeNewApplicationEntries() {
+        // Function to remove unwanted activity entries (applications and logins)
+        function removeUnwantedActivityEntries() {
             const container = document.getElementById('recentActivityContainer');
             if (!container) return;
             
@@ -2621,8 +3321,16 @@ $recent_activity = $conn->query($recent_activity_query);
             
             activityItems.forEach(item => {
                 const titleElement = item.querySelector('.text-sm.font-medium');
-                if (titleElement && titleElement.textContent.includes('New application received')) {
-                    item.remove(); // Remove the entire activity item
+                if (titleElement) {
+                    const text = titleElement.textContent;
+                    // Remove application and login related activities
+                    if (text.includes('New application received') || 
+                        text.includes('logged in') || 
+                        text.includes('Admin logged') ||
+                        text.includes('Secretary logged') ||
+                        text.includes('Department Head logged')) {
+                        item.remove(); // Remove the entire activity item
+                    }
                 }
             });
         }
@@ -2667,13 +3375,13 @@ $recent_activity = $conn->query($recent_activity_query);
             <form id="scheduleForm">
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Interview Date</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
                         <input type="date" id="interviewDate" required 
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Interview Time</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Time</label>
                         <input type="time" id="interviewTime" required 
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
@@ -2967,11 +3675,11 @@ $recent_activity = $conn->query($recent_activity_query);
         </div>
     </div>
 
-    <!-- Transfer to Department Head Modal -->
+    <!-- Transfer to Dean Modal -->
     <div id="transferModal" class="fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 hidden">
         <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-900">Transfer to Department Head</h3>
+                <h3 class="text-lg font-semibold text-gray-900">Transfer to Dean</h3>
                 <button onclick="closeTransferModal()" class="text-gray-400 hover:text-gray-600">
                     <i class="fas fa-times"></i>
                 </button>
@@ -2985,7 +3693,7 @@ $recent_activity = $conn->query($recent_activity_query);
                             <div>
                                 <h4 class="font-semibold text-blue-900 text-sm">Document Review Complete</h4>
                                 <p class="text-xs text-blue-700 mt-1">
-                                    This will transfer the application to the Department Head for interview scheduling and further evaluation.
+                                    This will transfer the application to the Dean for interview scheduling and further evaluation.
                                 </p>
                             </div>
                         </div>
@@ -2997,7 +3705,7 @@ $recent_activity = $conn->query($recent_activity_query);
                         </label>
                         <textarea id="transferNotes" rows="3"
                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                                  placeholder="Add any notes or comments for the Department Head..."></textarea>
+                                  placeholder="Add any notes or comments for the Dean..."></textarea>
                         <p class="text-xs text-gray-500 mt-1">Any observations or important details about the documents.</p>
                     </div>
                 </div>
@@ -3287,7 +3995,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                 <select name="department_role" id="editDepartment" required
                                         class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
                                     <option value="">Select department</option>
-                                    <option value="Computer Science">Computer Science</option>
+                                    <option value="Computing Studies">Computing Studies</option>
                                     <option value="Hospitality Management">Hospitality Management</option>
                                     <option value="Education">Education</option>
                                 </select>
@@ -3578,6 +4286,65 @@ $recent_activity = $conn->query($recent_activity_query);
             </div>
         </div>
     </div>
+
+<!-- More Filters Modal -->
+<div id="moreFiltersModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 transform transition-all">
+        <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-900">More Filters</h3>
+                <button onclick="closeMoreFiltersModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <div class="p-6 space-y-4">
+            <!-- Department Filter -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Department</label>
+                <select id="jobDepartmentFilter" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                    <option value="all">All Departments</option>
+                    <option value="Computing Studies">Computing Studies</option>
+                    <option value="Hospitality Management">Hospitality Management</option>
+                    <option value="Education">Education</option>
+                </select>
+            </div>
+            
+            <!-- Job Type Filter -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Job Type</label>
+                <select id="jobTypeFilter" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                    <option value="all">All Types</option>
+                    <option value="Full-time">Full-time</option>
+                    <option value="Part-time">Part-time</option>
+                </select>
+            </div>
+            
+            <!-- Date Range Filter -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Deadline Range</label>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">From</label>
+                        <input type="date" id="jobDeadlineFrom" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">To</label>
+                        <input type="date" id="jobDeadlineTo" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="p-6 border-t border-gray-200 flex gap-3">
+            <button onclick="clearJobFilters()" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                Clear Filters
+            </button>
+            <button onclick="applyMoreFilters()" class="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-800 transition-colors font-medium">
+                Apply Filters
+            </button>
+        </div>
+    </div>
+</div>
 
 <!-- Logout Confirmation Modal -->
 <div id="logoutModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center">
@@ -3972,6 +4739,90 @@ function closeLogoutModal() {
 function proceedLogout() {
     window.location.href = 'logout.php';
 }
+
+// Real-time stats update
+let statsUpdateInterval = null;
+
+function updateStatsCards() {
+    fetch('api/dashboard_stats.php', {
+        cache: 'no-store',
+        headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.stats) {
+            // Update each stat with smooth animation
+            updateStatWithAnimation('totalJobs', data.stats.total_jobs);
+            updateStatWithAnimation('totalApplicants', data.stats.total_applicants);
+            updateStatWithAnimation('activeUsers', data.stats.active_users);
+            updateStatWithAnimation('pendingReviews', data.stats.pending_reviews);
+            
+            // Update pending reviews label if role-specific
+            if (data.stats.pending_reviews_label) {
+                const label = document.getElementById('pendingReviewsLabel');
+                if (label) {
+                    label.textContent = data.stats.pending_reviews_label;
+                }
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error updating stats:', error);
+    });
+}
+
+function updateStatWithAnimation(elementId, newValue) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    
+    const currentValue = parseInt(element.textContent) || 0;
+    
+    if (currentValue !== newValue) {
+        // Add pulse animation to the card
+        const card = element.closest('.card-hover');
+        if (card) {
+            card.classList.add('animate-pulse');
+            
+            // Remove animation after 1 second
+            setTimeout(() => {
+                card.classList.remove('animate-pulse');
+            }, 1000);
+        }
+        
+        // Update the value
+        element.textContent = newValue;
+    }
+}
+
+// Start auto-updating stats every 30 seconds
+function startStatsAutoUpdate() {
+    // Update immediately on page load
+    updateStatsCards();
+    
+    // Then update every 30 seconds
+    statsUpdateInterval = setInterval(updateStatsCards, 30000);
+}
+
+// Stop auto-updating stats
+function stopStatsAutoUpdate() {
+    if (statsUpdateInterval) {
+        clearInterval(statsUpdateInterval);
+        statsUpdateInterval = null;
+    }
+}
+
+// Start stats auto-update when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    startStatsAutoUpdate();
+});
+
+// Stop updating when user leaves the page
+window.addEventListener('beforeunload', function() {
+    stopStatsAutoUpdate();
+});
 </script>
 </body>
 </html>

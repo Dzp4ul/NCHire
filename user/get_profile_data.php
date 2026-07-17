@@ -11,7 +11,7 @@ if (!isset($_SESSION['user_id']) && !isset($_SESSION['user_email'])) {
 // Database connection
 $servername = "localhost";
 $username = "root";
-$password = "12345678";
+$password = "";
 $dbname = "nchire";
 
 $conn = new mysqli($servername, $username, $password, $dbname);

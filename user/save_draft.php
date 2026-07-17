@@ -34,7 +34,7 @@ if (!isset($_SESSION['user_id'])) {
 
 $host = "127.0.0.1";
 $user = "root";
-$pass = "12345678";
+$pass = "";
 $dbname = "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
@@ -113,33 +113,33 @@ try {
     $existing_draft = $result->fetch_assoc();
     $check_stmt->close();
     
-    // Upload new files or keep existing ones
-    // Check for existing draft filenames sent from hidden inputs
-    $application_letter = uploadDraftFile('applicationLetter', $userDraftDir, $user_id) ?? ($_POST['existing_applicationLetter'] ?? ($existing_draft['application_letter'] ?? null));
-    $resume = uploadDraftFile('resume_file', $userDraftDir, $user_id) ?? ($_POST['existing_resume_file'] ?? ($existing_draft['resume'] ?? null));
-    $tor = uploadDraftFile('transcript', $userDraftDir, $user_id) ?? ($_POST['existing_transcript'] ?? ($existing_draft['tor'] ?? null));
-    $diploma = uploadDraftFile('diploma', $userDraftDir, $user_id) ?? ($_POST['existing_diploma'] ?? ($existing_draft['diploma'] ?? null));
-    $professional_license = uploadDraftFile('license', $userDraftDir, $user_id) ?? ($_POST['existing_license'] ?? ($existing_draft['professional_license'] ?? null));
-    $coe = uploadDraftFile('coe', $userDraftDir, $user_id) ?? ($_POST['existing_coe'] ?? ($existing_draft['coe'] ?? null));
-    $seminars_trainings = uploadDraftFile('certificates', $userDraftDir, $user_id, true) ?? ($_POST['existing_certificates[]'] ?? ($existing_draft['seminars_trainings'] ?? null));
-    $masteral_cert = uploadDraftFile('masteral_cert', $userDraftDir, $user_id) ?? ($_POST['existing_masteral_cert'] ?? ($existing_draft['masteral_cert'] ?? null));
-    $letter_of_intent = uploadDraftFile('letter_of_intent', $userDraftDir, $user_id) ?? ($_POST['existing_letter_of_intent'] ?? ($existing_draft['letter_of_intent'] ?? null));
+    // Upload new files - ONLY save what's currently uploaded
+    // Check for existing draft filenames sent from hidden inputs (already loaded drafts)
+    $application_letter = uploadDraftFile('applicationLetter', $userDraftDir, $user_id) ?? ($_POST['existing_applicationLetter'] ?? null);
+    $resume = uploadDraftFile('resume_file', $userDraftDir, $user_id) ?? ($_POST['existing_resume_file'] ?? null);
+    $tor = uploadDraftFile('transcript', $userDraftDir, $user_id) ?? ($_POST['existing_transcript'] ?? null);
+    $diploma = uploadDraftFile('diploma', $userDraftDir, $user_id) ?? ($_POST['existing_diploma'] ?? null);
+    $professional_license = uploadDraftFile('license', $userDraftDir, $user_id) ?? ($_POST['existing_license'] ?? null);
+    $coe = uploadDraftFile('coe', $userDraftDir, $user_id) ?? ($_POST['existing_coe'] ?? null);
+    $seminars_trainings = uploadDraftFile('certificates', $userDraftDir, $user_id, true) ?? ($_POST['existing_certificates[]'] ?? null);
+    $masteral_cert = uploadDraftFile('masteral_cert', $userDraftDir, $user_id) ?? ($_POST['existing_masteral_cert'] ?? null);
+    $letter_of_intent = uploadDraftFile('letter_of_intent', $userDraftDir, $user_id) ?? ($_POST['existing_letter_of_intent'] ?? null);
     
     error_log("letter_of_intent result after upload: " . ($letter_of_intent ?? 'NULL'));
     error_log("existing_letter_of_intent from POST: " . ($_POST['existing_letter_of_intent'] ?? 'NOT SET'));
     
     if ($existing_draft) {
-        // Update existing draft
+        // Update existing draft - REPLACE all fields (no COALESCE to preserve old values)
         $stmt = $conn->prepare("UPDATE user_draft_documents SET 
-            application_letter = COALESCE(?, application_letter),
-            resume = COALESCE(?, resume),
-            tor = COALESCE(?, tor),
-            diploma = COALESCE(?, diploma),
-            professional_license = COALESCE(?, professional_license),
-            coe = COALESCE(?, coe),
-            seminars_trainings = COALESCE(?, seminars_trainings),
-            masteral_cert = COALESCE(?, masteral_cert),
-            letter_of_intent = COALESCE(?, letter_of_intent),
+            application_letter = ?,
+            resume = ?,
+            tor = ?,
+            diploma = ?,
+            professional_license = ?,
+            coe = ?,
+            seminars_trainings = ?,
+            masteral_cert = ?,
+            letter_of_intent = ?,
             updated_at = CURRENT_TIMESTAMP
             WHERE user_id = ?");
         $stmt->bind_param("sssssssssi", 
