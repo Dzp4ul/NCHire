@@ -779,16 +779,6 @@ function clearUserFilters() {
     displayUsers(allUsers);
 }
 
-// Modal functions
-function openCreateJobModal() {
-    document.getElementById('createJobModal').classList.remove('hidden');
-}
-
-function closeCreateJobModal() {
-    document.getElementById('createJobModal').classList.add('hidden');
-    document.querySelector('#createJobModal form').reset();
-}
-
 function openCreateUserModal() {
     const modal = document.getElementById('createUserModal');
     const form = modal.querySelector('form');
