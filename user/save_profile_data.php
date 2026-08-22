@@ -32,6 +32,8 @@ if ($conn->connect_error) {
     exit();
 }
 
+require_once __DIR__ . '/../shared/helpers/recruitment.php';
+
 // Get user ID from session with fallback
 $user_id = $_SESSION['user_id'] ?? null;
 
@@ -53,48 +55,177 @@ if (!$user_id) {
     exit();
 }
 
+function ensureEducationProfileColumns(mysqli $conn): void
+{
+    $columns = [
+        'education_level' => "ALTER TABLE user_education ADD COLUMN education_level ENUM('bachelor','master','doctorate','other') NOT NULL DEFAULT 'other' AFTER user_id",
+        'education_status' => "ALTER TABLE user_education ADD COLUMN education_status ENUM('completed','ongoing') NOT NULL DEFAULT 'completed' AFTER institution",
+        'completed_units' => "ALTER TABLE user_education ADD COLUMN completed_units INT NULL AFTER education_status",
+        'year_completed' => "ALTER TABLE user_education ADD COLUMN year_completed INT NULL AFTER completed_units",
+        'certificate_of_grades' => "ALTER TABLE user_education ADD COLUMN certificate_of_grades VARCHAR(255) NULL AFTER year_completed",
+        'proof_of_enrollment' => "ALTER TABLE user_education ADD COLUMN proof_of_enrollment VARCHAR(255) NULL AFTER certificate_of_grades"
+    ];
+
+    foreach ($columns as $column => $sql) {
+        if (!nc_column_exists($conn, 'user_education', $column)) {
+            $conn->query($sql);
+        }
+    }
+}
+
+function saveEducationDocument(string $fieldName, int $userId): ?string
+{
+    if (!isset($_FILES[$fieldName]) || $_FILES[$fieldName]['error'] === UPLOAD_ERR_NO_FILE) {
+        return null;
+    }
+
+    if ($_FILES[$fieldName]['error'] !== UPLOAD_ERR_OK) {
+        throw new RuntimeException('Unable to upload ' . str_replace('_', ' ', $fieldName) . '.');
+    }
+
+    if ($_FILES[$fieldName]['size'] > 5 * 1024 * 1024) {
+        throw new RuntimeException('Education document uploads must be 5MB or smaller.');
+    }
+
+    $allowedExtensions = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
+    $originalName = $_FILES[$fieldName]['name'] ?? '';
+    $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+    if (!in_array($extension, $allowedExtensions, true)) {
+        throw new RuntimeException('Education documents must be PDF, DOC, DOCX, JPG, or PNG files.');
+    }
+
+    $uploadDir = __DIR__ . '/uploads/education_documents/';
+    if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
+        throw new RuntimeException('Unable to prepare education document upload folder.');
+    }
+
+    $fileName = $fieldName . '_' . $userId . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $extension;
+    $targetPath = $uploadDir . $fileName;
+    if (!move_uploaded_file($_FILES[$fieldName]['tmp_name'], $targetPath)) {
+        throw new RuntimeException('Unable to save uploaded education document.');
+    }
+
+    return 'uploads/education_documents/' . $fileName;
+}
+
 // Handle Education Save
 if (isset($_POST['saveEducation'])) {
     error_log("=== EDUCATION SAVE START ===");
+    ensureEducationProfileColumns($conn);
+
     $edit_id = isset($_POST['edit_id']) && !empty($_POST['edit_id']) ? (int)$_POST['edit_id'] : 0;
-    $ed_degree = $conn->real_escape_string($_POST['ed_degree'] ?? '');
-    $ed_fs = $conn->real_escape_string($_POST['ed_fs'] ?? '');
-    $ed_ins = $conn->real_escape_string($_POST['ed_ins'] ?? '');
+    $ed_degree = trim($_POST['ed_degree'] ?? '');
+    $ed_fs = trim($_POST['ed_fs'] ?? '');
+    $ed_ins = trim($_POST['ed_ins'] ?? '');
     $ed_sy = (int)($_POST['ed_sy'] ?? 0);
     $ed_ey = (int)($_POST['ed_ey'] ?? 0);
-    $ed_gpa = $conn->real_escape_string($_POST['ed_gpa'] ?? '');
-    
-    error_log("User ID: $user_id, Degree: $ed_degree");
-    
-    if (empty($ed_degree) || empty($ed_fs) || empty($ed_ins) || empty($ed_sy) || empty($ed_ey)) {
+    $ed_gpa = trim($_POST['ed_gpa'] ?? '');
+    $education_level = strtolower(trim($_POST['education_level'] ?? $_POST['ed_level'] ?? 'other'));
+    $education_status = strtolower(trim($_POST['education_status'] ?? $_POST['ed_status'] ?? 'completed'));
+    $completed_units = isset($_POST['completed_units']) && $_POST['completed_units'] !== ''
+        ? (int)$_POST['completed_units']
+        : (isset($_POST['ed_completed_units']) && $_POST['ed_completed_units'] !== '' ? (int)$_POST['ed_completed_units'] : null);
+    $year_completed = isset($_POST['year_completed']) && $_POST['year_completed'] !== ''
+        ? (int)$_POST['year_completed']
+        : (isset($_POST['ed_year_completed']) && $_POST['ed_year_completed'] !== '' ? (int)$_POST['ed_year_completed'] : null);
+
+    if (!in_array($education_level, ['bachelor', 'master', 'doctorate', 'other'], true)) {
+        $education_level = 'other';
+    }
+    if (!in_array($education_status, ['completed', 'ongoing'], true)) {
+        $education_status = 'completed';
+    }
+    if ($education_level === 'other') {
+        $degree_l = strtolower($ed_degree);
+        if (strpos($degree_l, 'doctor') !== false || strpos($degree_l, 'ph.d') !== false || strpos($degree_l, 'phd') !== false) {
+            $education_level = 'doctorate';
+        } elseif (strpos($degree_l, 'master') !== false || strpos($degree_l, 'masteral') !== false) {
+            $education_level = 'master';
+        } elseif (strpos($degree_l, 'bachelor') !== false || strpos($degree_l, 'baccalaureate') !== false) {
+            $education_level = 'bachelor';
+        }
+    }
+
+    if ($education_status === 'ongoing') {
+        $year_completed = null;
+        $ed_ey = 0;
+    } else {
+        $completed_units = null;
+        $year_completed = $year_completed ?: $ed_ey;
+    }
+
+    $existing_documents = ['certificate_of_grades' => null, 'proof_of_enrollment' => null];
+    if ($edit_id > 0) {
+        $existing_stmt = $conn->prepare("SELECT certificate_of_grades, proof_of_enrollment FROM user_education WHERE id = ? AND user_id = ?");
+        if ($existing_stmt) {
+            $existing_stmt->bind_param("ii", $edit_id, $user_id);
+            $existing_stmt->execute();
+            $existing_documents = $existing_stmt->get_result()->fetch_assoc() ?: $existing_documents;
+            $existing_stmt->close();
+        }
+    }
+
+    try {
+        $certificate_of_grades = saveEducationDocument('certificate_of_grades', (int)$user_id) ?: ($existing_documents['certificate_of_grades'] ?? null);
+        $proof_of_enrollment = saveEducationDocument('proof_of_enrollment', (int)$user_id) ?: ($existing_documents['proof_of_enrollment'] ?? null);
+    } catch (RuntimeException $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        exit();
+    }
+
+    $is_graduate_ongoing = $education_status === 'ongoing' && in_array($education_level, ['master', 'doctorate'], true);
+    if ($is_graduate_ongoing && $completed_units === null) {
+        echo json_encode(['success' => false, 'message' => 'Completed units are required for ongoing graduate education.']);
+        exit();
+    }
+    if ($is_graduate_ongoing && (!$certificate_of_grades || !$proof_of_enrollment)) {
+        echo json_encode(['success' => false, 'message' => 'Certificate of Grades and Proof of Enrollment are required for ongoing graduate education.']);
+        exit();
+    }
+
+    if ($ed_degree === '' || $ed_fs === '' || $ed_ins === '' || empty($ed_sy) || ($education_status === 'completed' && empty($ed_ey))) {
         error_log("ERROR: Missing required fields");
         echo json_encode(['success' => false, 'message' => 'Please fill in all required fields']);
         exit();
     }
-    
+
+    $response_data = [
+        'degree' => $ed_degree,
+        'field_of_study' => $ed_fs,
+        'institution' => $ed_ins,
+        'education_level' => $education_level,
+        'education_status' => $education_status,
+        'completed_units' => $completed_units,
+        'year_completed' => $year_completed,
+        'certificate_of_grades' => $certificate_of_grades,
+        'proof_of_enrollment' => $proof_of_enrollment,
+        'start_year' => $ed_sy,
+        'end_year' => $ed_ey ?: null,
+        'gpa' => $ed_gpa
+    ];
+
     if ($edit_id > 0) {
-        // UPDATE existing record
-        $sql = "UPDATE user_education SET degree = ?, field_of_study = ?, institution = ?, start_year = ?, end_year = ?, gpa = ? 
-                WHERE id = ? AND user_id = ?";
+        $sql = "UPDATE user_education SET degree = ?, field_of_study = ?, institution = ?, education_level = ?, education_status = ?, completed_units = ?, year_completed = ?, certificate_of_grades = ?, proof_of_enrollment = ?, start_year = ?, end_year = ?, gpa = ? WHERE id = ? AND user_id = ?";
         $stmt = $conn->prepare($sql);
-        $stmt->bind_param("ssssiiii", $ed_degree, $ed_fs, $ed_ins, $ed_sy, $ed_ey, $ed_gpa, $edit_id, $user_id);
-        
+        $stmt->bind_param("sssssiissiisii", $ed_degree, $ed_fs, $ed_ins, $education_level, $education_status, $completed_units, $year_completed, $certificate_of_grades, $proof_of_enrollment, $ed_sy, $ed_ey, $ed_gpa, $edit_id, $user_id);
+
         if ($stmt->execute()) {
-            echo json_encode(['success' => true, 'message' => 'Education updated successfully']);
+            $response_data['id'] = $edit_id;
+            echo json_encode(['success' => true, 'message' => 'Education updated successfully', 'id' => $edit_id, 'data' => $response_data]);
         } else {
             error_log("Education update error: " . $stmt->error);
             echo json_encode(['success' => false, 'message' => 'Error updating education: ' . $stmt->error]);
         }
     } else {
-        // INSERT new record
-        $sql = "INSERT INTO user_education (user_id, degree, field_of_study, institution, start_year, end_year, gpa) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)";
+        $sql = "INSERT INTO user_education (user_id, degree, field_of_study, institution, education_level, education_status, completed_units, year_completed, certificate_of_grades, proof_of_enrollment, start_year, end_year, gpa) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         $stmt = $conn->prepare($sql);
-        $stmt->bind_param("isssiis", $user_id, $ed_degree, $ed_fs, $ed_ins, $ed_sy, $ed_ey, $ed_gpa);
-        
+        $stmt->bind_param("isssssiissiis", $user_id, $ed_degree, $ed_fs, $ed_ins, $education_level, $education_status, $completed_units, $year_completed, $certificate_of_grades, $proof_of_enrollment, $ed_sy, $ed_ey, $ed_gpa);
+
         if ($stmt->execute()) {
-            error_log("SUCCESS: Education inserted with ID: " . $stmt->insert_id);
-            echo json_encode(['success' => true, 'message' => 'Education added successfully', 'id' => $stmt->insert_id]);
+            $new_id = $stmt->insert_id;
+            $response_data['id'] = $new_id;
+            error_log("SUCCESS: Education inserted with ID: " . $new_id);
+            echo json_encode(['success' => true, 'message' => 'Education added successfully', 'id' => $new_id, 'data' => $response_data]);
         } else {
             error_log("ERROR: Education insert failed: " . $stmt->error);
             echo json_encode(['success' => false, 'message' => 'Error adding education: ' . $stmt->error]);
@@ -104,7 +235,6 @@ if (isset($_POST['saveEducation'])) {
     error_log("=== EDUCATION SAVE END ===");
     exit();
 }
-
 // Handle Personal Information Save
 if (isset($_POST['savePersonal'])) {
     error_log("=== PERSONAL INFO SAVE START ===");

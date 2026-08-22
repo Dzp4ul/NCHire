@@ -106,7 +106,7 @@ try {
     }
     
     // Check if draft already exists for this user
-    $check_stmt = $conn->prepare("SELECT id, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, letter_of_intent FROM user_draft_documents WHERE user_id = ?");
+    $check_stmt = $conn->prepare("SELECT id, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, certificate_of_grades, proof_of_enrollment, letter_of_intent FROM user_draft_documents WHERE user_id = ?");
     $check_stmt->bind_param("i", $user_id);
     $check_stmt->execute();
     $result = $check_stmt->get_result();
@@ -123,6 +123,8 @@ try {
     $coe = uploadDraftFile('coe', $userDraftDir, $user_id) ?? ($_POST['existing_coe'] ?? null);
     $seminars_trainings = uploadDraftFile('certificates', $userDraftDir, $user_id, true) ?? ($_POST['existing_certificates[]'] ?? null);
     $masteral_cert = uploadDraftFile('masteral_cert', $userDraftDir, $user_id) ?? ($_POST['existing_masteral_cert'] ?? null);
+    $certificate_of_grades = uploadDraftFile('certificate_of_grades', $userDraftDir, $user_id) ?? ($_POST['existing_certificate_of_grades'] ?? null);
+    $proof_of_enrollment = uploadDraftFile('proof_of_enrollment', $userDraftDir, $user_id) ?? ($_POST['existing_proof_of_enrollment'] ?? null);
     $letter_of_intent = uploadDraftFile('letter_of_intent', $userDraftDir, $user_id) ?? ($_POST['existing_letter_of_intent'] ?? null);
     
     error_log("letter_of_intent result after upload: " . ($letter_of_intent ?? 'NULL'));
@@ -139,22 +141,24 @@ try {
             coe = ?,
             seminars_trainings = ?,
             masteral_cert = ?,
+            certificate_of_grades = ?,
+            proof_of_enrollment = ?,
             letter_of_intent = ?,
             updated_at = CURRENT_TIMESTAMP
             WHERE user_id = ?");
-        $stmt->bind_param("sssssssssi", 
+        $stmt->bind_param("sssssssssssi", 
             $application_letter, $resume, $tor, $diploma, 
             $professional_license, $coe, $seminars_trainings, 
-            $masteral_cert, $letter_of_intent, $user_id
+            $masteral_cert, $certificate_of_grades, $proof_of_enrollment, $letter_of_intent, $user_id
         );
     } else {
         // Insert new draft
         $stmt = $conn->prepare("INSERT INTO user_draft_documents 
-            (user_id, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, letter_of_intent) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("isssssssss", 
+            (user_id, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, certificate_of_grades, proof_of_enrollment, letter_of_intent) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("isssssssssss", 
             $user_id, $application_letter, $resume, $tor, $diploma, 
-            $professional_license, $coe, $seminars_trainings, $masteral_cert, $letter_of_intent
+            $professional_license, $coe, $seminars_trainings, $masteral_cert, $certificate_of_grades, $proof_of_enrollment, $letter_of_intent
         );
     }
     
@@ -171,6 +175,8 @@ try {
                 'coe' => $coe,
                 'seminars_trainings' => $seminars_trainings,
                 'masteral_cert' => $masteral_cert,
+                'certificate_of_grades' => $certificate_of_grades,
+                'proof_of_enrollment' => $proof_of_enrollment,
                 'letter_of_intent' => $letter_of_intent
             ]
         ]);

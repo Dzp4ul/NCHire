@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="900" viewBox="0 0 1500 900">
+  <defs>
+    <pattern id="smallGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#242424" stroke-width="1"/>
+    </pattern>
+    <pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse">
+      <rect width="100" height="100" fill="url(#smallGrid)"/>
+      <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#343434" stroke-width="1.4"/>
+    </pattern>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#f2f2f2"/>
+    </marker>
+    <style>
+      .bg { fill: #101010; }
+      .grid { fill: url(#grid); }
+      .entity, .process { fill: #151515; stroke: #f2f2f2; stroke-width: 2; }
+      .label { fill: #f7f7f7; font-family: Arial, Helvetica, sans-serif; font-size: 18px; }
+      .small { fill: #f7f7f7; font-family: Arial, Helvetica, sans-serif; font-size: 15px; }
+      .title { fill: #ffffff; font-family: Arial, Helvetica, sans-serif; font-size: 26px; font-weight: 700; }
+      .flow { stroke: #f2f2f2; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .flowLabel {
+        fill: #f7f7f7;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 15px;
+        paint-order: stroke fill;
+        stroke: #101010;
+        stroke-width: 7;
+        stroke-linejoin: round;
+      }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1500" height="900"/>
+  <rect class="grid" width="1500" height="900" opacity="0.95"/>
+
+  <text class="title" x="60" y="58">DFD Level 0 - NCHire AI Recruitment System</text>
+
+  <!-- External entities -->
+  <rect class="entity" x="80" y="150" width="230" height="92"/>
+  <text class="label" x="195" y="188" text-anchor="middle">Applicant</text>
+  <text class="small" x="195" y="216" text-anchor="middle">Job Seeker</text>
+
+  <rect class="entity" x="1180" y="145" width="260" height="112"/>
+  <text class="label" x="1310" y="187" text-anchor="middle">Recruitment Staff</text>
+  <text class="small" x="1310" y="215" text-anchor="middle">Admin / Secretary</text>
+  <text class="small" x="1310" y="239" text-anchor="middle">Dean / HR Personnel</text>
+
+  <rect class="entity" x="1175" y="632" width="270" height="96"/>
+  <text class="label" x="1310" y="671" text-anchor="middle">Email / Notification</text>
+  <text class="small" x="1310" y="699" text-anchor="middle">Service</text>
+
+  <rect class="entity" x="85" y="632" width="260" height="104"/>
+  <text class="label" x="215" y="674" text-anchor="middle">AI Model Service</text>
+  <text class="small" x="215" y="702" text-anchor="middle">Resume, Matching,</text>
+  <text class="small" x="215" y="726" text-anchor="middle">Chatbot, Insights</text>
+
+  <!-- Main system -->
+  <circle class="process" cx="750" cy="430" r="145"/>
+  <text class="label" x="750" y="385" text-anchor="middle">NCHire</text>
+  <text class="label" x="750" y="414" text-anchor="middle">AI Recruitment</text>
+  <text class="label" x="750" y="443" text-anchor="middle">System</text>
+  <text class="small" x="750" y="477" text-anchor="middle">Recruitment Portal with</text>
+  <text class="small" x="750" y="501" text-anchor="middle">AI Screening Features</text>
+
+  <!-- Applicant flows -->
+  <path class="flow" d="M310 190 C430 165, 530 230, 625 320"/>
+  <text class="flowLabel" x="460" y="146" text-anchor="middle">
+    <tspan x="460" dy="0">Registration, profile, resume, documents</tspan>
+    <tspan x="460" dy="20">and job application</tspan>
+  </text>
+
+  <path class="flow" d="M625 520 C500 565, 360 460, 310 242"/>
+  <text class="flowLabel" x="425" y="580" text-anchor="middle">
+    <tspan x="425" dy="0">Job listings, application status,</tspan>
+    <tspan x="425" dy="20">notifications, AI match feedback</tspan>
+  </text>
+
+  <!-- Staff flows -->
+  <path class="flow" d="M1180 190 C1050 165, 945 220, 870 320"/>
+  <text class="flowLabel" x="985" y="148" text-anchor="middle">
+    <tspan x="985" dy="0">Job posts, review actions,</tspan>
+    <tspan x="985" dy="20">chatbot queries, report requests</tspan>
+  </text>
+
+  <path class="flow" d="M875 525 C1005 600, 1110 470, 1215 257"/>
+  <text class="flowLabel" x="1035" y="615" text-anchor="middle">
+    <tspan x="1035" dy="0">Ranked candidates, resume summaries,</tspan>
+    <tspan x="1035" dy="20">AI insights, chatbot responses</tspan>
+  </text>
+
+  <!-- Notification service flows -->
+  <path class="flow" d="M845 558 C965 682, 1085 690, 1175 690"/>
+  <text class="flowLabel" x="970" y="735" text-anchor="middle">Verification, schedule and status messages</text>
+
+  <path class="flow" d="M1175 675 C955 805, 560 790, 345 700"/>
+  <text class="flowLabel" x="710" y="806" text-anchor="middle">Email alerts to applicants and staff</text>
+
+  <!-- AI service flows -->
+  <path class="flow" d="M345 660 C455 600, 535 520, 615 480"/>
+  <text class="flowLabel" x="520" y="674" text-anchor="middle">
+    <tspan x="520" dy="0">Resume text, job requirements,</tspan>
+    <tspan x="520" dy="20">query context</tspan>
+  </text>
+
+  <path class="flow" d="M615 375 C500 345, 390 455, 330 632"/>
+  <text class="flowLabel" x="380" y="372" text-anchor="middle">
+    <tspan x="380" dy="0">Extracted profile, scores,</tspan>
+    <tspan x="380" dy="20">rankings, summaries</tspan>
+  </text>
+</svg>

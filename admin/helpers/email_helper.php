@@ -198,46 +198,46 @@ function sendDemoRescheduledEmail($to_email, $to_name, $demo_datetime, $demo_loc
 }
 
 /**
- * Send hired notification email
+ * Send application passed notification email
  */
 function sendHiredEmail($to_email, $to_name, $hired_notes = '') {
-    $subject = "Congratulations! You're Hired - NCHire";
-    $title = "Congratulations! You're Hired!";
-    $message = "We are pleased to inform you that you have been selected for the position at Norzagaray College.\n\n";
+    $subject = "Application Passed - NCHire";
+    $title = "Application Passed";
+    $message = "Congratulations! Your application has passed the recruitment process at Norzagaray College.\n\n";
     if ($hired_notes) {
         $message .= "Additional Information:\n$hired_notes\n\n";
     }
-    $message .= "Welcome to the Norzagaray College team! Please await further instructions regarding your onboarding process.";
+    $message .= "Please wait for further instructions from the recruitment team.";
     
     return sendEmailNotification($to_email, $to_name, $subject, $title, $message, 'success');
 }
 
 /**
- * Send initially hired notification email
+ * Send initial application passed notification email
  */
 function sendInitiallyHiredEmail($to_email, $to_name, $initially_hired_notes = '') {
-    $subject = "Marked as Initially Hired - NCHire";
-    $title = "Congratulations! Marked as Initially Hired";
-    $message = "Congratulations! You have been marked as initially hired at Norzagaray College.\n\n";
+    $subject = "Application Passed - NCHire";
+    $title = "Application Passed";
+    $message = "Congratulations! Your application has been marked as passed at Norzagaray College.\n\n";
     if ($initially_hired_notes) {
         $message .= "Additional Information:\n$initially_hired_notes\n\n";
     }
-    $message .= "Please wait for final approval and onboarding instructions. We will contact you soon with next steps.";
+    $message .= "Please wait for further instructions from the recruitment team.";
     
     return sendEmailNotification($to_email, $to_name, $subject, $title, $message, 'success');
 }
 
 /**
- * Send permanently hired notification email
+ * Send final application passed notification email
  */
 function sendPermanentlyHiredEmail($to_email, $to_name, $hired_notes = '') {
-    $subject = "Permanently Hired - Welcome Aboard! - NCHire";
-    $title = "Permanently Hired - Welcome Aboard!";
-    $message = "Congratulations! You have been permanently hired as a regular employee at Norzagaray College.\n\n";
+    $subject = "Application Passed - NCHire";
+    $title = "Application Passed";
+    $message = "Congratulations! Your application has passed the recruitment process at Norzagaray College.\n\n";
     if ($hired_notes) {
         $message .= "Details:\n$hired_notes\n\n";
     }
-    $message .= "Welcome to the team! Please await onboarding instructions and orientation details.";
+    $message .= "Please wait for further instructions from the recruitment team.";
     
     return sendEmailNotification($to_email, $to_name, $subject, $title, $message, 'success');
 }

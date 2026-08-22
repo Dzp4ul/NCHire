@@ -1,0 +1,223 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="1220" viewBox="0 0 1900 1220">
+  <defs>
+    <pattern id="smallGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#242424" stroke-width="1"/>
+    </pattern>
+    <pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse">
+      <rect width="100" height="100" fill="url(#smallGrid)"/>
+      <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#343434" stroke-width="1.4"/>
+    </pattern>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#f2f2f2"/>
+    </marker>
+    <style>
+      .bg { fill: #101010; }
+      .grid { fill: url(#grid); }
+      .entity, .process { fill: #151515; stroke: #f2f2f2; stroke-width: 2; }
+      .storeLine { stroke: #f2f2f2; stroke-width: 2; fill: none; }
+      .label { fill: #f7f7f7; font-family: Arial, Helvetica, sans-serif; font-size: 17px; }
+      .small { fill: #f7f7f7; font-family: Arial, Helvetica, sans-serif; font-size: 13px; }
+      .title { fill: #ffffff; font-family: Arial, Helvetica, sans-serif; font-size: 26px; font-weight: 700; }
+      .flow { stroke: #f2f2f2; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .contextFlow { stroke: #f2f2f2; stroke-width: 1.7; fill: none; marker-end: url(#arrow); opacity: 0.72; }
+      .flowLabel {
+        fill: #f7f7f7;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 13px;
+        paint-order: stroke fill;
+        stroke: #101010;
+        stroke-width: 7;
+        stroke-linejoin: round;
+      }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1900" height="1220"/>
+  <rect class="grid" width="1900" height="1220" opacity="0.95"/>
+  <text class="title" x="60" y="58">DFD Level 1 - NCHire with AI Features</text>
+
+  <!-- External entities -->
+  <rect class="entity" x="70" y="130" width="210" height="82"/>
+  <text class="label" x="175" y="166" text-anchor="middle">Applicant</text>
+  <text class="small" x="175" y="191" text-anchor="middle">Job Seeker</text>
+
+  <rect class="entity" x="1600" y="130" width="245" height="102"/>
+  <text class="label" x="1722" y="167" text-anchor="middle">Recruitment Staff</text>
+  <text class="small" x="1722" y="193" text-anchor="middle">Admin / Secretary</text>
+  <text class="small" x="1722" y="216" text-anchor="middle">Dean / HR Personnel</text>
+
+  <rect class="entity" x="1600" y="1000" width="250" height="90"/>
+  <text class="label" x="1725" y="1037" text-anchor="middle">Email / Notification</text>
+  <text class="small" x="1725" y="1063" text-anchor="middle">Service</text>
+
+  <!-- Processes -->
+  <circle class="process" cx="430" cy="170" r="78"/>
+  <text class="label" x="430" y="145" text-anchor="middle">1.0</text>
+  <text class="small" x="430" y="171" text-anchor="middle">Account &amp; Profile</text>
+  <text class="small" x="430" y="193" text-anchor="middle">Management</text>
+
+  <circle class="process" cx="1050" cy="170" r="78"/>
+  <text class="label" x="1050" y="145" text-anchor="middle">2.0</text>
+  <text class="small" x="1050" y="171" text-anchor="middle">Job Posting</text>
+  <text class="small" x="1050" y="193" text-anchor="middle">Management</text>
+
+  <circle class="process" cx="380" cy="430" r="84"/>
+  <text class="label" x="380" y="400" text-anchor="middle">3.0</text>
+  <text class="small" x="380" y="426" text-anchor="middle">Application</text>
+  <text class="small" x="380" y="448" text-anchor="middle">Submission &amp;</text>
+  <text class="small" x="380" y="470" text-anchor="middle">Upload</text>
+
+  <circle class="process" cx="720" cy="430" r="84"/>
+  <text class="label" x="720" y="400" text-anchor="middle">4.0</text>
+  <text class="small" x="720" y="426" text-anchor="middle">AI Resume</text>
+  <text class="small" x="720" y="448" text-anchor="middle">Analyzer</text>
+
+  <circle class="process" cx="1060" cy="430" r="88"/>
+  <text class="label" x="1060" y="397" text-anchor="middle">5.0</text>
+  <text class="small" x="1060" y="423" text-anchor="middle">AI Applicant-Job</text>
+  <text class="small" x="1060" y="445" text-anchor="middle">Matching &amp;</text>
+  <text class="small" x="1060" y="467" text-anchor="middle">Ranking</text>
+
+  <circle class="process" cx="1400" cy="430" r="86"/>
+  <text class="label" x="1400" y="400" text-anchor="middle">6.0</text>
+  <text class="small" x="1400" y="426" text-anchor="middle">Recruitment</text>
+  <text class="small" x="1400" y="448" text-anchor="middle">Workflow</text>
+  <text class="small" x="1400" y="470" text-anchor="middle">Processing</text>
+
+  <circle class="process" cx="980" cy="780" r="86"/>
+  <text class="label" x="980" y="750" text-anchor="middle">7.0</text>
+  <text class="small" x="980" y="776" text-anchor="middle">AI Recruitment</text>
+  <text class="small" x="980" y="798" text-anchor="middle">Assistant</text>
+  <text class="small" x="980" y="820" text-anchor="middle">Chatbot</text>
+
+  <circle class="process" cx="1285" cy="780" r="86"/>
+  <text class="label" x="1285" y="750" text-anchor="middle">8.0</text>
+  <text class="small" x="1285" y="776" text-anchor="middle">AI Recruitment</text>
+  <text class="small" x="1285" y="798" text-anchor="middle">Insights &amp;</text>
+  <text class="small" x="1285" y="820" text-anchor="middle">Reports</text>
+
+  <circle class="process" cx="1400" cy="1000" r="78"/>
+  <text class="label" x="1400" y="975" text-anchor="middle">9.0</text>
+  <text class="small" x="1400" y="1001" text-anchor="middle">Notification</text>
+  <text class="small" x="1400" y="1023" text-anchor="middle">Management</text>
+
+  <!-- Data stores -->
+  <g>
+    <path class="storeLine" d="M570 120 H850 M570 174 H850 M570 120 V174 M640 120 V174"/>
+    <text class="small" x="605" y="153" text-anchor="middle">D1</text>
+    <text class="small" x="745" y="153" text-anchor="middle">Applicants DB</text>
+  </g>
+
+  <g>
+    <path class="storeLine" d="M1200 250 H1510 M1200 304 H1510 M1200 250 V304 M1270 250 V304"/>
+    <text class="small" x="1235" y="283" text-anchor="middle">D2</text>
+    <text class="small" x="1385" y="283" text-anchor="middle">Job Postings DB</text>
+  </g>
+
+  <g>
+    <path class="storeLine" d="M520 610 H810 M520 664 H810 M520 610 V664 M590 610 V664"/>
+    <text class="small" x="555" y="643" text-anchor="middle">D3</text>
+    <text class="small" x="695" y="643" text-anchor="middle">Applications DB</text>
+  </g>
+
+  <g>
+    <path class="storeLine" d="M190 610 H470 M190 664 H470 M190 610 V664 M260 610 V664"/>
+    <text class="small" x="225" y="643" text-anchor="middle">D4</text>
+    <text class="small" x="365" y="643" text-anchor="middle">Uploaded Documents</text>
+  </g>
+
+  <g>
+    <path class="storeLine" d="M850 610 H1210 M850 664 H1210 M850 610 V664 M920 610 V664"/>
+    <text class="small" x="885" y="643" text-anchor="middle">D5</text>
+    <text class="small" x="1060" y="643" text-anchor="middle">AI Analysis / Scores DB</text>
+  </g>
+
+  <g>
+    <path class="storeLine" d="M1110 1018 H1280 M1110 1072 H1280 M1110 1018 V1072 M1180 1018 V1072"/>
+    <text class="small" x="1145" y="1051" text-anchor="middle">D6</text>
+    <text class="small" x="1230" y="1051" text-anchor="middle">Logs DB</text>
+  </g>
+
+  <!-- Main flows -->
+  <path class="flow" d="M280 170 H352"/>
+  <text class="flowLabel" x="315" y="148" text-anchor="middle">Signup / login / profile</text>
+
+  <path class="flow" d="M508 150 H570"/>
+  <text class="flowLabel" x="538" y="130" text-anchor="middle">Save profile</text>
+
+  <path class="flow" d="M570 174 H506"/>
+  <text class="flowLabel" x="690" y="198" text-anchor="middle">Return account status</text>
+
+  <path class="flow" d="M1600 165 H1128"/>
+  <text class="flowLabel" x="1365" y="143" text-anchor="middle">Create / edit / close jobs</text>
+
+  <path class="flow" d="M1095 234 C1120 262, 1155 276, 1200 277"/>
+  <text class="flowLabel" x="1160" y="244" text-anchor="middle">Save job requirements</text>
+
+  <path class="flow" d="M170 212 C175 322, 250 420, 296 430"/>
+  <text class="flowLabel" x="145" y="330" text-anchor="middle">
+    <tspan x="145" dy="0">Application form,</tspan>
+    <tspan x="145" dy="18">resume, documents</tspan>
+  </text>
+
+  <path class="flow" d="M420 504 C450 560, 485 628, 520 638"/>
+  <text class="flowLabel" x="475" y="585" text-anchor="middle">Store application</text>
+
+  <path class="flow" d="M326 498 C285 536, 254 574, 244 610"/>
+  <text class="flowLabel" x="262" y="558" text-anchor="middle">Store files</text>
+
+  <path class="flow" d="M470 615 C545 590, 600 510, 642 454"/>
+  <text class="flowLabel" x="555" y="578" text-anchor="middle">Resume / documents</text>
+
+  <path class="flow" d="M760 504 C795 554, 835 588, 875 610"/>
+  <text class="flowLabel" x="812" y="558" text-anchor="middle">Extracted info</text>
+
+  <path class="flow" d="M804 430 H972"/>
+  <text class="flowLabel" x="888" y="408" text-anchor="middle">AI resume data</text>
+
+  <path class="flow" d="M1200 304 C1132 338, 1090 368, 1078 343"/>
+  <text class="flowLabel" x="1160" y="348" text-anchor="middle">Job requirements</text>
+
+  <path class="flow" d="M1040 517 C1015 562, 970 590, 950 610"/>
+  <text class="flowLabel" x="1000" y="576" text-anchor="middle">Score and rank</text>
+
+  <path class="flow" d="M1210 636 C1284 622, 1340 568, 1362 507"/>
+  <text class="flowLabel" x="1284" y="606" text-anchor="middle">Use ranking</text>
+
+  <path class="flow" d="M1600 220 C1530 300, 1475 358, 1450 390"/>
+  <text class="flowLabel" x="1550" y="316" text-anchor="middle">Review decisions</text>
+
+  <path class="flow" d="M1475 405 C1545 348, 1608 282, 1648 232"/>
+  <text class="flowLabel" x="1585" y="384" text-anchor="middle">Workflow status</text>
+
+  <path class="flow" d="M1378 513 C1368 605, 1338 676, 1318 704"/>
+  <text class="flowLabel" x="1350" y="616" text-anchor="middle">Status event</text>
+
+  <path class="flow" d="M1400 516 V922"/>
+  <text class="flowLabel" x="1422" y="718" text-anchor="start">Status event</text>
+
+  <path class="flow" d="M1722 232 C1660 585, 1248 708, 1060 758"/>
+  <text class="flowLabel" x="1512" y="655" text-anchor="middle">Chat query</text>
+
+  <path class="flow" d="M1066 780 H1199"/>
+  <text class="flowLabel" x="1132" y="758" text-anchor="middle">Summaries</text>
+
+  <path class="flow" d="M1199 806 H1066"/>
+  <text class="flowLabel" x="1132" y="830" text-anchor="middle">Reports context</text>
+
+  <path class="flow" d="M1368 745 C1510 650, 1580 430, 1662 232"/>
+  <text class="flowLabel" x="1540" y="676" text-anchor="middle">Insights and chatbot response</text>
+
+  <path class="flow" d="M1360 1070 C1308 1112, 1232 1102, 1195 1072"/>
+  <text class="flowLabel" x="1265" y="1130" text-anchor="middle">Activity / notification logs</text>
+
+  <path class="flow" d="M1478 1000 H1600"/>
+  <text class="flowLabel" x="1538" y="978" text-anchor="middle">Send message</text>
+
+  <path class="flow" d="M1600 1032 H1478"/>
+  <text class="flowLabel" x="1538" y="1058" text-anchor="middle">Email result</text>
+
+  <!-- Data store context flows kept below labels to reduce clutter -->
+  <path class="contextFlow" d="M695 664 C770 722, 856 760, 894 774"/>
+  <path class="contextFlow" d="M1080 664 C1160 700, 1210 735, 1225 748"/>
+</svg>

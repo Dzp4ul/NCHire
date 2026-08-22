@@ -3,6 +3,7 @@ session_start();
 header('Content-Type: application/json');
 // Prevent PHP notices/warnings from corrupting JSON output
 ini_set('display_errors', 0);
+require_once __DIR__ . '/../shared/helpers/recruitment.php';
 
 $host = "127.0.0.1";
 $user = "root";
@@ -44,6 +45,17 @@ $training = $data["training"] ?? '';
 $eligibility = $data["eligibility"] ?? '';
 $competency = $data["competency"] ?? '';
 
+$subject_code = trim($data["subject_code"] ?? "");
+$subject_name = trim($data["subject_name"] ?? "") ?: $subject;
+$program = trim($data["program"] ?? "") ?: $department;
+$academic_year = trim($data["academic_year"] ?? "") ?: nc_current_academic_year();
+$semester = nc_normalize_semester($data["semester"] ?? "");
+$teaching_schedule = trim($data["teaching_schedule"] ?? "");
+$teaching_hours = (isset($data["teaching_hours_per_week"]) && $data["teaching_hours_per_week"] !== "") ? (float)$data["teaching_hours_per_week"] : null;
+$load_units = (isset($data["load_units"]) && $data["load_units"] !== "") ? (float)$data["load_units"] : null;
+$required_instructors = max(1, (int)($data["required_instructors"] ?? 1));
+$salary_grade = trim($data["salary_grade"] ?? "");
+
 if ($department === 'Computer Science') {
     $department = 'Computing Studies';
 }
@@ -62,18 +74,27 @@ try {
     $ok = $stmt->execute();
     if ($ok) {
         $job_id = $conn->insert_id;
+        if (nc_column_exists($conn, 'job', 'teaching_hours_per_week')) {
+            $meta_sql = "UPDATE job SET status = 'Active', subject_code = ?, subject_name = ?, program = ?, academic_year = ?, semester = ?, teaching_schedule = ?, teaching_hours_per_week = ?, load_units = ?, required_instructors = ?, salary_grade = ? WHERE id = ?";
+            $meta_stmt = $conn->prepare($meta_sql);
+            if ($meta_stmt) {
+                $meta_stmt->bind_param("ssssssddisi", $subject_code, $subject_name, $program, $academic_year, $semester, $teaching_schedule, $teaching_hours, $load_units, $required_instructors, $salary_grade, $job_id);
+                $meta_stmt->execute();
+                $meta_stmt->close();
+            }
+        }
         // Log the activity with admin name
         $activity_sql = "INSERT INTO admin_activity (activity_type, description, user_name, related_table, related_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())";
         $astmt = $conn->prepare($activity_sql);
         if ($astmt) {
             $activity_type = "job_created";
-            $desc = "$admin_name created job posting: $title";
+            $desc = "$admin_name created teaching load: $title";
             $related_table = "job";
             $astmt->bind_param("ssssi", $activity_type, $desc, $admin_name, $related_table, $job_id);
             $astmt->execute();
             $astmt->close();
         }
-        echo json_encode(["success" => true, "message" => "Job added successfully"]);
+        echo json_encode(["success" => true, "message" => "Teaching load added successfully"]);
     } else {
         echo json_encode(["success" => false, "message" => "Insert failed: " . $stmt->error]);
     }
@@ -81,7 +102,7 @@ try {
 } catch (Throwable $e) {
     // Log the error server-side and return a clean JSON error
     error_log('add_job.php error: ' . $e->getMessage());
-    echo json_encode(["success" => false, "message" => "Server error while adding job."]);
+    echo json_encode(["success" => false, "message" => "Server error while adding teaching load."]);
 }
 
 $conn->close();

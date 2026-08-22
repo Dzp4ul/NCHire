@@ -130,11 +130,19 @@ function filterJobs() {
         const deadline = new Date(job.application_deadline);
         const jobStatus = today > deadline ? "Closed" : "Active";
         
-        // Search filter (job title, location, department)
-        const matchesSearch = !searchTerm || 
-            job.job_title.toLowerCase().includes(searchTerm) ||
-            job.locations.toLowerCase().includes(searchTerm) ||
-            job.department_role.toLowerCase().includes(searchTerm);
+        // Search filter (teaching load, subject, academic period, department)
+        const searchableText = [
+            job.job_title,
+            job.teaching_load_title,
+            job.subject,
+            job.subject_name,
+            job.subject_code,
+            job.academic_year,
+            job.semester,
+            job.department_role,
+            job.program
+        ].filter(Boolean).join(' ').toLowerCase();
+        const matchesSearch = !searchTerm || searchableText.includes(searchTerm);
         
         // Status filter
         const matchesStatus = statusFilter === 'all' || 
@@ -170,7 +178,7 @@ function displayFilteredJobs() {
     tbody.innerHTML = '';
     
     if (filteredJobs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-500">No jobs found matching your filters.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-500">No teaching loads found matching your filters.</td></tr>';
         return;
     }
     
@@ -185,8 +193,8 @@ function displayFilteredJobs() {
         row.innerHTML = `
             <td class="px-6 py-4">
                 <div>
-                    <div class="font-medium text-gray-900">${job.job_title}</div>
-                    <div class="text-sm text-gray-500">${job.locations}</div>
+                    <div class="font-medium text-gray-900">${job.teaching_load_title || job.job_title}</div>
+                    <div class="text-sm text-gray-500">${job.academic_period_label || [job.academic_year, job.semester].filter(Boolean).join(' - ') || job.locations}</div>
                     <div class="text-sm text-green-600 font-medium">${job.salary_range}</div>
                 </div>
             </td>
@@ -329,7 +337,7 @@ function showSection(sectionName) {
         
         // Clear all search inputs and filters when changing sections
         const searchInputs = [
-            // Job Postings filters
+            // Teaching Loads filters
             { id: 'jobSearchInput', type: 'text', callback: 'filterJobs' },
             { id: 'jobStatusFilter', type: 'select', defaultValue: 'all', callback: 'filterJobs' },
             { id: 'jobDepartmentFilter', type: 'select', defaultValue: 'all', callback: 'filterJobs' },
@@ -863,15 +871,30 @@ function closeCreateUserModal() {
 async function createJob(event) {
     event.preventDefault();
     const formData = new FormData(event.target);
+    const subjectCode = (formData.get('subject_code') || '').trim();
+    const subjectName = (formData.get('subject_name') || '').trim();
+    const subjectArea = (formData.get('subject') || '').trim();
+    const typedTitle = (formData.get('title') || formData.get('uti') || formData.get('sec') || '').trim();
+    const derivedTitle = [subjectCode, subjectName || subjectArea].filter(Boolean).join(' - ');
 
     const newJob = {
-        job_title: formData.get('title') || formData.get('uti') || formData.get('sec'),
-        department_role: formData.get('department'),  // ✅ match DB column
+        job_title: typedTitle && typedTitle.toLowerCase() !== 'instructor' ? typedTitle : (derivedTitle || typedTitle || 'Teaching Load'),
+        department_role: formData.get('department'),
         job_type: formData.get('type'),
-        locations: formData.get('location'),         // ✅ match DB column
-        salary_range: formData.get('salary'),
+        locations: formData.get('location') || 'Norzagaray College',
+        salary_range: formData.get('salary') || '',
         application_deadline: formData.get('deadline'),
-        subject: formData.get('subject') || '',      // ✅ subject field
+        subject: subjectArea || subjectName,
+        subject_code: subjectCode,
+        subject_name: subjectName || subjectArea,
+        program: formData.get('program') || formData.get('department') || '',
+        academic_year: formData.get('academic_year') || '',
+        semester: formData.get('semester') || '',
+        teaching_schedule: formData.get('teaching_schedule') || '',
+        teaching_hours_per_week: formData.get('teaching_hours_per_week') || '',
+        load_units: formData.get('load_units') || '',
+        required_instructors: formData.get('required_instructors') || '1',
+        salary_grade: formData.get('salary_grade') || '',
         job_description: formData.get('description'),
         // New fields from enhanced form
         education: formData.get('education') || '',
@@ -1125,7 +1148,9 @@ function getStatusColor(status) {
 
 function getApplicantStatusColor(status) {
     switch(status) {
-        case 'Hired': return 'bg-green-100 text-green-800';
+        case 'Passed':
+        case 'Application Passed':
+        case 'Hired':
         case 'Initially Hired': return 'bg-green-100 text-green-700';
         case 'Rejected': return 'bg-red-100 text-red-800';
         case 'Interview Scheduled': return 'bg-blue-100 text-blue-800';
@@ -1134,6 +1159,8 @@ function getApplicantStatusColor(status) {
         case 'Demo Passed': return 'bg-emerald-100 text-emerald-800';
         case 'Psychological Exam': return 'bg-purple-100 text-purple-800';
         case 'Resubmission Required': return 'bg-orange-100 text-orange-800';
+        case 'Submitted': return 'bg-blue-100 text-blue-800';
+        case 'Waiting for Interview Schedule': return 'bg-cyan-100 text-cyan-800';
         case 'Pending': return 'bg-yellow-100 text-yellow-800';
         case 'Under Review': return 'bg-yellow-100 text-yellow-800';
         default: return 'bg-gray-100 text-gray-800';
@@ -1162,7 +1189,9 @@ function getRoleIcon(role) {
 
 function getStatusIcon(status) {
     switch(status) {
-        case 'Hired': return '<i class="fas fa-check-circle text-green-500"></i>';
+        case 'Passed':
+        case 'Application Passed':
+        case 'Hired':
         case 'Initially Hired': return '<i class="fas fa-user-check text-green-500"></i>';
         case 'Rejected': return '<i class="fas fa-times-circle text-red-500"></i>';
         case 'Interview Scheduled': return '<i class="fas fa-calendar text-blue-500"></i>';
@@ -1171,6 +1200,8 @@ function getStatusIcon(status) {
         case 'Demo Passed': return '<i class="fas fa-check-double text-emerald-500"></i>';
         case 'Psychological Exam': return '<i class="fas fa-brain text-purple-500"></i>';
         case 'Resubmission Required': return '<i class="fas fa-redo text-orange-500"></i>';
+        case 'Submitted': return '<i class="fas fa-paper-plane text-blue-500"></i>';
+        case 'Waiting for Interview Schedule': return '<i class="fas fa-calendar-plus text-cyan-500"></i>';
         case 'Pending': return '<i class="fas fa-clock text-yellow-500"></i>';
         default: return '<i class="fas fa-clock text-yellow-500"></i>';
     }
@@ -1194,18 +1225,19 @@ function viewJob(id) {
     if (!job) return;
 
     const modal = document.getElementById('viewJobModal');
+    const academicPeriod = job.academic_period_label || [job.academic_year, job.semester].filter(Boolean).join(' - ') || 'Not specified';
     
     // Update header information
-    modal.querySelector('.job-title').innerText = job.job_title || 'Job Title';
+    modal.querySelector('.job-title').innerText = job.teaching_load_title || job.job_title || 'Teaching Load';
     modal.querySelectorAll('.job-dept').forEach(el => el.innerText = job.department_role || 'Not specified');
     modal.querySelectorAll('.job-type').forEach(el => el.innerText = job.job_type || 'Not specified');
-    modal.querySelectorAll('.job-loc').forEach(el => el.innerText = job.locations || 'Not specified');
-    modal.querySelector('.job-salary').innerText = job.salary_range || 'Not specified';
+    modal.querySelectorAll('.job-loc').forEach(el => el.innerText = academicPeriod);
+    modal.querySelector('.job-salary').innerText = job.salary_display || job.salary_range || 'Salary projection not configured';
     modal.querySelector('.job-deadline').innerText = job.application_deadline ? new Date(job.application_deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Not specified';
     
     // Update job highlights
     modal.querySelector('.job-type-highlight').innerText = job.job_type || 'Not specified';
-    modal.querySelector('.job-loc-highlight').innerText = job.locations || 'Not specified';
+    modal.querySelector('.job-loc-highlight').innerText = academicPeriod;
     modal.querySelector('.job-dept-highlight').innerText = job.department_role || 'Not specified';
     
     // Update Position Overview (Job Description)
@@ -1303,6 +1335,13 @@ function populateGeneralJobModal(job) {
     document.getElementById('editJobType').value = job.job_type || "";
     document.getElementById('editLocation').value = job.locations || "";
     document.getElementById('editSalary').value = job.salary_range || "";
+    document.getElementById('editAcademicYear').value = job.academic_year || '';
+    document.getElementById('editSemester').value = job.semester || 'First Semester';
+    document.getElementById('editRequiredInstructors').value = job.required_instructors || 1;
+    document.getElementById('editTeachingHours').value = job.teaching_hours_per_week || '';
+    document.getElementById('editLoadUnits').value = job.load_units || '';
+    document.getElementById('editSalaryGrade').value = job.salary_grade || '';
+    document.getElementById('editTeachingSchedule').value = job.teaching_schedule || '';
     
     // Format date for input field
     if (job.application_deadline) {
@@ -1379,6 +1418,13 @@ async function saveJob(event) {
         locations: formData.get("location"),
         salary_range: formData.get("salary"),
         application_deadline: formData.get("deadline"),
+        academic_year: formData.get('academic_year') || '',
+        semester: formData.get('semester') || '',
+        teaching_schedule: formData.get('teaching_schedule') || '',
+        teaching_hours_per_week: formData.get('teaching_hours_per_week') || '',
+        load_units: formData.get('load_units') || '',
+        required_instructors: formData.get('required_instructors') || '1',
+        salary_grade: formData.get('salary_grade') || '',
         job_description: formData.get("description")
     };
 
@@ -1440,13 +1486,13 @@ function confirmDeleteJob() {
                 loadDashboardData();
             }
         } else {
-            showToast(result.message || 'Failed to delete job posting', 'error');
+            showToast(result.message || 'Failed to delete teaching load', 'error');
             console.error(result.message);
         }
         modal.classList.add('hidden');
     })
     .catch(error => {
-        showToast('Network error: Failed to delete job posting', 'error');
+        showToast('Network error: Failed to delete teaching load', 'error');
         console.error('Error deleting job:', error);
         modal.classList.add('hidden');
     });
@@ -1904,17 +1950,17 @@ async function loadDashboardData() {
                         case 'job_created':
                             iconClass = 'fas fa-briefcase text-blue-600';
                             bgClass = 'bg-blue-100';
-                            activityTitle = 'Job posting created';
+                            activityTitle = 'Teaching load created';
                             break;
                         case 'job_edited':
                             iconClass = 'fas fa-edit text-orange-600';
                             bgClass = 'bg-orange-100';
-                            activityTitle = 'Job posting updated';
+                            activityTitle = 'Teaching load updated';
                             break;
                         case 'job_deleted':
                             iconClass = 'fas fa-trash text-red-600';
                             bgClass = 'bg-red-100';
-                            activityTitle = 'Job posting deleted';
+                            activityTitle = 'Teaching load deleted';
                             break;
                         case 'interview_scheduled':
                             iconClass = 'fas fa-calendar-check text-blue-600';
@@ -1954,7 +2000,7 @@ async function loadDashboardData() {
                         case 'applicant_hired':
                             iconClass = 'fas fa-user-check text-green-600';
                             bgClass = 'bg-green-100';
-                            activityTitle = 'Applicant hired';
+                            activityTitle = 'Application passed';
                             break;
                         case 'applicant_transferred':
                             iconClass = 'fas fa-share text-blue-600';
@@ -1964,7 +2010,7 @@ async function loadDashboardData() {
                         case 'applicant_initially_hired':
                             iconClass = 'fas fa-user-plus text-green-600';
                             bgClass = 'bg-green-100';
-                            activityTitle = 'Applicant initially hired';
+                            activityTitle = 'Application passed';
                             break;
                         case 'user_created':
                             iconClass = 'fas fa-user-shield text-purple-600';
@@ -2018,7 +2064,7 @@ async function loadDashboardData() {
                 activityContainer.innerHTML = activityHTML;
             }
             
-            // Update recent job postings
+            // Update recent teaching loads
             if (data.recent_jobs) {
                 const jobsContainer = document.querySelector('#recentJobsContainer');
                 if (jobsContainer) {
@@ -2028,7 +2074,7 @@ async function loadDashboardData() {
                             <tr class="hover:bg-gray-50">
                                 <td class="px-6 py-4">
                                     <div>
-                                        <div class="font-medium text-gray-900">${job.job_title}</div>
+                                        <div class="font-medium text-gray-900">${job.teaching_load_title || job.job_title}</div>
                                         <div class="text-sm text-gray-500">${job.department_role || 'General'}</div>
                                     </div>
                                 </td>
@@ -2043,7 +2089,7 @@ async function loadDashboardData() {
                     });
                     
                     if (jobsHTML === '') {
-                        jobsHTML = '<tr><td colspan="3" class="px-6 py-4 text-center text-gray-500">No jobs found</td></tr>';
+                        jobsHTML = '<tr><td colspan="3" class="px-6 py-4 text-center text-gray-500">No teaching loads found</td></tr>';
                     }
                     
                     jobsContainer.innerHTML = jobsHTML;
@@ -2064,9 +2110,11 @@ async function loadDashboardData() {
                             case 'Approved':
                             case 'Initially Hired':
                             case 'Permanently Hired':
-                            case 'Hired':
+                            case 'Passed':
+        case 'Application Passed':
+        case 'Hired':
                                 statusClass = 'bg-green-100 text-green-800';
-                                statusText = applicant.status;
+                                statusText = ['Initially Hired', 'Permanently Hired', 'Hired', 'Application Passed'].includes(applicant.status) ? 'Passed' : applicant.status;
                                 break;
                             case 'Rejected':
                                 statusClass = 'bg-red-100 text-red-800';
@@ -2284,7 +2332,9 @@ async function viewApplicantDetails(applicantId) {
                 { field: 'professional_license', label: 'Professional License' },
                 { field: 'coe', label: 'Certificate of Employment (COE)' },
                 { field: 'seminars_trainings', label: 'Seminar/Training Certificates' },
-                { field: 'masteral_cert', label: 'Masteral Certificate' }
+                { field: 'masteral_cert', label: 'Masteral Certificate' },
+                { field: 'certificate_of_grades', label: 'Certificate of Grades (COG)' },
+                { field: 'proof_of_enrollment', label: 'Proof of Enrollment' }
             ];
             
             console.log('📄 Document files from database:');
@@ -2297,6 +2347,8 @@ async function viewApplicantDetails(applicantId) {
             console.log('  COE:', applicant.coe);
             console.log('  Seminars/Trainings:', applicant.seminars_trainings);
             console.log('  Masteral Cert:', applicant.masteral_cert);
+            console.log('  Certificate of Grades:', applicant.certificate_of_grades);
+            console.log('  Proof of Enrollment:', applicant.proof_of_enrollment);
             
             let documentsHTML = '';
             documents.forEach(doc => {
@@ -2487,14 +2539,14 @@ async function viewApplicantDetails(applicantId) {
                         <div class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                             <p class="text-sm text-yellow-800 flex items-center">
                                 <i class="fas fa-info-circle mr-2"></i>
-                                Please review the receipt and click "Initially Hire Applicant" to approve.
+                                Please review the receipt and click "Mark Application Passed" to approve.
                             </p>
                         </div>
                         ` : `
                         <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
                             <p class="text-sm text-green-800 flex items-center">
                                 <i class="fas fa-check-circle mr-2"></i>
-                                Receipt approved - Applicant marked as initially hired
+                                Receipt approved - application marked as passed
                             </p>
                         </div>
                         `}
@@ -2567,9 +2619,12 @@ function getStatusBadge(status) {
             icon = '<i class="fas fa-brain mr-1"></i>';
             break;
         case 'Initially Hired':
+        case 'Permanently Hired':
             colorClass = 'bg-green-100 text-green-700 border border-green-300';
             icon = '<i class="fas fa-user-check mr-1"></i>';
             break;
+        case 'Passed':
+        case 'Application Passed':
         case 'Hired':
             colorClass = 'bg-green-100 text-green-800 border-2 border-green-300';
             icon = '<i class="fas fa-check-circle mr-1"></i>';
@@ -2584,7 +2639,8 @@ function getStatusBadge(status) {
             break;
     }
     
-    return `<span class="px-3 py-2 text-sm font-bold rounded-full ${colorClass} inline-flex items-center">${icon}${status}</span>`;
+    const displayStatus = ['Initially Hired', 'Permanently Hired', 'Hired', 'Application Passed'].includes(status) ? 'Passed' : status;
+    return `<span class="px-3 py-2 text-sm font-bold rounded-full ${colorClass} inline-flex items-center">${icon}${displayStatus}</span>`;
 }
 
 // Update action buttons visibility based on applicant status
@@ -2709,7 +2765,7 @@ function updateActionButtons(status, applicant = null) {
             workflowStage === 'interview_scheduled' || workflowStage === 'interview_completed' ||
             workflowStage === 'demo_scheduled' || workflowStage === 'demo_completed' ||
             workflowStage === 'psych_scheduled' || workflowStage === 'psych_completed' ||
-            workflowStage === 'hired' || workflowStage === 'initially_hired' ||
+            workflowStage === 'waiting_interview_schedule' || workflowStage === 'passed' || workflowStage === 'hired' || workflowStage === 'initially_hired' ||
             workflowStage === 'permanently_hired')) {
             // Show info message for Secretary viewing transferred application
             const actionButtonsContainer = document.getElementById('actionButtons');
@@ -2735,7 +2791,7 @@ function updateActionButtons(status, applicant = null) {
     }
     
     // DEPARTMENT HEAD ACTIONS: Schedule Interview (NO Request Resubmission)
-    if (workflowStage === 'department_head_review') {
+    if (workflowStage === 'waiting_interview_schedule' || workflowStage === 'department_head_review') {
         if (scheduleBtn) scheduleBtn.classList.remove('hidden');
         if (rejectBtn) rejectBtn.classList.remove('hidden');
         // Note: NO resubmitBtn for Dean
@@ -2765,11 +2821,11 @@ function updateActionButtons(status, applicant = null) {
         return;
     }
     
-    // DEMO COMPLETED: Show hire button and psych exam indicator
+    // DEMO COMPLETED: Show pass button and psych exam indicator
     if (workflowStage === 'demo_completed') {
         const actionButtonsContainer = document.getElementById('actionButtons');
         
-        // Show hire button (may be disabled if no psych receipt)
+        // Show pass button (may be disabled if no psych receipt)
         if (hireBtn) {
             hireBtn.classList.remove('hidden');
             
@@ -2789,7 +2845,7 @@ function updateActionButtons(status, applicant = null) {
                             <div>
                                 <h4 class="font-semibold text-yellow-900 text-sm">Waiting for Psychological Exam Receipt</h4>
                                 <p class="text-xs text-yellow-700 mt-1">
-                                    The applicant needs to take the psychological examination and upload the receipt before you can proceed with hiring.
+                                    The applicant needs to take the psychological examination and upload the receipt before you can mark the application as passed.
                                 </p>
                             </div>
                         </div>
@@ -2808,7 +2864,7 @@ function updateActionButtons(status, applicant = null) {
         return;
     }
 
-    // PSYCH EXAM: Wait for receipt, then allow Dean to hire.
+    // PSYCH EXAM: Wait for receipt, then allow Dean to mark the application as passed.
     if (workflowStage === 'psych_scheduled' || workflowStage === 'psych_completed') {
         const actionButtonsContainer = document.getElementById('actionButtons');
 
@@ -2829,7 +2885,7 @@ function updateActionButtons(status, applicant = null) {
                             <div>
                                 <h4 class="font-semibold text-yellow-900 text-sm">Waiting for Psychological Exam Receipt</h4>
                                 <p class="text-xs text-yellow-700 mt-1">
-                                    The applicant must upload the psychological exam receipt before hiring can proceed.
+                                    The applicant must upload the psychological exam receipt before the application can be marked as passed.
                                 </p>
                             </div>
                         </div>
@@ -2847,15 +2903,15 @@ function updateActionButtons(status, applicant = null) {
         return;
     }
 
-    // INITIALLY HIRED: Allow final hiring confirmation.
+    // LEGACY INITIALLY HIRED: Allow final pass confirmation.
     if (workflowStage === 'initially_hired') {
         if (permanentHireBtn) permanentHireBtn.classList.remove('hidden');
         if (rejectBtn) rejectBtn.classList.remove('hidden');
         return;
     }
     
-    // HIRED: Show success message
-    if (workflowStage === 'hired') {
+    // PASSED: Show success message
+    if (workflowStage === 'passed' || workflowStage === 'hired') {
         const actionButtonsContainerHired = document.getElementById('actionButtons');
         if (actionButtonsContainerHired && !actionButtonsContainerHired.querySelector('.hired-status')) {
             const hiredDiv = document.createElement('div');
@@ -2865,9 +2921,9 @@ function updateActionButtons(status, applicant = null) {
                     <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
                         <i class="fas fa-user-check text-3xl text-green-600"></i>
                     </div>
-                    <h3 class="text-lg font-semibold text-green-900 mb-2">Applicant Hired</h3>
+                    <h3 class="text-lg font-semibold text-green-900 mb-2">Application Passed</h3>
                     <p class="text-sm text-green-700">
-                        This applicant has been successfully hired. No further actions are required.
+                        This application has passed the recruitment process. No further actions are required.
                     </p>
                 </div>
             `;
@@ -2904,7 +2960,7 @@ function updateActionButtons(status, applicant = null) {
             if (rejectBtn) rejectBtn.classList.remove('hidden');
             break;
         case 'Demo Passed':
-            // After demo passed, check if psych receipt uploaded before showing hire button
+            // After demo passed, check if psych receipt uploaded before showing pass button
             if (hasPsychReceipt) {
                 if (hireBtn) hireBtn.classList.remove('hidden');
             } else {
@@ -2918,7 +2974,7 @@ function updateActionButtons(status, applicant = null) {
                             <i class="fas fa-exclamation-triangle text-yellow-600 mt-1"></i>
                             <div>
                                 <h4 class="font-semibold text-yellow-900 text-sm">Psychological Exam Receipt Required</h4>
-                                <p class="text-xs text-yellow-700 mt-1">The applicant must upload their psychological exam receipt before you can proceed with hiring.</p>
+                                <p class="text-xs text-yellow-700 mt-1">The applicant must upload their psychological exam receipt before you can mark the application as passed.</p>
                             </div>
                         </div>
                     `;
@@ -2928,7 +2984,7 @@ function updateActionButtons(status, applicant = null) {
             if (rejectBtn) rejectBtn.classList.remove('hidden');
             break;
         case 'Psychological Exam':
-            // User uploaded receipt, admin reviews and can hire or reject
+            // User uploaded receipt, admin reviews and can pass or reject
             if (hasPsychReceipt) {
                 if (hireBtn) hireBtn.classList.remove('hidden');
             } else {
@@ -2942,7 +2998,7 @@ function updateActionButtons(status, applicant = null) {
                             <i class="fas fa-exclamation-triangle text-yellow-600 mt-1"></i>
                             <div>
                                 <h4 class="font-semibold text-yellow-900 text-sm">Psychological Exam Receipt Required</h4>
-                                <p class="text-xs text-yellow-700 mt-1">The applicant must upload their psychological exam receipt before you can proceed with hiring.</p>
+                                <p class="text-xs text-yellow-700 mt-1">The applicant must upload their psychological exam receipt before you can mark the application as passed.</p>
                             </div>
                         </div>
                     `;
@@ -2952,9 +3008,11 @@ function updateActionButtons(status, applicant = null) {
             if (rejectBtn) rejectBtn.classList.remove('hidden');
             break;
         case 'Initially Hired':
-            // After initially hired, show Permanently Hire button
+            // Legacy initially hired status can still be finalized
             if (permanentHireBtn) permanentHireBtn.classList.remove('hidden');
             break;
+        case 'Passed':
+        case 'Application Passed':
         case 'Hired':
         case 'Rejected':
             // These are handled earlier in the function with workflow stages
@@ -2968,7 +3026,7 @@ function updateActionButtons(status, applicant = null) {
             break;
     }
     
-    // Remove any existing warning if hire button is now visible
+    // Remove any existing warning if pass button is now visible
     if (hireBtn && !hireBtn.classList.contains('hidden')) {
         const existingWarning = document.querySelector('.psych-warning');
         if (existingWarning) {
@@ -3013,7 +3071,9 @@ function openResubmitModal() {
         { field: 'professional_license', label: 'Professional License' },
         { field: 'coe', label: 'Certificate of Employment (COE)' },
         { field: 'seminars_trainings', label: 'Seminar/Training Certificates' },
-        { field: 'masteral_cert', label: 'Masteral Certificate' }
+        { field: 'masteral_cert', label: 'Masteral Certificate' },
+        { field: 'certificate_of_grades', label: 'Certificate of Grades (COG)' },
+        { field: 'proof_of_enrollment', label: 'Proof of Enrollment' }
     ];
     
     // Clear existing checkboxes
@@ -3225,6 +3285,12 @@ document.addEventListener('DOMContentLoaded', function() {
             showToast('Please select both date and time', 'warning');
             return;
         }
+        const selectedWeekday = new Date(dateValue + 'T00:00:00').getDay();
+        if (selectedWeekday === 0 || selectedWeekday === 6) {
+            showToast('Schedules are only available on weekdays.', 'warning');
+            return;
+        }
+
         
         // Validate 15-minute interval
         if (!isValid15MinuteInterval(timeValue)) {
@@ -3264,8 +3330,11 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('applicant_id', currentApplicantId);
             formData.append('interview_date', dateValue);
             formData.append('interview_time', timeValue);
-            formData.append('interview_location', document.getElementById('interviewLocation').value);
-            formData.append('interview_room', document.getElementById('interviewRoom').value);
+            const roomSelect = document.getElementById('interviewRoom');
+            const selectedRoom = roomSelect?.selectedOptions?.[0];
+            formData.append('interview_location', selectedRoom?.dataset.location || document.getElementById('interviewLocation').value);
+            formData.append('interview_room', selectedRoom?.textContent.trim() || '');
+            formData.append('interview_room_id', roomSelect?.value || '');
             formData.append('interview_notes', document.getElementById('interviewNotes').value);
             
             // Map actions to status names
@@ -3451,7 +3520,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Initially Hire Applicant Form
+    // Mark Application Passed Form
     document.getElementById('hireForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
@@ -3473,11 +3542,11 @@ document.addEventListener('DOMContentLoaded', function() {
             if (result.success) {
                 closeHireModal();
                 
-                // Update action buttons immediately - hide all buttons for initially hired status
-                updateActionButtons('Initially Hired');
+                // Update action buttons immediately for final passed status
+                updateActionButtons('Passed');
                 
                 // Show success message
-                showToast('Applicant marked as initially hired successfully!', 'success');
+                showToast('Application marked as passed successfully!', 'success');
                 
                 // Refresh applicant details and applicants list
                 setTimeout(() => {
@@ -3485,16 +3554,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     loadApplicants();
                 }, 500); // Small delay to ensure database update is complete
             } else {
-                showToast('Error marking as initially hired: ' + result.error, 'error');
+                showToast('Error marking application as passed: ' + result.error, 'error');
             }
         } catch (error) {
-            console.error('Error marking as initially hired:', error);
-            showToast('Failed to mark applicant as initially hired', 'error');
+            console.error('Error marking application as passed:', error);
+            showToast('Failed to mark application as passed', 'error');
         }
         });
     });
     
-    // Permanent Hire Form
+    // Final Pass Form
     document.getElementById('permanentHireForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
@@ -3524,14 +3593,14 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
                                 <i class="fas fa-user-tie text-3xl text-green-600"></i>
                             </div>
-                            <h3 class="text-lg font-semibold text-green-900 mb-2">Permanently Hired</h3>
-                            <p class="text-sm text-green-700">This applicant has been permanently hired and is now a regular employee.</p>
+                            <h3 class="text-lg font-semibold text-green-900 mb-2">Application Passed</h3>
+                            <p class="text-sm text-green-700">This application has been marked as passed.</p>
                         </div>
                     `;
                 }
                 
                 // Show success message
-                showToast('Applicant permanently hired successfully!', 'success');
+                showToast('Application final pass confirmed successfully!', 'success');
                 
                 // Refresh applicant details and applicants list
                 setTimeout(() => {
@@ -3539,11 +3608,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     loadApplicants();
                 }, 500);
             } else {
-                showToast('Error marking as permanently hired: ' + result.error, 'error');
+                showToast('Error confirming final pass: ' + result.error, 'error');
             }
         } catch (error) {
-            console.error('Error marking as permanently hired:', error);
-            showToast('Failed to mark applicant as permanently hired', 'error');
+            console.error('Error confirming final pass:', error);
+            showToast('Failed to confirm final pass', 'error');
         }
         });
     });
@@ -3617,7 +3686,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateActionButtons('Demo Passed');
                 
                 // Show success message
-                showToast('Demo approved successfully! You can now proceed with hiring.', 'success');
+                showToast('Demo approved successfully! You can now mark the application as passed.', 'success');
                 
                 // Refresh applicant details and applicants list
                 setTimeout(() => {
@@ -3680,7 +3749,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Mark Initially Hired Form
+    // Mark Application Passed Form
     const initialHireForm = document.getElementById('initialHireForm');
     if (initialHireForm) {
         initialHireForm.addEventListener('submit', async function(e) {
@@ -3702,11 +3771,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     const result = await response.json();
                     
                     if (result.success) {
-                        showToast('Applicant marked as initially hired successfully!', 'success');
+                        showToast('Application marked as passed successfully!', 'success');
                         closeInitialHireModal();
                         
                         // Update action buttons
-                        updateActionButtons('Initially Hired');
+                        updateActionButtons('Passed');
                         
                         // Refresh applicant details
                         setTimeout(() => {
@@ -3714,11 +3783,11 @@ document.addEventListener('DOMContentLoaded', function() {
                             loadApplicants();
                         }, 500);
                     } else {
-                        showToast('Error marking as initially hired: ' + result.error, 'error');
+                        showToast('Error marking application as passed: ' + result.error, 'error');
                     }
                 } catch (error) {
-                    console.error('Error marking as initially hired:', error);
-                    showToast('Failed to mark as initially hired', 'error');
+                    console.error('Error marking application as passed:', error);
+                    showToast('Failed to mark application as passed', 'error');
                 }
             });
         });
@@ -3737,6 +3806,12 @@ document.addEventListener('DOMContentLoaded', function() {
             showToast('Please select both date and time', 'warning');
             return;
         }
+        const selectedWeekday = new Date(dateValue + 'T00:00:00').getDay();
+        if (selectedWeekday === 0 || selectedWeekday === 6) {
+            showToast('Schedules are only available on weekdays.', 'warning');
+            return;
+        }
+
         
         // Validate 15-minute interval
         if (!isValid15MinuteInterval(timeValue)) {
@@ -3778,8 +3853,11 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('applicant_id', currentApplicantId);
             formData.append('interview_date', dateValue);
             formData.append('interview_time', timeValue);
-            formData.append('interview_location', document.getElementById('rescheduleInterviewLocation').value);
-            formData.append('interview_room', document.getElementById('rescheduleInterviewRoom').value);
+            const rescheduleRoomSelect = document.getElementById('rescheduleInterviewRoom');
+            const selectedRescheduleRoom = rescheduleRoomSelect?.selectedOptions?.[0];
+            formData.append('interview_location', selectedRescheduleRoom?.dataset.location || document.getElementById('rescheduleInterviewLocation').value);
+            formData.append('interview_room', selectedRescheduleRoom?.textContent.trim() || '');
+            formData.append('interview_room_id', rescheduleRoomSelect?.value || '');
             formData.append('interview_notes', reasonValue);
             
             try {
@@ -4329,7 +4407,7 @@ function updateStatusCounts() {
         interview: allApplicantsData.filter(a => a.status === 'Interview Scheduled').length,
         resubmission: allApplicantsData.filter(a => a.status === 'Resubmission Required').length,
         rejected: allApplicantsData.filter(a => a.status === 'Rejected').length,
-        hired: allApplicantsData.filter(a => a.status === 'Hired').length
+        hired: allApplicantsData.filter(a => ['Passed', 'Application Passed', 'Initially Hired', 'Permanently Hired', 'Hired'].includes(a.status)).length
     };
     
     // Update count displays
@@ -4380,6 +4458,13 @@ async function submitSecretaryEditJob(event) {
         locations: formData.get('locations'),
         salary_range: formData.get('salary_range'),
         application_deadline: formData.get('application_deadline'),
+        academic_year: formData.get('academic_year') || '',
+        semester: formData.get('semester') || '',
+        teaching_schedule: formData.get('teaching_schedule') || '',
+        teaching_hours_per_week: formData.get('teaching_hours_per_week') || '',
+        load_units: formData.get('load_units') || '',
+        required_instructors: formData.get('required_instructors') || '1',
+        salary_grade: formData.get('salary_grade') || '',
         job_description: formData.get('job_description'),
         job_requirements: formData.get('job_requirements'),
         education: formData.get('education'),
@@ -4445,6 +4530,13 @@ async function submitEditJob(event) {
         locations: formData.get('locations'),
         salary_range: formData.get('salary_range'),
         application_deadline: formData.get('application_deadline'),
+        academic_year: formData.get('academic_year') || '',
+        semester: formData.get('semester') || '',
+        teaching_schedule: formData.get('teaching_schedule') || '',
+        teaching_hours_per_week: formData.get('teaching_hours_per_week') || '',
+        load_units: formData.get('load_units') || '',
+        required_instructors: formData.get('required_instructors') || '1',
+        salary_grade: formData.get('salary_grade') || '',
         job_description: formData.get('job_description'),
         job_requirements: formData.get('job_requirements'),
         education: formData.get('education'),
@@ -4499,6 +4591,13 @@ async function updateJob(event) {
         locations: formData.get('location'),
         salary_range: formData.get('salary'),
         application_deadline: formData.get('deadline'),
+        academic_year: formData.get('academic_year') || '',
+        semester: formData.get('semester') || '',
+        teaching_schedule: formData.get('teaching_schedule') || '',
+        teaching_hours_per_week: formData.get('teaching_hours_per_week') || '',
+        load_units: formData.get('load_units') || '',
+        required_instructors: formData.get('required_instructors') || '1',
+        salary_grade: formData.get('salary_grade') || '',
         job_description: formData.get('description'),
         job_requirements: formData.get('requirements'),
         education: formData.get('education'),
@@ -4532,6 +4631,286 @@ async function updateJob(event) {
         showToast('Failed to update job. Please try again.', 'error');
     }
 }
+
+let chatbotInitialized = false;
+let chatbotMessages = [];
+let chatbotIsSending = false;
+const chatbotEndpoint = '../api/chatbot/message.php';
+
+function initializeChatbot() {
+    const form = document.getElementById('chatbotForm');
+    const input = document.getElementById('chatbotInput');
+
+    if (!form || !input || chatbotInitialized) {
+        return;
+    }
+
+    const floatingButton = document.getElementById('chatbotFloatingButton');
+    const closeButton = document.getElementById('chatbotCloseBtn');
+
+    if (floatingButton) {
+        floatingButton.addEventListener('click', toggleChatbotWidget);
+    }
+
+    if (closeButton) {
+        closeButton.addEventListener('click', closeChatbotWidget);
+    }
+
+    form.addEventListener('submit', handleChatbotSubmit);
+
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            submitChatbotForm(form);
+        }
+    });
+
+    document.querySelectorAll('[data-chatbot-suggestion]').forEach(function(button) {
+        button.addEventListener('click', function() {
+            input.value = button.getAttribute('data-chatbot-suggestion') || '';
+            input.focus();
+            submitChatbotForm(form);
+        });
+    });
+
+    const clearButton = document.getElementById('chatbotClearBtn');
+    if (clearButton) {
+        clearButton.addEventListener('click', clearChatbotConversation);
+    }
+
+    chatbotInitialized = true;
+    renderChatbotMessages();
+}
+
+function toggleChatbotWidget() {
+    const panel = document.getElementById('chatbotWidgetPanel');
+    if (!panel) {
+        return;
+    }
+
+    if (panel.classList.contains('hidden')) {
+        openChatbotWidget();
+    } else {
+        closeChatbotWidget();
+    }
+}
+
+function openChatbotWidget() {
+    const panel = document.getElementById('chatbotWidgetPanel');
+    const button = document.getElementById('chatbotFloatingButton');
+    const input = document.getElementById('chatbotInput');
+
+    if (!panel) {
+        return;
+    }
+
+    panel.classList.remove('hidden');
+    panel.classList.add('flex', 'flex-col');
+
+    if (button) {
+        button.setAttribute('aria-expanded', 'true');
+    }
+
+    setTimeout(function() {
+        if (input) {
+            input.focus();
+        }
+    }, 50);
+}
+
+function closeChatbotWidget() {
+    const panel = document.getElementById('chatbotWidgetPanel');
+    const button = document.getElementById('chatbotFloatingButton');
+
+    if (!panel) {
+        return;
+    }
+
+    panel.classList.add('hidden');
+    panel.classList.remove('flex', 'flex-col');
+
+    if (button) {
+        button.setAttribute('aria-expanded', 'false');
+    }
+}
+
+function submitChatbotForm(form) {
+    if (typeof form.requestSubmit === 'function') {
+        form.requestSubmit();
+        return;
+    }
+
+    form.dispatchEvent(new Event('submit', { cancelable: true }));
+}
+
+async function handleChatbotSubmit(e) {
+    e.preventDefault();
+
+    if (chatbotIsSending) {
+        return;
+    }
+
+    const input = document.getElementById('chatbotInput');
+    if (!input) {
+        return;
+    }
+
+    const message = input.value.trim();
+    if (!message) {
+        showToast('Please enter a message for the AI Assistant.', 'warning');
+        return;
+    }
+
+    appendChatbotMessage('user', message);
+    input.value = '';
+    setChatbotLoading(true);
+
+    try {
+        const response = await fetch(chatbotEndpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ message: message })
+        });
+
+        const data = await response.json().catch(function() {
+            return null;
+        });
+
+        if (!response.ok || !data || data.success === false) {
+            const fallbackReply = data && data.reply
+                ? data.reply
+                : 'The AI Recruitment Assistant is temporarily unavailable. Please try again.';
+            appendChatbotMessage('assistant', fallbackReply, true);
+            return;
+        }
+
+        appendChatbotMessage('assistant', data.reply || 'No response was returned by the AI Assistant.');
+    } catch (error) {
+        appendChatbotMessage('assistant', 'The AI Recruitment Assistant is temporarily unavailable. Please try again.', true);
+    } finally {
+        setChatbotLoading(false);
+    }
+}
+
+async function clearChatbotConversation() {
+    chatbotMessages = [];
+    renderChatbotMessages();
+
+    try {
+        await fetch(chatbotEndpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ action: 'clear' })
+        });
+
+        showToast('Conversation cleared.', 'success');
+    } catch (error) {
+        showToast('Conversation cleared locally, but the server history could not be reset.', 'warning');
+    }
+}
+
+function appendChatbotMessage(role, content, isError = false) {
+    chatbotMessages.push({
+        role: role,
+        content: content,
+        isError: isError
+    });
+
+    renderChatbotMessages();
+}
+
+function renderChatbotMessages() {
+    const container = document.getElementById('chatbotMessages');
+    const emptyState = document.getElementById('chatbotEmptyState');
+
+    if (!container) {
+        return;
+    }
+
+    container.querySelectorAll('[data-chatbot-message]').forEach(function(node) {
+        node.remove();
+    });
+
+    if (emptyState) {
+        emptyState.classList.toggle('hidden', chatbotMessages.length > 0);
+    }
+
+    chatbotMessages.forEach(function(message) {
+        const row = document.createElement('div');
+        row.setAttribute('data-chatbot-message', 'true');
+        row.className = message.role === 'user' ? 'flex justify-end' : 'flex justify-start';
+
+        const bubble = document.createElement('div');
+        bubble.className = getChatbotBubbleClasses(message);
+
+        const label = document.createElement('div');
+        label.className = message.role === 'user'
+            ? 'text-xs font-semibold text-blue-100 mb-1'
+            : (message.isError ? 'text-xs font-semibold text-red-700 mb-1' : 'text-xs font-semibold text-gray-500 mb-1');
+        label.textContent = message.role === 'user' ? 'You' : 'NCHire AI Assistant';
+
+        const text = document.createElement('div');
+        text.className = 'text-sm leading-relaxed whitespace-pre-wrap';
+        text.textContent = message.content;
+
+        bubble.appendChild(label);
+        bubble.appendChild(text);
+        row.appendChild(bubble);
+        container.appendChild(row);
+    });
+
+    requestAnimationFrame(function() {
+        container.scrollTop = container.scrollHeight;
+    });
+}
+
+function getChatbotBubbleClasses(message) {
+    const base = 'max-w-[85%] rounded-lg px-3 py-2 shadow-sm';
+
+    if (message.role === 'user') {
+        return base + ' bg-blue-600 text-white';
+    }
+
+    if (message.isError) {
+        return base + ' bg-red-50 text-red-900 border border-red-200';
+    }
+
+    return base + ' bg-white text-gray-800 border border-gray-200';
+}
+
+function setChatbotLoading(isLoading) {
+    chatbotIsSending = isLoading;
+
+    const typing = document.getElementById('chatbotTyping');
+    const sendButton = document.getElementById('chatbotSendBtn');
+    const input = document.getElementById('chatbotInput');
+
+    if (typing) {
+        typing.classList.toggle('hidden', !isLoading);
+    }
+
+    if (sendButton) {
+        sendButton.disabled = isLoading;
+        sendButton.classList.toggle('opacity-60', isLoading);
+        sendButton.classList.toggle('cursor-not-allowed', isLoading);
+    }
+
+    if (input) {
+        input.disabled = isLoading;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    initializeChatbot();
+});
 
 // Salary Range Input Formatting
 document.addEventListener('DOMContentLoaded', function() {
@@ -4603,5 +4982,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+
 
 

@@ -107,14 +107,14 @@ try {
 
     // 4. Overall Hired
     if (!empty($department_params)) {
-        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Initially Hired', 'Permanently Hired', 'Hired')" . $department_filter);
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Passed', 'Application Passed', 'Initially Hired', 'Permanently Hired', 'Hired')" . $department_filter);
         $stmt->bind_param("s", ...$department_params);
         $stmt->execute();
         $result = $stmt->get_result();
         $stats['overall_hired'] = $result->fetch_assoc()['count'];
         $stmt->close();
     } else {
-        $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Initially Hired', 'Permanently Hired', 'Hired')");
+        $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Passed', 'Application Passed', 'Initially Hired', 'Permanently Hired', 'Hired')");
         $stats['overall_hired'] = $result ? $result->fetch_assoc()['count'] : 0;
     }
 
@@ -158,16 +158,16 @@ try {
         $stats['demo_scheduled'] = $result ? $result->fetch_assoc()['count'] : 0;
     }
 
-    // Hired (includes Initially Hired, Permanently Hired, and Hired)
+    // Passed (includes current Passed statuses and legacy hired statuses)
     if (!empty($department_params)) {
-        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Initially Hired', 'Permanently Hired', 'Hired')" . $department_filter);
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Passed', 'Application Passed', 'Initially Hired', 'Permanently Hired', 'Hired')" . $department_filter);
         $stmt->bind_param("s", ...$department_params);
         $stmt->execute();
         $result = $stmt->get_result();
         $stats['hired'] = $result->fetch_assoc()['count'];
         $stmt->close();
     } else {
-        $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Initially Hired', 'Permanently Hired', 'Hired')");
+        $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Passed', 'Application Passed', 'Initially Hired', 'Permanently Hired', 'Hired')");
         $stats['hired'] = $result ? $result->fetch_assoc()['count'] : 0;
     }
 

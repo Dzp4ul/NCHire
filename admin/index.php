@@ -24,6 +24,9 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
+require_once __DIR__ . '/../shared/helpers/recruitment.php';
+$active_rooms = nc_get_active_rooms($conn);
+
 // Verify user status is still active
 if (isset($_SESSION['admin_id'])) {
     $status_check = $conn->prepare("SELECT status FROM admin_users WHERE id = ?");
@@ -144,16 +147,16 @@ if ($show_applicant_stats) {
     $stats['interviews_this_week'] = 0;
 }
 
-// 4. Overall Hired (all applicants with hired status)
+// 4. Overall Passed (all applicants with hired status)
 if ($show_applicant_stats) {
     if (!empty($department_params)) {
-        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Initially Hired', 'Permanently Hired', 'Hired')" . $department_filter);
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Passed', 'Application Passed', 'Initially Hired', 'Permanently Hired', 'Hired')" . $department_filter);
         $stmt->bind_param("s", ...$department_params);
         $stmt->execute();
         $result = $stmt->get_result();
         $stats['overall_hired'] = $result->fetch_assoc()['count'];
     } else {
-        $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Initially Hired', 'Permanently Hired', 'Hired')");
+        $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Passed', 'Application Passed', 'Initially Hired', 'Permanently Hired', 'Hired')");
         $stats['overall_hired'] = $result ? $result->fetch_assoc()['count'] : 0;
     }
 } else {
@@ -177,7 +180,7 @@ if ($show_applicant_stats) {
     $stats['total_applicants'] = 0;
 }
 
-// Total Jobs (for stats cards)
+// Total Teaching Loads (for stats cards)
 $result = $conn->query("SELECT COUNT(*) as count FROM job");
 $stats['total_jobs'] = $result ? $result->fetch_assoc()['count'] : 0;
 
@@ -217,16 +220,16 @@ if ($show_applicant_stats) {
     $stats['demo_scheduled'] = 0;
 }
 
-// Hired (keep for applicants section)
+// Passed (keep for applicants section)
 if ($show_applicant_stats) {
     if (!empty($department_params)) {
-        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Initially Hired', 'Permanently Hired', 'Hired')" . $department_filter);
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Passed', 'Application Passed', 'Initially Hired', 'Permanently Hired', 'Hired')" . $department_filter);
         $stmt->bind_param("s", ...$department_params);
         $stmt->execute();
         $result = $stmt->get_result();
         $stats['hired'] = $result->fetch_assoc()['count'];
     } else {
-        $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Initially Hired', 'Permanently Hired', 'Hired')");
+        $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Passed', 'Application Passed', 'Initially Hired', 'Permanently Hired', 'Hired')");
         $stats['hired'] = $result ? $result->fetch_assoc()['count'] : 0;
     }
 } else {
@@ -256,6 +259,53 @@ $recent_jobs_query = "SELECT j.*, COUNT(ja.id) as application_count
                       ORDER BY j.id DESC 
                       LIMIT 5";
 $recent_jobs = $conn->query($recent_jobs_query);
+
+$assigned_teaching_load_sql = "
+    SELECT job_id, COUNT(*) AS assigned_count
+    FROM job_applicants
+    WHERE job_id IS NOT NULL
+      AND (
+            status IN ('Passed', 'Application Passed', 'Hired', 'Permanently Hired')
+            OR workflow_stage IN ('passed', 'hired', 'permanently_hired')
+          )
+    GROUP BY job_id
+";
+$vacancy_expr = "GREATEST(COALESCE(j.required_instructors, 1) - COALESCE(a.assigned_count, 0), 0)";
+$vacancy_stats = [
+    'subject_count' => 0,
+    'slot_count' => 0,
+    'program_count' => 0,
+];
+$vacancy_stats_query = "
+    SELECT COUNT(*) AS subject_count,
+           COALESCE(SUM(remaining_vacancies), 0) AS slot_count,
+           COUNT(DISTINCT program_label) AS program_count
+    FROM (
+        SELECT {$vacancy_expr} AS remaining_vacancies,
+               COALESCE(NULLIF(j.program, ''), j.department_role, 'Unassigned') AS program_label
+        FROM job j
+        LEFT JOIN ({$assigned_teaching_load_sql}) a ON a.job_id = j.id
+        WHERE j.status = 'Active'
+          AND j.application_deadline >= CURDATE()
+        HAVING remaining_vacancies > 0
+    ) vacancies
+";
+$vacancy_stats_result = $conn->query($vacancy_stats_query);
+if ($vacancy_stats_result) {
+    $vacancy_stats = array_merge($vacancy_stats, $vacancy_stats_result->fetch_assoc() ?: []);
+}
+$vacant_teaching_loads_query = "
+    SELECT j.*, COALESCE(a.assigned_count, 0) AS assigned_instructors,
+           {$vacancy_expr} AS remaining_vacancies
+    FROM job j
+    LEFT JOIN ({$assigned_teaching_load_sql}) a ON a.job_id = j.id
+    WHERE j.status = 'Active'
+      AND j.application_deadline >= CURDATE()
+    HAVING remaining_vacancies > 0
+    ORDER BY j.application_deadline ASC, j.id DESC
+    LIMIT 5
+";
+$vacant_teaching_loads = $conn->query($vacant_teaching_loads_query);
 
 // Get weekly application data for chart (last 7 days)
 $weekly_data = [];
@@ -562,7 +612,7 @@ $recent_activity = $conn->query($recent_activity_query);
             <?php if ($admin_role !== 'Admin'): ?>
             <button onclick="showSection('jobs')" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg mb-2 text-gray-700 hover:bg-gray-100">
                 <i class="fas fa-briefcase w-5 h-5"></i>
-                Job Postings
+                Teaching Loads
             </button>
             <?php endif; ?>
             <?php if ($admin_role === 'Secretary' || $admin_role === 'Department Head' || $admin_role === 'HR Manager' || $admin_role === 'Recruiter'): ?>
@@ -676,11 +726,11 @@ $recent_activity = $conn->query($recent_activity_query);
 
                 <!-- Stats Cards -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                    <!-- Total Jobs Card -->
+                    <!-- Total Teaching Loads Card -->
                     <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm font-medium text-gray-600 mb-1">Total Jobs</p>
+                                <p class="text-sm font-medium text-gray-600 mb-1">Total Teaching Loads</p>
                                 <p class="text-3xl font-bold text-gray-900" id="totalJobs"><?php echo $stats['total_jobs']; ?></p>
                             </div>
                             <div class="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -749,6 +799,83 @@ $recent_activity = $conn->query($recent_activity_query);
                     </div>
                 </div>
 
+                <!-- Teaching Load Vacancy Summary -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600 mb-1">Subjects With Vacancies</p>
+                                <p class="text-3xl font-bold text-gray-900"><?php echo (int)($vacancy_stats['subject_count'] ?? 0); ?></p>
+                            </div>
+                            <div class="w-12 h-12 bg-cyan-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-book-open text-white text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600 mb-1">Open Instructor Slots</p>
+                                <p class="text-3xl font-bold text-gray-900"><?php echo (int)($vacancy_stats['slot_count'] ?? 0); ?></p>
+                            </div>
+                            <div class="w-12 h-12 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-user-plus text-white text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600 mb-1">Programs With Vacancies</p>
+                                <p class="text-3xl font-bold text-gray-900"><?php echo (int)($vacancy_stats['program_count'] ?? 0); ?></p>
+                            </div>
+                            <div class="w-12 h-12 bg-indigo-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-layer-group text-white text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+                    <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-semibold text-gray-900">Vacant Teaching Loads</h2>
+                            <p class="text-sm text-gray-500 mt-1"><?php echo htmlspecialchars(nc_format_academic_period(['academic_year' => nc_current_academic_year(), 'semester' => nc_current_semester()])); ?></p>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Program</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Schedule</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vacancy</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                <?php if ($vacant_teaching_loads && $vacant_teaching_loads->num_rows > 0): ?>
+                                    <?php while ($load = $vacant_teaching_loads->fetch_assoc()): ?>
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-6 py-4">
+                                                <div class="font-medium text-gray-900"><?php echo htmlspecialchars(nc_format_teaching_load_title($load)); ?></div>
+                                                <div class="text-sm text-gray-500"><?php echo htmlspecialchars($load['academic_year'] . ' - ' . $load['semester']); ?></div>
+                                            </td>
+                                            <td class="px-6 py-4 text-sm text-gray-700"><?php echo htmlspecialchars($load['program'] ?: $load['department_role']); ?></td>
+                                            <td class="px-6 py-4 text-sm text-gray-700"><?php echo htmlspecialchars($load['teaching_schedule'] ?: 'Schedule to be announced'); ?></td>
+                                            <td class="px-6 py-4 text-sm font-semibold text-gray-900"><?php echo (int)$load['remaining_vacancies']; ?> / <?php echo (int)($load['required_instructors'] ?: 1); ?></td>
+                                        </tr>
+                                    <?php endwhile; ?>
+                                <?php else: ?>
+                                    <tr>
+                                        <td colspan="4" class="px-6 py-6 text-center text-gray-500">No vacant teaching loads for the active period.</td>
+                                    </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <!-- Charts Row -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                     <!-- Applications Chart -->
@@ -813,17 +940,17 @@ $recent_activity = $conn->query($recent_activity_query);
                                             case 'job_created':
                                                 $icon_class = 'fas fa-briefcase text-blue-600';
                                                 $bg_class = 'bg-blue-100';
-                                                $activity_title = 'Job posting created';
+                                                $activity_title = 'Teaching load created';
                                                 break;
                                             case 'job_edited':
                                                 $icon_class = 'fas fa-edit text-orange-600';
                                                 $bg_class = 'bg-orange-100';
-                                                $activity_title = 'Job posting updated';
+                                                $activity_title = 'Teaching load updated';
                                                 break;
                                             case 'job_deleted':
                                                 $icon_class = 'fas fa-trash text-red-600';
                                                 $bg_class = 'bg-red-100';
-                                                $activity_title = 'Job posting deleted';
+                                                $activity_title = 'Teaching load deleted';
                                                 break;
                                             case 'interview_scheduled':
                                                 $icon_class = 'fas fa-calendar-check text-blue-600';
@@ -863,7 +990,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                             case 'applicant_hired':
                                                 $icon_class = 'fas fa-user-check text-green-600';
                                                 $bg_class = 'bg-green-100';
-                                                $activity_title = 'Applicant hired';
+                                                $activity_title = 'Application passed';
                                                 break;
                                             case 'applicant_transferred':
                                                 $icon_class = 'fas fa-share text-blue-600';
@@ -873,7 +1000,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                             case 'applicant_initially_hired':
                                                 $icon_class = 'fas fa-user-plus text-green-600';
                                                 $bg_class = 'bg-green-100';
-                                                $activity_title = 'Applicant initially hired';
+                                                $activity_title = 'Application passed';
                                                 break;
                                             case 'user_created':
                                                 $icon_class = 'fas fa-user-shield text-purple-600';
@@ -916,7 +1043,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                                 } elseif (strpos($activity['description'], 'hired') !== false) {
                                                     $icon_class = 'fas fa-user-check text-green-600';
                                                     $bg_class = 'bg-green-100';
-                                                    $activity_title = 'Applicant hired';
+                                                    $activity_title = 'Application passed';
                                                 }
                                                 break;
                                         }
@@ -967,16 +1094,16 @@ $recent_activity = $conn->query($recent_activity_query);
 
                 <!-- Recent Tables -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Recent Jobs -->
+                    <!-- Recent Teaching Loads -->
                     <div class="bg-white rounded-lg shadow-sm border border-gray-200">
                         <div class="p-6 border-b border-gray-200">
-                            <h2 class="text-lg font-semibold text-gray-900">Recent Job Postings</h2>
+                            <h2 class="text-lg font-semibold text-gray-900">Recent Teaching Loads</h2>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full">
                                 <thead class="bg-gray-50">
                                     <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Job Title</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teaching Load Title</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Applications</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                                     </tr>
@@ -1001,7 +1128,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                         <?php endwhile; ?>
                                     <?php else: ?>
                                         <tr>
-                                            <td colspan="3" class="px-6 py-4 text-center text-gray-500">No jobs found</td>
+                                            <td colspan="3" class="px-6 py-4 text-center text-gray-500">No teaching loads found</td>
                                         </tr>
                                     <?php endif; ?>
                                 </tbody>
@@ -1046,15 +1173,15 @@ $recent_activity = $conn->query($recent_activity_query);
                                                             break;
                                                         case 'Initially Hired':
                                                             $statusClass = 'bg-green-100 text-green-800';
-                                                            $statusText = 'Initially Hired';
+                                                            $statusText = 'Passed';
                                                             break;
                                                         case 'Permanently Hired':
                                                             $statusClass = 'bg-green-100 text-green-800';
-                                                            $statusText = 'Permanently Hired';
+                                                            $statusText = 'Passed';
                                                             break;
                                                         case 'Hired':
                                                             $statusClass = 'bg-green-100 text-green-800';
-                                                            $statusText = 'Hired';
+                                                            $statusText = 'Passed';
                                                             break;
                                                         case 'Rejected':
                                                             $statusClass = 'bg-red-100 text-red-800';
@@ -1103,13 +1230,13 @@ $recent_activity = $conn->query($recent_activity_query);
                 </div>
             </div>
 
-            <!-- Job Postings Section -->
+            <!-- Teaching Loads Section -->
             <div id="jobsSection" class="section hidden">
                 <div class="flex items-center justify-between mb-6">
-                    <h1 class="text-3xl font-bold text-gray-900">Job Postings</h1>
+                    <h1 class="text-3xl font-bold text-gray-900">Teaching Loads</h1>
                     <button onclick="openCreateJobModal()" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors flex items-center gap-2">
     <i class="fas fa-plus"></i>
-    Create Job
+    Create Teaching Load
 </button>
                 </div>
 
@@ -1119,7 +1246,7 @@ $recent_activity = $conn->query($recent_activity_query);
                         <div class="flex-1">
                             <div class="relative">
                                 <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                                <input type="text" id="jobSearchInput" placeholder="Search jobs..." 
+                                <input type="text" id="jobSearchInput" placeholder="Search teaching loads..." 
                                        oninput="filterJobs()" 
                                        class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                             </div>
@@ -1140,13 +1267,13 @@ $recent_activity = $conn->query($recent_activity_query);
                     </div>
                 </div>
 
-                <!-- Jobs Table -->
+                <!-- Teaching Loads Table -->
                 <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                     <div class="overflow-x-auto">
                         <table class="w-full">
                             <thead class="bg-gray-50">
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Job Details</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teaching Load Details</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department / Role</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Application Deadline</th>
@@ -1155,7 +1282,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200" id="jobsTableBody">
-                                <!-- Jobs will be loaded here via JavaScript -->
+                                <!-- Teaching loads will be loaded here via JavaScript -->
                             </tbody>
                         </table>
                     </div>
@@ -1200,7 +1327,7 @@ $recent_activity = $conn->query($recent_activity_query);
                     <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm font-medium text-gray-600">Hired</p>
+                                <p class="text-sm font-medium text-gray-600">Passed</p>
                                 <p class="text-2xl font-bold text-gray-900" data-stat="hired"><?php echo $stats['hired']; ?></p>
                             </div>
                             <i class="fas fa-check-circle text-2xl text-green-500"></i>
@@ -1232,8 +1359,9 @@ $recent_activity = $conn->query($recent_activity_query);
                                 <option value="Demo Passed">Demo Passed</option>
                                 <option value="Psychological Exam">Psychological Exam</option>
                                 <option value="Resubmission Required">Resubmission Required</option>
-                                <option value="Initially Hired">Initially Hired</option>
-                                <option value="Hired">Hired</option>
+                                <option value="Submitted">Submitted</option>
+                                <option value="Waiting for Interview Schedule">Waiting for Interview Schedule</option>
+                                <option value="Passed">Passed</option>
                                 <option value="Rejected">Rejected</option>
                             </select>
                         </div>
@@ -1410,7 +1538,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                 <button id="hireBtn" onclick="openHireModal()" 
                                         class="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 hidden">
                                     <i class="fas fa-check-circle"></i>
-                                    Hire Applicant
+                                    Mark Application Passed
                                 </button>
                                 
                                 <button id="resubmitBtn" onclick="openResubmitModal()" 
@@ -1614,11 +1742,103 @@ $recent_activity = $conn->query($recent_activity_query);
             <?php endif; ?>
     </main>
 </div>
-<!-- Job Type Selection Modal -->
+
+<?php if ($admin_role === 'Secretary' || $admin_role === 'Department Head'): ?>
+<!-- Floating AI Recruitment Assistant -->
+<div id="chatbotWidgetPanel"
+     class="fixed bottom-24 right-4 left-4 sm:left-auto sm:right-6 sm:w-[28rem] h-[34rem] max-h-[calc(100vh-8rem)] bg-white border border-gray-200 rounded-lg shadow-2xl z-40 hidden"
+     role="dialog"
+     aria-label="NCHire AI Recruitment Assistant">
+    <div class="bg-primary text-white px-4 py-3 rounded-t-lg flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3 min-w-0">
+            <div class="w-9 h-9 rounded-full bg-white bg-opacity-15 flex items-center justify-center shrink-0">
+                <i class="fas fa-robot"></i>
+            </div>
+            <div class="min-w-0">
+                <h2 class="font-semibold text-sm truncate">NCHire AI Recruitment Assistant</h2>
+                <p class="text-xs text-blue-100 truncate"><?php echo htmlspecialchars($admin_role_display); ?> recruitment workspace</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-1">
+            <button id="chatbotClearBtn" type="button"
+                    class="w-8 h-8 rounded-lg hover:bg-white hover:bg-opacity-15 inline-flex items-center justify-center"
+                    title="Clear conversation"
+                    aria-label="Clear conversation">
+                <i class="fas fa-eraser text-sm"></i>
+            </button>
+            <button id="chatbotCloseBtn" type="button"
+                    class="w-8 h-8 rounded-lg hover:bg-white hover:bg-opacity-15 inline-flex items-center justify-center"
+                    title="Close assistant"
+                    aria-label="Close assistant">
+                <i class="fas fa-times text-sm"></i>
+            </button>
+        </div>
+    </div>
+
+    <div id="chatbotMessages" class="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-gray-50" aria-live="polite">
+        <div id="chatbotEmptyState" class="h-full flex items-center justify-center">
+            <div class="w-full">
+                <div class="text-center mb-4">
+                    <div class="w-12 h-12 rounded-full bg-blue-100 text-primary flex items-center justify-center mx-auto mb-3">
+                        <i class="fas fa-comments"></i>
+                    </div>
+                    <h3 class="text-sm font-semibold text-gray-900">Suggested Questions</h3>
+                </div>
+                <div class="space-y-2">
+                    <button type="button" data-chatbot-suggestion="How many applicants are currently pending?" class="chatbot-suggestion w-full text-left px-3 py-2 rounded-lg border border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm">
+                        How many applicants are currently pending?
+                    </button>
+                    <button type="button" data-chatbot-suggestion="Show me the applicants for Instructor." class="chatbot-suggestion w-full text-left px-3 py-2 rounded-lg border border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm">
+                        Show me the applicants for Instructor.
+                    </button>
+                    <button type="button" data-chatbot-suggestion="Summarize the application of Gabriel Cruz." class="chatbot-suggestion w-full text-left px-3 py-2 rounded-lg border border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm">
+                        Summarize the application of Gabriel Cruz.
+                    </button>
+                    <button type="button" data-chatbot-suggestion="What job vacancies are currently available?" class="chatbot-suggestion w-full text-left px-3 py-2 rounded-lg border border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm">
+                        What job vacancies are currently available?
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="chatbotTyping" class="hidden px-4 py-2 border-t border-gray-100 bg-white text-xs text-gray-600">
+        <span class="inline-flex items-center gap-2">
+            <span class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
+            Assistant is typing...
+        </span>
+    </div>
+
+    <form id="chatbotForm" class="border-t border-gray-200 p-3 bg-white rounded-b-lg">
+        <div class="flex items-end gap-2">
+            <textarea id="chatbotInput" rows="2" maxlength="1000"
+                      class="flex-1 resize-none border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                      placeholder="Ask about applicants, statuses, or vacancies..."></textarea>
+            <button id="chatbotSendBtn" type="submit"
+                    class="w-11 h-11 shrink-0 inline-flex items-center justify-center bg-primary text-white rounded-lg hover:bg-blue-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    title="Send message"
+                    aria-label="Send message">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+    </form>
+</div>
+
+<button id="chatbotFloatingButton" type="button"
+        class="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-primary text-white shadow-lg hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-200 z-40 inline-flex items-center justify-center"
+        title="Open AI Recruitment Assistant"
+        aria-label="Open AI Recruitment Assistant"
+        aria-controls="chatbotWidgetPanel"
+        aria-expanded="false">
+    <i class="fas fa-comments text-xl"></i>
+</button>
+<?php endif; ?>
+
+<!-- Load Type Selection Modal -->
 <div id="jobTypeSelectionModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
     <div class="bg-white rounded-lg w-full max-w-md m-4">
         <div class="p-6 border-b border-gray-200">
-            <h2 class="text-xl font-semibold text-gray-900">Select Job Type</h2>
+            <h2 class="text-xl font-semibold text-gray-900">Select Load Type</h2>
         </div>
         
         <div class="p-6 space-y-4">
@@ -1635,17 +1855,17 @@ $recent_activity = $conn->query($recent_activity_query);
 
 
     
-    <!-- Create Job Modal -->
+    <!-- Create Teaching Load Modal -->
     <div id="createJobModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
         <div class="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4">
             <div class="p-6 border-b border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-900">Create New Job Posting</h2>
+                <h2 class="text-xl font-semibold text-gray-900">Create New Teaching Load</h2>
             </div>
             
             <form class="p-6 space-y-4" onsubmit="createJob(event)">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Teaching Load Title</label>
                         <input type="text" name="title" value="Instructor" required 
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent "
                                placeholder="Enter job title">
@@ -1665,50 +1885,100 @@ $recent_activity = $conn->query($recent_activity_query);
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Job Type</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Load Type</label>
                         <select name="type" required
                                 class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                             <option value="Full-time">Full-time</option>
                             <option value="Part-time">Part-time</option>
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                        <input type="text" name="location" value="Norzagaray College" required readonly
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-gray-100 cursor-not-allowed"
-                               placeholder="Job location">
-                    </div>
+                    <input type="hidden" name="location" value="Norzagaray College">
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Salary Range</label>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-xs text-gray-600 mb-1">Minimum</label>
-                                <input type="text" id="salaryMin1" required
-                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
-                                       placeholder="25,000">
-                            </div>
-                            <div>
-                                <label class="block text-xs text-gray-600 mb-1">Maximum</label>
-                                <input type="text" id="salaryMax1" required
-                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent salary-input"
-                                       placeholder="35,000">
-                            </div>
-                        </div>
-                        <input type="hidden" name="salary" id="salaryRange1">
-                    </div>
+                    <input type="hidden" name="salary" value="">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Application Deadline</label>
                         <input type="date" name="deadline" required
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                     </div>
+                    <div class="bg-blue-50 border border-blue-100 rounded-lg p-3">
+                        <p class="text-sm font-medium text-blue-900">Compensation Rule</p>
+                        <p class="text-xs text-blue-800 mt-1">Full-time loads use SGD. Part-time loads are computed from applicant qualification and teaching hours.</p>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-200 pt-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">TEACHING LOAD DETAILS</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Academic Year</label>
+                            <input type="text" name="academic_year" value="<?php echo htmlspecialchars(nc_current_academic_year()); ?>" required
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                   placeholder="2026-2027">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Semester</label>
+                            <select name="semester" required
+                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                                <option value="First Semester" <?php echo nc_current_semester() === 'First Semester' ? 'selected' : ''; ?>>First Semester</option>
+                                <option value="Second Semester" <?php echo nc_current_semester() === 'Second Semester' ? 'selected' : ''; ?>>Second Semester</option>
+                                <option value="Summer">Summer</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Subject Code</label>
+                            <input type="text" name="subject_code"
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                   placeholder="e.g., CC 101">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Subject Name</label>
+                            <input type="text" name="subject_name" required
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                   placeholder="e.g., Introduction to Computing">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Program</label>
+                            <input type="text" name="program" required
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                   placeholder="e.g., BS Computer Science">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Required Instructors</label>
+                            <input type="number" name="required_instructors" value="1" min="1" required
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Teaching Hours / Week</label>
+                            <input type="number" name="teaching_hours_per_week" min="0" step="0.25" required
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                   placeholder="e.g., 6">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Load Units</label>
+                            <input type="number" name="load_units" min="0" step="0.25"
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                   placeholder="e.g., 3">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Salary Grade (Full-time only)</label>
+                            <input type="text" name="salary_grade"
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                   placeholder="e.g., SG-11">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Teaching Schedule</label>
+                        <textarea name="teaching_schedule" rows="2"
+                                  class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                  placeholder="e.g., Mon/Wed 8:00 AM-10:00 AM"></textarea>
+                    </div>
                 </div>
 
                 <!-- Subject Field -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Subject <span class="text-red-500">*</span></label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Subject Area <span class="text-red-500">*</span></label>
                     <select name="subject" required
                             class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                         <option value="">Select subject</option>
@@ -1723,7 +1993,7 @@ $recent_activity = $conn->query($recent_activity_query);
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Job Description</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Teaching Load Description</label>
                     <textarea name="description" rows="4" required
                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                               placeholder="Enter detailed job description"></textarea>
@@ -1784,7 +2054,7 @@ $recent_activity = $conn->query($recent_activity_query);
                     </button>
                     <button type="submit"
                             class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-800 transition-colors">
-                        Create Job
+                        Create Teaching Load
                     </button>
                 </div>
             </form>
@@ -1796,13 +2066,13 @@ $recent_activity = $conn->query($recent_activity_query);
     <div id="createutilityJobModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
         <div class="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4">
             <div class="p-6 border-b border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-900">Create New Job Posting</h2>
+                <h2 class="text-xl font-semibold text-gray-900">Create New Teaching Load</h2>
             </div>
             
             <form class="p-6 space-y-4" onsubmit="createJob(event)">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Teaching Load Title</label>
                         <input type="text" name="uti" required
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                                placeholder="Enter job title">
@@ -1822,7 +2092,7 @@ $recent_activity = $conn->query($recent_activity_query);
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Job Type</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Load Type</label>
                         <select name="type" required
                                 class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                             <option value="Full-time">Full-time</option>
@@ -1830,12 +2100,7 @@ $recent_activity = $conn->query($recent_activity_query);
                             <option value="Contract">Contract</option>
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                        <input type="text" name="location" required
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                               placeholder="Job location">
-                    </div>
+                    <input type="hidden" name="location" value="Norzagaray College">
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1865,7 +2130,7 @@ $recent_activity = $conn->query($recent_activity_query);
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Job Description</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Teaching Load Description</label>
                     <textarea name="description" rows="4" required
                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                               placeholder="Enter detailed job description"></textarea>
@@ -1926,7 +2191,7 @@ $recent_activity = $conn->query($recent_activity_query);
                     </button>
                     <button type="submit"
                             class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-800 transition-colors">
-                        Create Job
+                        Create Teaching Load
                     </button>
                 </div>
             </form>
@@ -1937,13 +2202,13 @@ $recent_activity = $conn->query($recent_activity_query);
     <div id="createsecJobModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
         <div class="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4">
             <div class="p-6 border-b border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-900">Create New Job Posting</h2>
+                <h2 class="text-xl font-semibold text-gray-900">Create New Teaching Load</h2>
             </div>
             
             <form class="p-6 space-y-4" onsubmit="createJob(event)">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Teaching Load Title</label>
                         <input type="text" name="sec" required
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                                placeholder="Enter job title">
@@ -1961,7 +2226,7 @@ $recent_activity = $conn->query($recent_activity_query);
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Job Type</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Load Type</label>
                         <select name="type" required
                                 class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                             <option value="Full-time">Full-time</option>
@@ -1969,12 +2234,7 @@ $recent_activity = $conn->query($recent_activity_query);
                             <option value="Contract">Contract</option>
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                        <input type="text" name="location" required
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                               placeholder="Job location">
-                    </div>
+                    <input type="hidden" name="location" value="Norzagaray College">
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2005,7 +2265,7 @@ $recent_activity = $conn->query($recent_activity_query);
 
                 <!-- Subject Field -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Subject <span class="text-red-500">*</span></label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Subject Area <span class="text-red-500">*</span></label>
                     <select name="subject" required
                             class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                         <option value="">Select subject</option>
@@ -2020,7 +2280,7 @@ $recent_activity = $conn->query($recent_activity_query);
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Job Description</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Teaching Load Description</label>
                     <textarea name="description" rows="4" required
                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                               placeholder="Enter detailed job description"></textarea>
@@ -2081,7 +2341,7 @@ $recent_activity = $conn->query($recent_activity_query);
                     </button>
                     <button type="submit"
                             class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-800 transition-colors">
-                        Create Job
+                        Create Teaching Load
                     </button>
                 </div>
             </form>
@@ -2097,14 +2357,14 @@ $recent_activity = $conn->query($recent_activity_query);
     <div id="editJobModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
         <div class="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4">
             <div class="p-6 border-b border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-900">Create New Job Posting</h2>
+                <h2 class="text-xl font-semibold text-gray-900">Create New Teaching Load</h2>
             </div>
             
             <form class="p-6 space-y-4" onsubmit="saveJob(event)">
                 <input type="hidden" name="id" />
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Teaching Load Title</label>
                         <input type="text" name="title" required
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                                placeholder="Enter job title">
@@ -2124,7 +2384,7 @@ $recent_activity = $conn->query($recent_activity_query);
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Job Type</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Load Type</label>
                         <select name="type" required
                                 class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                             <option value="Full-time">Full-time</option>
@@ -2132,12 +2392,7 @@ $recent_activity = $conn->query($recent_activity_query);
                             <option value="Contract">Contract</option>
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                        <input type="text" name="location" required
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                               placeholder="Job location">
-                    </div>
+                    <input type="hidden" name="location" value="Norzagaray College">
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2167,7 +2422,7 @@ $recent_activity = $conn->query($recent_activity_query);
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Job Description</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Teaching Load Description</label>
                     <textarea name="description" rows="4" required
                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                               placeholder="Enter detailed job description"></textarea>
@@ -2193,14 +2448,14 @@ $recent_activity = $conn->query($recent_activity_query);
     <div id="editutilityJobModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
         <div class="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4">
             <div class="p-6 border-b border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-900">Create New Job Posting</h2>
+                <h2 class="text-xl font-semibold text-gray-900">Create New Teaching Load</h2>
             </div>
             
             <form class="p-6 space-y-4" onsubmit="saveJob(event)">
                 <input type="hidden" name="id" />
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Teaching Load Title</label>
                         <input type="text" name="uti" required
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                                placeholder="Enter job title">
@@ -2220,7 +2475,7 @@ $recent_activity = $conn->query($recent_activity_query);
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Job Type</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Load Type</label>
                         <select name="type" required
                                 class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                             <option value="Full-time">Full-time</option>
@@ -2228,12 +2483,7 @@ $recent_activity = $conn->query($recent_activity_query);
                             <option value="Contract">Contract</option>
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                        <input type="text" name="location" required
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                               placeholder="Job location">
-                    </div>
+                    <input type="hidden" name="location" value="Norzagaray College">
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2263,7 +2513,7 @@ $recent_activity = $conn->query($recent_activity_query);
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Job Description</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Teaching Load Description</label>
                     <textarea name="description" rows="4" required
                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                               placeholder="Enter detailed job description"></textarea>
@@ -2288,14 +2538,14 @@ $recent_activity = $conn->query($recent_activity_query);
     <div id="editsecJobModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
         <div class="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4">
             <div class="p-6 border-b border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-900">Create New Job Posting</h2>
+                <h2 class="text-xl font-semibold text-gray-900">Create New Teaching Load</h2>
             </div>
             
             <form class="p-6 space-y-4" onsubmit="saveJob(event)">
                 <input type="hidden" name="id" />
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Teaching Load Title</label>
                         <input type="text" name="sec" required
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                                placeholder="Enter job title">
@@ -2313,7 +2563,7 @@ $recent_activity = $conn->query($recent_activity_query);
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Job Type</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Load Type</label>
                         <select name="type" required
                                 class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                             <option value="Full-time">Full-time</option>
@@ -2321,12 +2571,7 @@ $recent_activity = $conn->query($recent_activity_query);
                             <option value="Contract">Contract</option>
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                        <input type="text" name="location" required
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                               placeholder="Job location">
-                    </div>
+                    <input type="hidden" name="location" value="Norzagaray College">
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2356,7 +2601,7 @@ $recent_activity = $conn->query($recent_activity_query);
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Job Description</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Teaching Load Description</label>
                     <textarea name="description" rows="4" required
                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                               placeholder="Enter detailed job description"></textarea>
@@ -2407,18 +2652,18 @@ $recent_activity = $conn->query($recent_activity_query);
     
     <!-- Content -->
     <div class="p-6 space-y-6">
-      <!-- Job Highlights -->
+      <!-- Teaching Load Highlights -->
       <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-5 border-l-4 border-blue-600">
         <h3 class="text-lg font-bold text-gray-900 mb-3 flex items-center">
-          <i class="fas fa-star text-blue-600 mr-2"></i>Job Highlights
+          <i class="fas fa-star text-blue-600 mr-2"></i>Teaching Load Highlights
         </h3>
         <div class="grid grid-cols-3 gap-4">
           <div class="bg-white rounded-lg p-3 shadow-sm">
-            <div class="text-xs text-gray-500 font-semibold mb-1">Job Type</div>
+            <div class="text-xs text-gray-500 font-semibold mb-1">Load Type</div>
             <div class="text-gray-900 font-medium job-type-highlight"></div>
           </div>
           <div class="bg-white rounded-lg p-3 shadow-sm">
-            <div class="text-xs text-gray-500 font-semibold mb-1">Location</div>
+            <div class="text-xs text-gray-500 font-semibold mb-1">Academic Period</div>
             <div class="text-gray-900 font-medium job-loc-highlight"></div>
           </div>
           <div class="bg-white rounded-lg p-3 shadow-sm">
@@ -2428,10 +2673,10 @@ $recent_activity = $conn->query($recent_activity_query);
         </div>
       </div>
       
-      <!-- Position Overview -->
+      <!-- Teaching Load Overview -->
       <div class="bg-white border border-gray-200 rounded-xl p-5">
         <h3 class="text-lg font-bold text-gray-900 mb-3 flex items-center">
-          <i class="fas fa-file-alt text-blue-600 mr-2"></i>Position Overview
+          <i class="fas fa-file-alt text-blue-600 mr-2"></i>Teaching Load Overview
         </h3>
         <div class="text-gray-700 space-y-2 job-desc"></div>
       </div>
@@ -3077,17 +3322,17 @@ $recent_activity = $conn->query($recent_activity_query);
                 'job_created': {
                     iconClass: 'fas fa-briefcase text-blue-600',
                     bgClass: 'bg-blue-100',
-                    title: 'Job posting created'
+                    title: 'Teaching load created'
                 },
                 'job_edited': {
                     iconClass: 'fas fa-edit text-orange-600',
                     bgClass: 'bg-orange-100',
-                    title: 'Job posting updated'
+                    title: 'Teaching load updated'
                 },
                 'job_deleted': {
                     iconClass: 'fas fa-trash text-red-600',
                     bgClass: 'bg-red-100',
-                    title: 'Job posting deleted'
+                    title: 'Teaching load deleted'
                 },
                 'interview_scheduled': {
                     iconClass: 'fas fa-calendar-check text-blue-600',
@@ -3127,7 +3372,7 @@ $recent_activity = $conn->query($recent_activity_query);
                 'applicant_hired': {
                     iconClass: 'fas fa-user-check text-green-600',
                     bgClass: 'bg-green-100',
-                    title: 'Applicant hired'
+                    title: 'Application passed'
                 },
                 'applicant_transferred': {
                     iconClass: 'fas fa-share text-blue-600',
@@ -3137,7 +3382,7 @@ $recent_activity = $conn->query($recent_activity_query);
                 'applicant_initially_hired': {
                     iconClass: 'fas fa-user-plus text-green-600',
                     bgClass: 'bg-green-100',
-                    title: 'Applicant initially hired'
+                    title: 'Application passed'
                 },
                 'status_changed': {
                     iconClass: 'fas fa-exchange-alt text-purple-600',
@@ -3212,7 +3457,7 @@ $recent_activity = $conn->query($recent_activity_query);
                         </tr>
                     `;
                 });
-                jobsTable.innerHTML = jobsHtml || '<tr><td colspan="3" class="px-6 py-4 text-center text-gray-500">No jobs found</td></tr>';
+                jobsTable.innerHTML = jobsHtml || '<tr><td colspan="3" class="px-6 py-4 text-center text-gray-500">No teaching loads found</td></tr>';
             }
             
             // Update applicants table
@@ -3245,9 +3490,11 @@ $recent_activity = $conn->query($recent_activity_query);
         function getStatusBadge(status) {
             const badges = {
                 'Approved': { class: 'bg-green-100 text-green-800', text: 'Approved' },
-                'Initially Hired': { class: 'bg-green-100 text-green-800', text: 'Initially Hired' },
-                'Permanently Hired': { class: 'bg-green-100 text-green-800', text: 'Permanently Hired' },
-                'Hired': { class: 'bg-green-100 text-green-800', text: 'Hired' },
+                'Submitted': { class: 'bg-blue-100 text-blue-800', text: 'Submitted' },
+                'Waiting for Interview Schedule': { class: 'bg-cyan-100 text-cyan-800', text: 'Waiting for Interview Schedule' },
+                'Passed': { class: 'bg-green-100 text-green-800', text: 'Passed' },
+                'Application Passed': { class: 'bg-green-100 text-green-800', text: 'Passed' },
+                'Hired': { class: 'bg-green-100 text-green-800', text: 'Passed' },
                 'Rejected': { class: 'bg-red-100 text-red-800', text: 'Rejected' },
                 'Interview Scheduled': { class: 'bg-blue-100 text-blue-800', text: 'Interview Scheduled' },
                 'Demo Scheduled': { class: 'bg-blue-100 text-blue-800', text: 'Demo Scheduled' },
@@ -3356,7 +3603,7 @@ $recent_activity = $conn->query($recent_activity_query);
         if (originalSaveJob) {
             window.saveJob = function(event) {
                 const result = originalSaveJob(event);
-                logActivity('job_created', 'New job posting created');
+                logActivity('job_created', 'New teaching load created');
                 return result;
             };
         }
@@ -3386,19 +3633,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                        <input type="text" id="interviewLocation" required readonly
-                               value="Norzagaray College"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Room</label>
-                        <input type="text" id="interviewRoom" required 
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                               placeholder="e.g., Room 201, HR Office">
-                    </div>
+                    <input type="hidden" id="interviewLocation" value="Norzagaray College">                                          <div>                         <label class="block text-sm font-medium text-gray-700 mb-1">Room</label>                         <select id="interviewRoom" required                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">                             <option value="">Select a room</option>                             <?php foreach ($active_rooms as $room): ?>                                 <option value="<?php echo (int)$room['id']; ?>" data-location="<?php echo htmlspecialchars($room['campus_location'] ?? ''); ?>">                                     <?php echo htmlspecialchars($room['room_name']); ?>                                 </option>                             <?php endforeach; ?>                         </select>                     </div>
                     
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
@@ -3453,19 +3688,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
                     </div>
                     
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                        <input type="text" id="rescheduleInterviewLocation" required readonly
-                               value="Norzagaray College"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-amber-500">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Room</label>
-                        <input type="text" id="rescheduleInterviewRoom" required 
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                               placeholder="e.g., Room 201, HR Office">
-                    </div>
+                    <input type="hidden" id="rescheduleInterviewLocation" value="Norzagaray College">                                          <div>                         <label class="block text-sm font-medium text-gray-700 mb-1">Room</label>                         <select id="rescheduleInterviewRoom" required                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">                             <option value="">Select a room</option>                             <?php foreach ($active_rooms as $room): ?>                                 <option value="<?php echo (int)$room['id']; ?>" data-location="<?php echo htmlspecialchars($room['campus_location'] ?? ''); ?>">                                     <?php echo htmlspecialchars($room['room_name']); ?>                                 </option>                             <?php endforeach; ?>                         </select>                     </div>
                     
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Reason for Rescheduling</label>
@@ -3725,11 +3948,11 @@ $recent_activity = $conn->query($recent_activity_query);
         </div>
     </div>
 
-    <!-- Hire Applicant Modal -->
+    <!-- Mark Application Passed Modal -->
     <div id="hireModal" class="fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 hidden">
         <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-900">Hire Applicant</h3>
+                <h3 class="text-lg font-semibold text-gray-900">Mark Application Passed</h3>
                 <button onclick="closeHireModal()" class="text-gray-400 hover:text-gray-600">
                     <i class="fas fa-times"></i>
                 </button>
@@ -3739,8 +3962,8 @@ $recent_activity = $conn->query($recent_activity_query);
                 <div class="space-y-4">
                     <div class="text-center py-4">
                         <i class="fas fa-check-circle text-6xl text-green-500 mb-4"></i>
-                        <p class="text-gray-700 mb-4">Are you sure you want to hire this applicant?</p>
-                        <p class="text-sm text-gray-500">This action will mark the applicant as "Hired" and send them a notification.</p>
+                        <p class="text-gray-700 mb-4">Are you sure you want to mark this application as passed?</p>
+                        <p class="text-sm text-gray-500">This action will mark the application as "Passed" and send the applicant a notification.</p>
                     </div>
                     
                     <div>
@@ -3758,14 +3981,14 @@ $recent_activity = $conn->query($recent_activity_query);
                     </button>
                     <button type="submit" 
                             class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                        Hire Applicant
+                        Mark Application Passed
                     </button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Permanent Hire Modal -->
+    <!-- Final Pass Modal -->
     <div id="permanentHireModal" class="fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 hidden">
         <div class="bg-white rounded-lg p-8 w-full max-w-lg mx-4">
             <div class="text-center">
@@ -3774,8 +3997,8 @@ $recent_activity = $conn->query($recent_activity_query);
                     <i class="fas fa-user-tie text-3xl text-green-600"></i>
                 </div>
                 
-                <h3 class="text-2xl font-semibold text-gray-900 mb-2">Permanently Hire Applicant</h3>
-                <p class="text-gray-600 mb-6">Finalize the hiring process and mark this applicant as a permanent employee</p>
+                <h3 class="text-2xl font-semibold text-gray-900 mb-2">Finalize Application Passed</h3>
+                <p class="text-gray-600 mb-6">Confirm that this applicant has passed the final recruitment stage.</p>
             </div>
             
             <form id="permanentHireForm">
@@ -3783,18 +4006,18 @@ $recent_activity = $conn->query($recent_activity_query);
                     <div class="bg-green-50 border border-green-200 rounded-lg p-4">
                         <h4 class="font-semibold text-green-900 mb-2 flex items-center gap-2">
                             <i class="fas fa-check-circle"></i>
-                            Confirm Permanent Hiring
+                            Confirm Final Pass
                         </h4>
                         <p class="text-sm text-green-800">
-                            By permanently hiring this applicant, you confirm that they have successfully completed all requirements and are now a regular employee.
+                            By confirming this result, you mark the application as passed after all requirements have been completed.
                         </p>
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Hiring Notes (Optional)</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Final Notes (Optional)</label>
                         <textarea id="permanentHireNotes" rows="4"
                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                                  placeholder="Add employment details, start date, position confirmation, etc..."></textarea>
+                                  placeholder="Add final evaluation notes, conditions, or reminders..."></textarea>
                     </div>
                     
                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -3803,7 +4026,7 @@ $recent_activity = $conn->query($recent_activity_query);
                             Final Status
                         </h4>
                         <p class="text-sm text-blue-800">
-                            After confirmation, the applicant's status will be updated to "Hired" and they will receive a congratulatory notification.
+                            After confirmation, the applicant's status will be updated to "Passed" and they will receive a notification.
                         </p>
                     </div>
                 </div>
@@ -3816,7 +4039,7 @@ $recent_activity = $conn->query($recent_activity_query);
                     <button type="submit" 
                             class="flex-1 px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 flex items-center justify-center gap-2">
                         <i class="fas fa-user-tie"></i>
-                        Confirm Permanent Hire
+                        Confirm Passed
                     </button>
                 </div>
             </form>
@@ -3861,7 +4084,7 @@ $recent_activity = $conn->query($recent_activity_query);
                             Next Steps
                         </h4>
                         <p class="text-sm text-blue-800">
-                            After approval, the applicant's status will be updated to "Demo Passed" and you'll be able to proceed with hiring.
+                            After approval, the applicant's status will be updated to "Demo Passed" and you'll be able to proceed with final review.
                         </p>
                     </div>
                 </div>
@@ -3941,7 +4164,7 @@ $recent_activity = $conn->query($recent_activity_query);
 
     <!-- Document Viewer Modal -->
     <div id="documentViewerModal" class="fixed inset-0 bg-black bg-opacity-75 items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-lg w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden">
+        <div class="bg-white rounded-lg w-full max-w-7xl mx-4 max-h-[96vh] overflow-hidden">
             <div class="flex items-center justify-between p-4 border-b border-gray-200">
                 <h3 id="documentModalTitle" class="text-lg font-semibold text-gray-900">Document Viewer</h3>
                 <button onclick="closeDocumentViewer()" class="text-gray-400 hover:text-gray-600">
@@ -3949,7 +4172,7 @@ $recent_activity = $conn->query($recent_activity_query);
                 </button>
             </div>
             
-            <div id="documentModalContent" class="p-6 overflow-auto max-h-[calc(90vh-80px)]">
+            <div id="documentModalContent" class="p-6 overflow-auto max-h-[calc(96vh-80px)]">
                 <!-- Document content will be loaded here -->
             </div>
         </div>
@@ -3962,8 +4185,8 @@ $recent_activity = $conn->query($recent_activity_query);
             <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
                 <div class="flex justify-between items-center">
                     <div>
-                        <h2 class="text-2xl font-bold">Edit Job Posting</h2>
-                        <p class="text-blue-100 text-sm mt-1">Update job information and requirements</p>
+                        <h2 class="text-2xl font-bold">Edit Teaching Load</h2>
+                        <p class="text-blue-100 text-sm mt-1">Update teaching load information and requirements</p>
                     </div>
                     <button onclick="closeNewEditJobModal()" class="text-white hover:text-gray-200 transition-colors">
                         <i class="fas fa-times text-2xl"></i>
@@ -3985,7 +4208,7 @@ $recent_activity = $conn->query($recent_activity_query);
                         
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Job Title *</label>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Teaching Load Title *</label>
                                 <input type="text" name="job_title" id="editJobTitle" required
                                        class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                        placeholder="Enter job title">
@@ -4001,24 +4224,18 @@ $recent_activity = $conn->query($recent_activity_query);
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Job Type *</label>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Load Type *</label>
                                 <select name="job_type" id="editJobType" required
                                         class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
                                     <option value="Full-time">Full-time</option>
                                     <option value="Part-time">Part-time</option>
                                 </select>
                             </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Location *</label>
-                                <input type="text" name="locations" id="editLocation" required
-                                       class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                       placeholder="Job location">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Salary Range *</label>
-                                <input type="text" name="salary_range" id="editSalary" required
-                                       class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                       placeholder="e.g., ₱25,000 - ₱35,000">
+                                <input type="hidden" name="locations" id="editLocation" value="Norzagaray College">
+                            <input type="hidden" name="salary_range" id="editSalary" value="">
+                            <div class="bg-blue-50 border border-blue-100 rounded-lg p-3">
+                                <p class="text-sm font-medium text-blue-900">Compensation Rule</p>
+                                <p class="text-xs text-blue-800 mt-1">Full-time loads use SGD. Part-time loads are computed from applicant qualification and teaching hours.</p>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Application Deadline *</label>
@@ -4027,8 +4244,54 @@ $recent_activity = $conn->query($recent_activity_query);
                             </div>
                         </div>
                         
+                        <div class="mt-4 border-t border-gray-200 pt-4">
+                            <h4 class="text-sm font-semibold text-gray-900 mb-3">Teaching Load Details</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Academic Year</label>
+                                    <input type="text" name="academic_year" id="editAcademicYear"
+                                           class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                           placeholder="2026-2027">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Semester</label>
+                                    <select name="semester" id="editSemester"
+                                            class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                                        <option value="First Semester">First Semester</option>
+                                        <option value="Second Semester">Second Semester</option>
+                                        <option value="Summer">Summer</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Required Instructors</label>
+                                    <input type="number" name="required_instructors" id="editRequiredInstructors" min="1"
+                                           class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Teaching Hours / Week</label>
+                                    <input type="number" name="teaching_hours_per_week" id="editTeachingHours" min="0" step="0.25"
+                                           class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Load Units</label>
+                                    <input type="number" name="load_units" id="editLoadUnits" min="0" step="0.25"
+                                           class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Salary Grade (Full-time only)</label>
+                                    <input type="text" name="salary_grade" id="editSalaryGrade"
+                                           class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                                </div>
+                            </div>
+                            <div class="mt-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Teaching Schedule</label>
+                                <textarea name="teaching_schedule" id="editTeachingSchedule" rows="2"
+                                          class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"></textarea>
+                            </div>
+                        </div>
+
                         <div class="mt-4">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Job Description *</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Teaching Load Description *</label>
                             <textarea name="job_description" id="editDescription" rows="4" required
                                       class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                       placeholder="Enter detailed job description"></textarea>
@@ -4070,19 +4333,19 @@ $recent_activity = $conn->query($recent_activity_query);
                         </div>
                     </div>
 
-                    <!-- Job Details Section -->
+                    <!-- Teaching Load Details Section -->
                     <div class="bg-green-50 rounded-lg p-6">
                         <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                             <i class="fas fa-tasks text-green-600 mr-2"></i>
-                            Job Details
+                            Teaching Load Details
                         </h3>
                         
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Job Requirements</label>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Teaching Load Requirements</label>
                                 <textarea name="job_requirements" id="editRequirements" rows="4"
                                           class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                                          placeholder="Specific job requirements"></textarea>
+                                          placeholder="Specific teaching load requirements"></textarea>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Duties & Responsibilities</label>
@@ -4193,7 +4456,7 @@ $recent_activity = $conn->query($recent_activity_query);
                         </div>
                         
                         <div class="mt-4">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Job Description *</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Teaching Load Description *</label>
                             <textarea name="job_description" id="editSecretaryDescription" rows="4" required
                                       class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                       placeholder="Describe the secretary position responsibilities and work environment"></textarea>
@@ -4310,9 +4573,9 @@ $recent_activity = $conn->query($recent_activity_query);
                 </select>
             </div>
             
-            <!-- Job Type Filter -->
+            <!-- Load Type Filter -->
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Job Type</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Load Type</label>
                 <select id="jobTypeFilter" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                     <option value="all">All Types</option>
                     <option value="Full-time">Full-time</option>
@@ -4826,3 +5089,4 @@ window.addEventListener('beforeunload', function() {
 </script>
 </body>
 </html>
+

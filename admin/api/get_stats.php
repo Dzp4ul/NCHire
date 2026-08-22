@@ -71,9 +71,9 @@ if ($show_applicant_stats && !empty($department_params)) {
     $stats['interview_scheduled'] = 0;
 }
 
-// Hired (includes Initially Hired, Permanently Hired, and Hired)
+// Passed (includes current Passed statuses and legacy hired statuses)
 if ($show_applicant_stats && !empty($department_params)) {
-    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Initially Hired', 'Permanently Hired', 'Hired')" . $department_filter);
+    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Passed', 'Application Passed', 'Initially Hired', 'Permanently Hired', 'Hired')" . $department_filter);
     $stmt->bind_param("s", ...$department_params);
     $stmt->execute();
     $result = $stmt->get_result();

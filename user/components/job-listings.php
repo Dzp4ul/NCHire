@@ -8,8 +8,8 @@
 <div class="mb-6">
     <div class="flex items-center justify-between">
         <div>
-            <h1 class="text-3xl font-bold text-gray-900 mb-2">Available Positions</h1>
-            <p class="text-gray-600">Browse and apply for open positions at Norzagaray College</p>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Available Teaching Loads</h1>
+            <p class="text-gray-600">Browse and apply for vacant teaching loads at Norzagaray College</p>
         </div>
     </div>
 </div>
@@ -19,7 +19,7 @@
     <div class="flex flex-col md:flex-row gap-4">
         <div class="flex-1">
             <div class="relative">
-                <input type="text" id="jobSearch" placeholder="Search positions..." 
+                <input type="text" id="jobSearch" placeholder="Search teaching loads..." 
                        class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
                 <i class="ri-search-line absolute left-3 top-3 text-gray-400"></i>
             </div>
@@ -44,7 +44,7 @@
     <!-- Jobs loaded via JavaScript -->
     <div class="text-center py-8 col-span-full">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-        <p class="text-gray-600 mt-4">Loading jobs...</p>
+        <p class="text-gray-600 mt-4">Loading teaching loads...</p>
     </div>
 </div>
 

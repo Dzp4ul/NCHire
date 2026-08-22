@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../shared/helpers/recruitment.php';
 $host = "127.0.0.1";
 $user = "root";
 $pass = "";
@@ -15,8 +16,7 @@ $jobId = isset($_GET['id']) ? (int)$_GET['id'] : null;
 
 if ($jobId) {
     // Fetch single job with all fields
-    $sql = "SELECT id, job_title, department_role, job_type, locations, salary_range, application_deadline, 
-                   job_description, job_requirements, education, experience, training, eligibility, duties, competency 
+    $sql = "SELECT * 
             FROM job WHERE id = ?";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $jobId);
@@ -25,6 +25,8 @@ if ($jobId) {
     
     if ($result->num_rows > 0) {
         $job = $result->fetch_assoc();
+        $job['teaching_load_title'] = nc_format_teaching_load_title($job);
+        $job['academic_period_label'] = nc_format_academic_period($job);
         echo json_encode($job);
     } else {
         echo json_encode(["error" => "Job not found"]);
@@ -32,14 +34,14 @@ if ($jobId) {
     $stmt->close();
 } else {
     // Fetch all jobs with all fields
-    $sql = "SELECT id, job_title, department_role, job_type, locations, salary_range, application_deadline, 
-                   job_description, job_requirements, education, experience, training, eligibility, duties, competency 
-            FROM job ORDER BY id DESC";
+    $sql = "SELECT * FROM job ORDER BY id DESC";
     $result = $conn->query($sql);
 
     $jobs = [];
     if ($result->num_rows > 0) {
         while($row = $result->fetch_assoc()) {
+            $row['teaching_load_title'] = nc_format_teaching_load_title($row);
+            $row['academic_period_label'] = nc_format_academic_period($row);
             $jobs[] = $row;
         }
     }

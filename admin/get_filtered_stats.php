@@ -132,14 +132,14 @@ if (!empty($all_params)) {
 
 // 4. Overall Hired
 if (!empty($all_params)) {
-    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Initially Hired', 'Permanently Hired', 'Hired') AND $base_where");
+    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Passed', 'Application Passed', 'Initially Hired', 'Permanently Hired', 'Hired') AND $base_where");
     $stmt->bind_param($param_types, ...$all_params);
     $stmt->execute();
     $result = $stmt->get_result();
     $stats['overall_hired'] = $result->fetch_assoc()['count'];
     $stmt->close();
 } else {
-    $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Initially Hired', 'Permanently Hired', 'Hired')");
+    $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status IN ('Passed', 'Application Passed', 'Initially Hired', 'Permanently Hired', 'Hired')");
     $stats['overall_hired'] = $result ? $result->fetch_assoc()['count'] : 0;
 }
 
@@ -184,7 +184,7 @@ if (!empty($all_params)) {
     $stats['demo_scheduled'] = $result ? $result->fetch_assoc()['count'] : 0;
 }
 
-// Hired (same as overall_hired, kept for backward compatibility)
+// Passed (same as overall_hired, kept under the legacy key for compatibility)
 $stats['hired'] = $stats['overall_hired'];
 
 // Return JSON response

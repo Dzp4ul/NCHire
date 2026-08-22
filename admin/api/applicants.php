@@ -40,9 +40,9 @@ function loadApplicants() {
     }
     // Department Head: Only see applications transferred to them (department_head_review and beyond)
     elseif ($admin_role === 'Department Head') {
-        $where_conditions[] = "workflow_stage IN ('department_head_review', 'interview_scheduled', 'interview_completed', 
+        $where_conditions[] = "workflow_stage IN ('waiting_interview_schedule', 'department_head_review', 'interview_scheduled', 'interview_completed', 
                                                      'demo_scheduled', 'demo_completed', 'psych_scheduled', 'psych_completed',
-                                                     'initially_hired', 'permanently_hired', 'hired')";
+                                                     'initially_hired', 'permanently_hired', 'passed', 'hired')";
         if (!empty($admin_department)) {
             $where_conditions[] = "assigned_to_department IN (?, ?)";
             $params[] = $admin_department;
@@ -71,6 +71,14 @@ function loadApplicants() {
         applied_date as appliedDate,
         status,
         workflow_stage,
+        application_type,
+        academic_year,
+        semester,
+        certificate_of_grades,
+        proof_of_enrollment,
+        applicable_hourly_rate,
+        salary_projection,
+        salary_projection_basis,
         assigned_to_department,
         '' as experience,
         '' as education
@@ -178,3 +186,4 @@ switch ($method) {
 
 $conn->close();
 ?>
+

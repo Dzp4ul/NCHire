@@ -55,6 +55,7 @@ $conn = new mysqli($host, $user, $pass, $dbname);
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
+require_once __DIR__ . '/../shared/helpers/recruitment.php';
 
 // Check if this is an AJAX request early to suppress debug output
 $is_ajax_request = ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_submit']));
@@ -119,7 +120,7 @@ if (isset($_SESSION['user_id'])) {
     $exp_stmt->close();
     
     // Fetch ALL education entries
-    $edu_stmt = $conn->prepare("SELECT institution, degree, field_of_study, start_year, end_year, gpa FROM user_education WHERE user_id = ? ORDER BY start_year DESC");
+    $edu_stmt = $conn->prepare("SELECT institution, degree, field_of_study, start_year, end_year, gpa, education_level, education_status, completed_units, year_completed FROM user_education WHERE user_id = ? ORDER BY start_year DESC");
     $edu_stmt->bind_param("i", $profile_user_id);
     $edu_stmt->execute();
     $edu_result = $edu_stmt->get_result();
@@ -336,7 +337,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
     
     // Get draft documents from database
     $draft_docs = null;
-    $draft_stmt = $conn->prepare("SELECT application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, letter_of_intent FROM user_draft_documents WHERE user_id = ?");
+    $draft_stmt = $conn->prepare("SELECT application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, certificate_of_grades, proof_of_enrollment, letter_of_intent FROM user_draft_documents WHERE user_id = ?");
     $draft_stmt->bind_param("i", $user_id);
     $draft_stmt->execute();
     $draft_result = $draft_stmt->get_result();
@@ -442,6 +443,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         $masteral_cert = copyDraftFile($draft_docs['masteral_cert'], $user_id, $uploadDir);
     }
     
+    // Required when the applicant has an ongoing master's record.
+    $certificate_of_grades = uploadFile('certificate_of_grades', $uploadDir);
+    if (!$certificate_of_grades && isset($_POST['existing_certificate_of_grades']) && !empty($_POST['existing_certificate_of_grades']) && $draft_docs && !empty($draft_docs['certificate_of_grades'])) {
+        $certificate_of_grades = copyDraftFile($draft_docs['certificate_of_grades'], $user_id, $uploadDir);
+    }
+
+    $proof_of_enrollment = uploadFile('proof_of_enrollment', $uploadDir);
+    if (!$proof_of_enrollment && isset($_POST['existing_proof_of_enrollment']) && !empty($_POST['existing_proof_of_enrollment']) && $draft_docs && !empty($draft_docs['proof_of_enrollment'])) {
+        $proof_of_enrollment = copyDraftFile($draft_docs['proof_of_enrollment'], $user_id, $uploadDir);
+    }
+
     $letter_of_intent = uploadFile('letter_of_intent', $uploadDir);
     error_log("Letter of Intent upload result: " . ($letter_of_intent ?? 'NULL'));
     // Only use draft if explicitly loaded
@@ -478,6 +490,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         if (!$letter_of_intent) {
             $upload_errors[] = 'Letter of Intent is required';
         }
+
+    $master_status = nc_get_master_status($conn, (int)$user_id);
+    if ($master_status['requires_ongoing_documents']) {
+        if (!$certificate_of_grades) {
+            $upload_errors[] = 'Certificate of Grades is required for ongoing master\'s applicants';
+        }
+        if (!$proof_of_enrollment) {
+            $upload_errors[] = 'Proof of Enrollment is required for ongoing master\'s applicants';
+        }
+    }
     }
     
     if (!empty($upload_errors) && !$is_resubmission) {
@@ -511,10 +533,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
     
     // Get applicant data
     $applicant_name = $_SESSION['first_name'] ?? "Guest";
-    $position = $_POST['job_title'] ?? "Unknown"; 
-    $job_id = $_POST['job_id'] ?? null;
+    $position = $_POST['job_title'] ?? "Unknown";
+    $job_id = isset($_POST['job_id']) ? (int)$_POST['job_id'] : 0;
     $applied_date = date("Y-m-d H:i:s");
-    $status = "Pending";
+    $status = "Submitted";
+    $application_type = ($_POST['application_type'] ?? 'new') === 'renewing' ? 'renewing' : 'new';
+    $application_academic_year = nc_current_academic_year();
+    $application_semester = nc_current_semester();
+    $job_data = null;
+    $applicable_hourly_rate = null;
+    $salary_projection = null;
+    $salary_projection_basis = null;
 
     // Validate job_id
     if (empty($job_id)) {
@@ -536,22 +565,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         exit();
     }
     
-    // Fetch job department for application routing
+    // Fetch teaching load details for routing, vacancy checks, and salary projection.
     $job_department = null;
-    $job_dept_stmt = $conn->prepare("SELECT department_role FROM job WHERE id = ?");
+    $job_validation_errors = [];
+    $job_dept_stmt = $conn->prepare("SELECT * FROM job WHERE id = ? LIMIT 1");
     if ($job_dept_stmt) {
         $job_dept_stmt->bind_param("i", $job_id);
         $job_dept_stmt->execute();
         $job_dept_result = $job_dept_stmt->get_result();
         if ($job_dept_row = $job_dept_result->fetch_assoc()) {
-            $job_department = $job_dept_row['department_role'];
+            $job_data = $job_dept_row;
+            $job_department = $job_dept_row['department_role'] ?? null;
             if ($job_department === 'Computer Science') {
                 $job_department = 'Computing Studies';
             }
+            $application_academic_year = $job_dept_row['academic_year'] ?? $application_academic_year;
+            $application_semester = $job_dept_row['semester'] ?? $application_semester;
         }
         $job_dept_stmt->close();
     }
-    
+
+    if (!$job_data) {
+        $job_validation_errors[] = 'Teaching load was not found';
+    } else {
+        $job_status = $job_data['status'] ?? 'Active';
+        $deadline = $job_data['application_deadline'] ?? null;
+        if ($job_status !== 'Active' || ($deadline && strtotime($deadline) < strtotime(date('Y-m-d')))) {
+            $job_validation_errors[] = 'This teaching load is no longer open for applications';
+        }
+        if (nc_remaining_vacancies($conn, $job_data) <= 0) {
+            $job_validation_errors[] = 'This teaching load no longer has vacant slots';
+        }
+
+        $position = nc_format_teaching_load_title($job_data);
+        $salary_snapshot = nc_calculate_salary_projection($conn, (int)$user_id, $job_data);
+        $applicable_hourly_rate = $salary_snapshot['applicable_hourly_rate'];
+        $salary_projection = $salary_snapshot['projected_salary'];
+        $salary_projection_basis = $salary_snapshot['projection_basis'];
+    }
+
+    if (!empty($job_validation_errors)) {
+        $error_message = implode('. ', $job_validation_errors) . '.';
+        $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
+        $is_ajax = $is_ajax || (isset($_POST['ajax_submit']) && $_POST['ajax_submit'] == '1');
+        if ($is_ajax) {
+            while (ob_get_level()) { ob_end_clean(); }
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => $error_message, 'message' => $error_message]);
+            exit();
+        }
+        $_SESSION['application_error'] = $error_message;
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit();
+    }
+
     // Debug logging for department assignment
     error_log("=== DEPARTMENT ASSIGNMENT DEBUG ===");
     error_log("Job ID: " . $job_id);
@@ -583,7 +650,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         error_log("RESUBMISSION DETECTED: App ID = $resubmit_app_id, User ID = $user_id");
         
         // First, get the existing file data and job_id
-        $existing_stmt = $conn->prepare("SELECT job_id, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, letter_of_intent FROM job_applicants WHERE id = ? AND user_id = ?");
+        $existing_stmt = $conn->prepare("SELECT job_id, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, certificate_of_grades, proof_of_enrollment, letter_of_intent FROM job_applicants WHERE id = ? AND user_id = ?");
         $existing_stmt->bind_param("ii", $resubmit_app_id, $user_id);
         $existing_stmt->execute();
         $existing_result = $existing_stmt->get_result();
@@ -612,7 +679,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
             $coe = $coe ?: $existing_data['coe'];
             $seminars_trainings = $seminars_trainings ?: $existing_data['seminars_trainings'];
             $masteral_cert = $masteral_cert ?: $existing_data['masteral_cert'];
+            $certificate_of_grades = $certificate_of_grades ?: ($existing_data['certificate_of_grades'] ?? null);
+            $proof_of_enrollment = $proof_of_enrollment ?: ($existing_data['proof_of_enrollment'] ?? null);
             $letter_of_intent = $letter_of_intent ?: ($existing_data['letter_of_intent'] ?? null);
+
+            if ($master_status['requires_ongoing_documents'] && (!$certificate_of_grades || !$proof_of_enrollment)) {
+                $error_message = 'Ongoing master requirements are incomplete. Please upload Certificate of Grades and Proof of Enrollment.';
+                $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
+                $is_ajax = $is_ajax || (isset($_POST['ajax_submit']) && $_POST['ajax_submit'] == '1');
+                if ($is_ajax) {
+                    while (ob_get_level()) { ob_end_clean(); }
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'error' => $error_message, 'message' => $error_message]);
+                    exit();
+                }
+                $_SESSION['application_error'] = $error_message;
+                header("Location: " . $_SERVER['PHP_SELF']);
+                exit();
+            }
             
             error_log("AFTER MERGE - Final values to update:");
             error_log("  AL final: " . ($application_letter ?? "NULL"));
@@ -629,15 +713,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
                 coe = ?, 
                 seminars_trainings = ?, 
                 masteral_cert = ?,
+                certificate_of_grades = ?,
+                proof_of_enrollment = ?,
                 letter_of_intent = ?,
                 status = 'Resubmitted',
                 resubmission_documents = NULL,
                 resubmission_notes = NULL
                 WHERE id = ? AND user_id = ?");
             
-            $update_stmt->bind_param("sssssssssii", 
+            $update_stmt->bind_param("sssssssssssii", 
                 $application_letter, $resume, $tor, $diploma, 
-                $professional_license, $coe, $seminars_trainings, $masteral_cert, $letter_of_intent,
+                $professional_license, $coe, $seminars_trainings, $masteral_cert, $certificate_of_grades, $proof_of_enrollment, $letter_of_intent,
                 $resubmit_app_id, $user_id);
             
             if ($update_stmt->execute()) {
@@ -758,6 +844,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         if ($stmt->execute()) {
         // Success - Get the application ID
         $application_id = $conn->insert_id;
+        $extended_columns_ready = nc_column_exists($conn, 'job_applicants', 'application_type')
+            && nc_column_exists($conn, 'job_applicants', 'certificate_of_grades')
+            && nc_column_exists($conn, 'job_applicants', 'proof_of_enrollment')
+            && nc_column_exists($conn, 'job_applicants', 'salary_projection');
+        if ($extended_columns_ready) {
+            $meta_stmt = $conn->prepare("UPDATE job_applicants SET application_type = ?, academic_year = ?, semester = ?, certificate_of_grades = ?, proof_of_enrollment = ?, applicable_hourly_rate = ?, salary_projection = ?, salary_projection_basis = ?, salary_projection_computed_at = NOW() WHERE id = ?");
+            if ($meta_stmt) {
+                $meta_stmt->bind_param("sssssddsi", $application_type, $application_academic_year, $application_semester, $certificate_of_grades, $proof_of_enrollment, $applicable_hourly_rate, $salary_projection, $salary_projection_basis, $application_id);
+                if (!$meta_stmt->execute()) {
+                    error_log("Extended teaching-load metadata update failed: " . $meta_stmt->error);
+                }
+                $meta_stmt->close();
+            }
+        }
+
         $_SESSION['application_success'] = "Application submitted successfully! We will review your application and contact you soon.";
         $_SESSION['applied_job_id'] = $job_id;
         $_SESSION['new_application_id'] = $application_id; // Store for showing step 3
@@ -787,7 +888,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
             exit();
         }
         } else {
-            // ❌ Error - check if AJAX request
+            // ? Error - check if AJAX request
             $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
                        strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
             
@@ -1354,7 +1455,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
         <span class="text-sm"><?= htmlspecialchars($first_name) ?></span>
     </div>
 
-    <!-- Dropdown (inside relative container ✅) -->
+    <!-- Dropdown (inside relative container ?) -->
     <div id="profileDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg z-50">
         <div class="py-2">
             <a href="#" onclick="confirmLogout(event)" class="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100">
@@ -1406,8 +1507,8 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
 
 <main id="mainContent" class="max-w-[1400px] mx-auto px-12 py-8">
 <div id="jobHeader" class="mb-8">
-<h1 class="text-4xl font-bold text-gray-900 mb-3">Available Job Opportunities</h1>
-<p class="text-lg text-gray-600">Find your perfect career match at NCHire</p>
+<h1 id="teachingLoadsTitle" class="text-4xl font-bold text-gray-900 mb-3">Available Teaching Loads</h1>
+<p class="text-lg text-gray-600">Browse open teaching assignments for the active academic period.</p>
 </div>
 <!-- Search, Filter and Sort Section -->
 <div id="searchFilters" class="mb-6 space-y-4">
@@ -1416,7 +1517,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
     <div class="absolute left-3 top-1/2 transform -translate-y-1/2">
       <i class="ri-search-line text-gray-400 text-lg"></i>
     </div>
-    <input type="text" id="searchInput" placeholder="Search job positions, departments, or locations..." 
+    <input type="text" id="searchInput" placeholder="Search subject codes, subjects, programs, departments, or schedules..." 
            class="w-full pl-10 pr-4 py-3.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-base">
   </div>
   
@@ -1474,14 +1575,14 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
         </div>
     </div>
     
-    <!-- Jobs will be populated here by JavaScript -->
+    <!-- Teaching loads will be populated here by JavaScript -->
     <div id="jobsContainer"></div>
     
-    <!-- No jobs message -->
+    <!-- No teaching loads message -->
     <div id="noJobsMessage" class="hidden text-center py-12">
         <div class="text-gray-500">
             <i class="ri-briefcase-line text-4xl mb-4"></i>
-            <p class="text-lg">No job opportunities found</p>
+            <p class="text-lg">No teaching loads found</p>
             <p class="text-sm">Try adjusting your search criteria</p>
         </div>
     </div>
@@ -1491,7 +1592,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
 <div id="paginationContainer" class="mt-8 flex justify-center items-center space-x-4">
     <!-- Pagination info -->
     <div id="paginationInfo" class="text-sm text-gray-600 mr-4">
-        <!-- Will show "Showing 1-4 of 20 jobs" -->
+        <!-- Will show "Showing 1-4 of 20 teaching loads" -->
     </div>
     
     <!-- Pagination controls -->
@@ -1855,6 +1956,14 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                         <input type="hidden" name="email" id="rf_email">
                         <input type="hidden" name="cellphone" id="rf_cellphone">
 
+                        <div class="bg-white rounded-lg border border-gray-200 p-4">
+                            <label for="rf_application_type" class="block text-sm font-semibold text-gray-700 mb-2">Applicant Category</label>
+                            <select name="application_type" id="rf_application_type" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="new">New Applicant</option>
+                                <option value="renewing">Old/Renewing Applicant</option>
+                            </select>
+                        </div>
+
                         <!-- Load Draft Button -->
                         <div id="loadDraftSection" class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-lg p-4 mb-4">
                             <div class="flex items-center justify-between">
@@ -2011,6 +2120,26 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                                         </div>
                                         <p class="text-xs text-gray-500 mt-1">If you have a master's degree, upload your certificate here.</p>
                                     </div>
+                                    <div class="grid md:grid-cols-2 gap-4 mt-4">
+                                        <div class="space-y-2">
+                                            <label class="block text-sm font-semibold text-gray-700">
+                                                <i class="ri-file-text-line mr-2 text-blue-600"></i>Certificate of Grades <span class="text-amber-600">(Required if master's is ongoing)</span>
+                                            </label>
+                                            <div class="border-2 border-dashed border-gray-300 rounded-lg p-3 hover:border-blue-400 transition-colors">
+                                                <input type="file" name="certificate_of_grades" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                                       class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                            </div>
+                                        </div>
+                                        <div class="space-y-2">
+                                            <label class="block text-sm font-semibold text-gray-700">
+                                                <i class="ri-file-text-line mr-2 text-blue-600"></i>Proof of Enrollment <span class="text-amber-600">(Required if master's is ongoing)</span>
+                                            </label>
+                                            <div class="border-2 border-dashed border-gray-300 rounded-lg p-3 hover:border-blue-400 transition-colors">
+                                                <input type="file" name="proof_of_enrollment" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                                       class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -2035,15 +2164,15 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                     </form>
                 </section>
                 
-                <!-- Step 3: Interview Scheduled -->
+                <!-- Step 3: Waiting for Interview Schedule -->
                 <section id="step3" class="wizard-step hidden">
-                    <h2 class="text-xl font-semibold text-gray-900 mb-2">Interview Scheduled</h2>
+                    <h2 class="text-xl font-semibold text-gray-900 mb-2">Waiting for Interview Schedule</h2>
                     <p class="text-gray-600 mb-6">Waiting for dean to schedule and approve your interview</p>
                     
                     <div class="bg-white rounded-lg border border-gray-200 p-6">
                         <div id="interview_status_container" class="text-center py-8">
                             <i class="ri-calendar-line text-6xl text-blue-500 mb-4"></i>
-                            <h3 class="text-lg font-semibold text-gray-900 mb-2">Interview Scheduling</h3>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-2">Waiting for Interview Schedule</h3>
                             <p class="text-gray-600" id="interview_status_text">Your application has been submitted. Please wait while the dean reviews your documents and schedules an interview.</p>
                             <div id="interview_details" class="hidden mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                                 <!-- Interview details will be populated here -->
@@ -2287,7 +2416,7 @@ searchResults.innerHTML = filteredJobs.map(job => `
 <i class="${job.icon} mr-1"></i>
 ${job.department}
 </span>
-<span class="mx-2">•</span>
+<span class="mx-2">�</span>
 <span>${job.type}</span>
 </div>
 </div>
@@ -2298,7 +2427,7 @@ ${job.department}
 } else {
 searchResults.innerHTML = `
 <div class="p-4 text-center text-gray-500">
-No jobs found matching "${searchTerm}"
+No teaching loads found matching "${searchTerm}"
 </div>`;
 }
 searchResults.classList.remove('hidden');
@@ -2473,9 +2602,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // CRITICAL: When showing step 1, immediately initialize displays
     if (n === 1) {
-      console.log('🎯 Step 1 activated - initializing displays...');
+      console.log('?? Step 1 activated - initializing displays...');
       setTimeout(() => {
-        console.log('📊 Calling display functions...');
+        console.log('?? Calling display functions...');
         console.log('Initial data check:');
         console.log('- Work Experiences:', initialWorkExperiences);
         console.log('- Education:', initialEducation);
@@ -2483,23 +2612,23 @@ document.addEventListener('DOMContentLoaded', function() {
         
         try {
           displayWorkExperience();
-          console.log('✅ displayWorkExperience() called');
+          console.log('? displayWorkExperience() called');
         } catch (e) {
-          console.error('❌ Error in displayWorkExperience:', e);
+          console.error('? Error in displayWorkExperience:', e);
         }
         
         try {
           displaySkills();
-          console.log('✅ displaySkills() called');
+          console.log('? displaySkills() called');
         } catch (e) {
-          console.error('❌ Error in displaySkills:', e);
+          console.error('? Error in displaySkills:', e);
         }
         
         try {
           displayEducation();
-          console.log('✅ displayEducation() called');
+          console.log('? displayEducation() called');
         } catch (e) {
-          console.error('❌ Error in displayEducation:', e);
+          console.error('? Error in displayEducation:', e);
         }
       }, 100);
     }
@@ -2525,9 +2654,9 @@ document.addEventListener('DOMContentLoaded', function() {
       targetStep.style.setProperty('visibility', 'visible', 'important');
       targetStep.style.setProperty('opacity', '1', 'important');
       targetStep.classList.remove('hidden');
-      console.log(`✓ Step ${n} is now VISIBLE`);
+      console.log(`? Step ${n} is now VISIBLE`);
     } else {
-      console.error(`✗ Step ${n} element not found!`);
+      console.error(`? Step ${n} element not found!`);
     }
     
     // When navigating to Step 2, restore file indicators if application data exists
@@ -2553,14 +2682,14 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // Check if we should load draft (DISABLED - now manual via button)
       if (false && !window.currentApplicationData && !window._draftLoadAttempted) {
-        console.log('📥 No application data - attempting to load saved draft...');
+        console.log('?? No application data - attempting to load saved draft...');
         window._draftLoadAttempted = true;
         
         fetch('get_draft.php')
           .then(response => response.json())
           .then(data => {
             if (data.success && data.has_draft) {
-              console.log('✅ Draft found!', data.draft);
+              console.log('? Draft found!', data.draft);
               
               // Show notification that draft was loaded
               const draftNotif = document.createElement('div');
@@ -2584,7 +2713,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 'professional_license': { name: 'license', label: 'Professional License' },
                 'coe': { name: 'coe', label: 'Certificate of Employment' },
                 'seminars_trainings': { name: 'certificates[]', label: 'Seminars/Trainings' },
-                'masteral_cert': { name: 'masteral_cert', label: 'Masteral Certificate' }
+                'masteral_cert': { name: 'masteral_cert', label: 'Masteral Certificate' },
+                'certificate_of_grades': { name: 'certificate_of_grades', label: 'Certificate of Grades' },
+                'proof_of_enrollment': { name: 'proof_of_enrollment', label: 'Proof of Enrollment' }
               };
               
               Object.keys(docMap).forEach(dbField => {
@@ -2715,11 +2846,11 @@ document.addEventListener('DOMContentLoaded', function() {
               });
               
             } else {
-              console.log('ℹ️ No saved draft found');
+              console.log('?? No saved draft found');
             }
           })
           .catch(error => {
-            console.error('❌ Error loading draft:', error);
+            console.error('? Error loading draft:', error);
           });
       }
       
@@ -2763,7 +2894,7 @@ document.addEventListener('DOMContentLoaded', function() {
       console.log('window.currentApplicationData:', window.currentApplicationData);
       
       if (!window.currentApplicationData) {
-        console.warn('⚠️ No application data available for button state check');
+        console.warn('?? No application data available for button state check');
       }
       
       const app = window.currentApplicationData;
@@ -2771,14 +2902,14 @@ document.addEventListener('DOMContentLoaded', function() {
       // Use setTimeout to ensure DOM is fully rendered
       setTimeout(() => {
         if (!app) {
-          console.log('❌ No app data available, skipping button enablement');
+          console.log('? No app data available, skipping button enablement');
           return;
         }
         // Display interview details if available
         if (app.interview_date) {
           const interviewDate = new Date(app.interview_date);
           const detailsHtml = `
-            <p class="text-sm text-green-600 font-medium">✓ Interview scheduled</p>
+            <p class="text-sm text-green-600 font-medium">? Interview scheduled</p>
             <p class="text-sm text-gray-700 mt-2">
               <i class="ri-calendar-event-line mr-1"></i>
               ${interviewDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
@@ -2802,7 +2933,7 @@ document.addEventListener('DOMContentLoaded', function() {
           backBtn.removeAttribute('disabled');
           backBtn.style.pointerEvents = 'auto';
           backBtn.style.cursor = 'pointer';
-          console.log('✅ Step 3 back button enabled');
+          console.log('? Step 3 back button enabled');
         }
         
         // Enable next button if:
@@ -2821,7 +2952,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('- Has progressed past interview:', hasProgressedPastInterview);
         
         if (isInterviewApproved || hasProgressedPastInterview) {
-          console.log('✓ Interview APPROVED OR user has progressed - enabling navigation to demo step');
+          console.log('? Interview APPROVED OR user has progressed - enabling navigation to demo step');
           const nextBtn = document.getElementById('interview_next_btn');
           if (nextBtn) {
             // Aggressively enable the button
@@ -2839,7 +2970,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Add direct click event listener as backup (only if not already added)
             if (!nextBtn.hasAttribute('data-listener-added')) {
               nextBtn.addEventListener('click', function(e) {
-                console.log('🖱️ Interview next button clicked!');
+                console.log('??? Interview next button clicked!');
                 e.preventDefault();
                 e.stopPropagation();
                 if (typeof setStep === 'function') {
@@ -2852,14 +2983,14 @@ document.addEventListener('DOMContentLoaded', function() {
               nextBtn.setAttribute('data-listener-added', 'true');
             }
             
-            console.log('✅ Interview next button enabled with click listener!');
+            console.log('? Interview next button enabled with click listener!');
             console.log('Button state:', {
               disabled: nextBtn.disabled,
               className: nextBtn.className,
               onclick: nextBtn.getAttribute('onclick')
             });
           } else {
-            console.error('❌ interview_next_btn not found!');
+            console.error('? interview_next_btn not found!');
           }
           
           // Show appropriate status message
@@ -2900,7 +3031,7 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         } else if (app.interview_date && !isInterviewApproved) {
           // Interview is scheduled but not yet approved
-          console.log('⏳ Interview scheduled but not approved - button remains disabled');
+          console.log('? Interview scheduled but not approved - button remains disabled');
           const nextBtn = document.getElementById('interview_next_btn');
           if (nextBtn) {
             nextBtn.disabled = true;
@@ -2923,7 +3054,7 @@ document.addEventListener('DOMContentLoaded', function() {
             approvedElement.classList.remove('hidden');
           }
         } else {
-          console.log('❌ No interview scheduled yet - button will remain disabled');
+          console.log('? No interview scheduled yet - button will remain disabled');
           console.log('Full app object:', app);
         }
       }, 100); // Small delay to ensure DOM is ready
@@ -2943,7 +3074,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (app.demo_date) {
           const demoDate = new Date(app.demo_date);
           const detailsHtml = `
-            <p class="text-sm text-green-600 font-medium">✓ Demo teaching scheduled</p>
+            <p class="text-sm text-green-600 font-medium">? Demo teaching scheduled</p>
             <p class="text-sm text-gray-700 mt-2">
               <i class="ri-calendar-event-line mr-1"></i>
               ${demoDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
@@ -2977,7 +3108,7 @@ document.addEventListener('DOMContentLoaded', function() {
           backBtn.removeAttribute('disabled');
           backBtn.style.pointerEvents = 'auto';
           backBtn.style.cursor = 'pointer';
-          console.log('✅ Step 4 back button enabled');
+          console.log('? Step 4 back button enabled');
         }
         
         // Enable next button if:
@@ -2997,7 +3128,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('- Has progressed past demo:', hasProgressedPastDemo);
         
         if (status.includes('demo') && status.includes('passed') || hasProgressedPastDemo) {
-          console.log('✅ Demo passed OR user has progressed - enabling next button');
+          console.log('? Demo passed OR user has progressed - enabling next button');
           const nextBtn = document.getElementById('demo_next_btn');
           if (nextBtn) {
             // Aggressively enable the button
@@ -3015,7 +3146,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Add direct click event listener as backup (only if not already added)
             if (!nextBtn.hasAttribute('data-listener-added')) {
               nextBtn.addEventListener('click', function(e) {
-                console.log('🖱️ Demo next button clicked!');
+                console.log('??? Demo next button clicked!');
                 e.preventDefault();
                 e.stopPropagation();
                 if (typeof setStep === 'function') {
@@ -3028,14 +3159,14 @@ document.addEventListener('DOMContentLoaded', function() {
               nextBtn.setAttribute('data-listener-added', 'true');
             }
             
-            console.log('✅ Demo next button enabled with click listener!');
+            console.log('? Demo next button enabled with click listener!');
             console.log('Button state:', {
               disabled: nextBtn.disabled,
               className: nextBtn.className,
               onclick: nextBtn.getAttribute('onclick')
             });
           } else {
-            console.error('❌ demo_next_btn not found!');
+            console.error('? demo_next_btn not found!');
           }
           
           // Show approval status
@@ -3067,7 +3198,7 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         } else if (app.demo_date) {
           // Demo scheduled but not yet approved
-          console.log('⏳ Demo scheduled but not approved - button remains disabled');
+          console.log('? Demo scheduled but not approved - button remains disabled');
           const nextBtn = document.getElementById('demo_next_btn');
           if (nextBtn) {
             nextBtn.disabled = true;
@@ -3089,7 +3220,7 @@ document.addEventListener('DOMContentLoaded', function() {
             approvedElement.classList.remove('hidden');
           }
         } else {
-          console.log('❌ No demo scheduled yet - button will remain disabled');
+          console.log('? No demo scheduled yet - button will remain disabled');
         }
       }, 100); // Small delay to ensure DOM is ready
     }
@@ -3108,7 +3239,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Has psych_exam_receipt:', !!app.psych_exam_receipt);
         
         if (status.includes('initially hired') || status.includes('hired')) {
-          console.log('✅✅✅ Admin has marked as Initially Hired - ENABLING BUTTON!');
+          console.log('??? Admin has marked as Initially Hired - ENABLING BUTTON!');
           const nextBtn = document.getElementById('psych_next_btn');
           if (nextBtn) {
             // Aggressively enable the button
@@ -3126,7 +3257,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Add direct click event listener as backup (only if not already added)
             if (!nextBtn.hasAttribute('data-listener-added')) {
               nextBtn.addEventListener('click', function(e) {
-                console.log('🖱️ Hired button clicked! Going to step 6...');
+                console.log('??? Hired button clicked! Going to step 6...');
                 e.preventDefault();
                 e.stopPropagation();
                 if (typeof setStep === 'function') {
@@ -3139,7 +3270,7 @@ document.addEventListener('DOMContentLoaded', function() {
               nextBtn.setAttribute('data-listener-added', 'true');
             }
             
-            console.log('🎉🎉🎉 BUTTON IS NOW CLICKABLE! You can view the hiring status!');
+            console.log('?????? BUTTON IS NOW CLICKABLE! You can view the hiring status!');
             console.log('Button state:', {
               disabled: nextBtn.disabled,
               className: nextBtn.className,
@@ -3147,10 +3278,10 @@ document.addEventListener('DOMContentLoaded', function() {
               backgroundColor: nextBtn.style.backgroundColor
             });
           } else {
-            console.error('❌ psych_next_btn not found!');
+            console.error('? psych_next_btn not found!');
           }
         } else {
-          console.log('❌ Not hired yet - button remains disabled');
+          console.log('? Not hired yet - button remains disabled');
           console.log('User has uploaded psych receipt but admin has not approved/hired yet');
           
           // Show appropriate status message
@@ -3268,7 +3399,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const labels = {
       1: 'Step 1 of 6: Personal Information, Work Experience, Education & Skills',
       2: 'Step 2 of 6: Submit Requirements',
-      3: 'Step 3 of 6: Interview Scheduled',
+      3: 'Step 3 of 6: Waiting for Interview Schedule',
       4: 'Step 4 of 6: Demo Teaching Scheduled',
       5: 'Step 5 of 6: Psychological Examination',
       6: 'Step 6 of 6: Initially Hired'
@@ -3285,22 +3416,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Public API: View existing application in wizard
   window.viewExistingApplication = async function(applicationId) {
-    console.log('📖 viewExistingApplication called with ID:', applicationId);
+    console.log('?? viewExistingApplication called with ID:', applicationId);
     
     // Mark that wizard was opened from My Applications (for close button behavior)
     window.wizardOpenedFromMyApplications = true;
-    console.log('✅ Marked wizard as opened from My Applications');
+    console.log('? Marked wizard as opened from My Applications');
     
     // Check if wizard element exists on this page
     const wizardElement = document.getElementById('applicationWizard');
     const mainContent = document.getElementById('mainContent');
     
     if (!wizardElement) {
-      console.log('⚠️ Wizard not visible. Switching to dashboard view...');
+      console.log('?? Wizard not visible. Switching to dashboard view...');
       
       // Check if we're in My Applications view (mainContent has been replaced)
       if (mainContent && mainContent.innerHTML.includes('user_application')) {
-        console.log('🔄 Switching from My Applications to Dashboard...');
+        console.log('?? Switching from My Applications to Dashboard...');
         
         // Show loading overlay
         const loadingOverlay = document.createElement('div');
@@ -3331,7 +3462,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // CRITICAL: Force dashboard view by clearing localStorage navigation state
         // This prevents page state persistence from restoring My Applications view
         localStorage.setItem('activeNavSection', 'dashboard');
-        console.log('🔄 Forced activeNavSection to dashboard');
+        console.log('?? Forced activeNavSection to dashboard');
         
         // Navigate to dashboard by reloading the page
         setTimeout(() => {
@@ -3340,31 +3471,31 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
       }
       
-      console.log('⚠️ Wizard element not found even on dashboard. This should not happen.');
+      console.log('?? Wizard element not found even on dashboard. This should not happen.');
       alert('Unable to open application wizard. Please refresh the page and try again.');
       return;
     }
     
-    console.log('✅ Wizard element found on page, proceeding to open...');
+    console.log('? Wizard element found on page, proceeding to open...');
     
     try {
-      console.log('🌐 Fetching application details from API...');
+      console.log('?? Fetching application details from API...');
       const res = await fetch(`get_application_details.php?id=${applicationId}`);
-      console.log('📡 API Response status:', res.status, res.statusText);
+      console.log('?? API Response status:', res.status, res.statusText);
       
       const data = await res.json();
-      console.log('📦 API Response data:', data);
-      console.log('📦 Work Experience from API:', data.work_experience);
-      console.log('📦 Education from API:', data.education);
-      console.log('📦 Skills from API:', data.skills);
+      console.log('?? API Response data:', data);
+      console.log('?? Work Experience from API:', data.work_experience);
+      console.log('?? Education from API:', data.education);
+      console.log('?? Skills from API:', data.skills);
       
       if (!data.success) {
-        console.error('❌ API returned error:', data.error);
+        console.error('? API returned error:', data.error);
         throw new Error(data.error || 'Failed to load application');
       }
       
       const app = data.application;
-      console.log('✅ Application loaded successfully:', app);
+      console.log('? Application loaded successfully:', app);
       
       // Determine current workflow step
       let workflowStep = 3;
@@ -3397,7 +3528,7 @@ document.addEventListener('DOMContentLoaded', function() {
       if (app.interview_date && workflowStep >= 3) {
         const interviewDate = new Date(app.interview_date);
         const detailsHtml = `
-          <p class="text-sm text-green-600 font-medium">✓ Interview scheduled</p>
+          <p class="text-sm text-green-600 font-medium">? Interview scheduled</p>
           <p class="text-sm text-gray-700 mt-2">
             <i class="ri-calendar-event-line mr-1"></i>
             ${interviewDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
@@ -3415,7 +3546,7 @@ document.addEventListener('DOMContentLoaded', function() {
       if (app.demo_date && workflowStep >= 4) {
         const demoDate = new Date(app.demo_date);
         const detailsHtml = `
-          <p class="text-sm text-green-600 font-medium">✓ Demo teaching scheduled</p>
+          <p class="text-sm text-green-600 font-medium">? Demo teaching scheduled</p>
           <p class="text-sm text-gray-700 mt-2">
             <i class="ri-calendar-event-line mr-1"></i>
             ${demoDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
@@ -3469,8 +3600,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
       
-      // ✅ POPULATE STEP 1 (Personal Information) with application data
-      console.log('📝 Populating Step 1 with application data...');
+      // ? POPULATE STEP 1 (Personal Information) with application data
+      console.log('?? Populating Step 1 with application data...');
       const pf_first = document.getElementById('pf_first_name');
       const pf_last = document.getElementById('pf_last_name');
       const pf_email = document.getElementById('pf_email');
@@ -3483,12 +3614,12 @@ document.addEventListener('DOMContentLoaded', function() {
       if (pf_phone) pf_phone.value = app.contact_num || '';
       if (pf_address) pf_address.value = app.address || '';
       
-      console.log('✅ Step 1 personal info populated');
+      console.log('? Step 1 personal info populated');
       
       // Parse resubmission documents if status is "Resubmission Required"
       let resubmissionDocs = [];
       if (app.status === 'Resubmission Required' && app.resubmission_documents) {
-        console.log('📋 Resubmission required - parsing documents:', app.resubmission_documents);
+        console.log('?? Resubmission required - parsing documents:', app.resubmission_documents);
         try {
           if (Array.isArray(app.resubmission_documents)) {
             resubmissionDocs = app.resubmission_documents;
@@ -3496,10 +3627,10 @@ document.addEventListener('DOMContentLoaded', function() {
             resubmissionDocs = JSON.parse(app.resubmission_documents);
           }
         } catch (e) {
-          console.log('⚠️ JSON parse failed, trying CSV format...');
+          console.log('?? JSON parse failed, trying CSV format...');
           resubmissionDocs = app.resubmission_documents.split(',').map(doc => doc.trim());
         }
-        console.log('✅ Parsed resubmission docs:', resubmissionDocs);
+        console.log('? Parsed resubmission docs:', resubmissionDocs);
         globalResubmissionDocs = resubmissionDocs;
         window.globalResubmissionDocs = resubmissionDocs;
         window.currentResubmissionDocs = resubmissionDocs;
@@ -3509,8 +3640,8 @@ document.addEventListener('DOMContentLoaded', function() {
       showWizard(true);
       setStep(workflowStep);
       
-      // ✅ POPULATE STEP 2 form fields (for resubmission or viewing)
-      console.log('📝 Populating Step 2 with job info...');
+      // ? POPULATE STEP 2 form fields (for resubmission or viewing)
+      console.log('?? Populating Step 2 with job info...');
       setTimeout(() => {
         const rf_job_id = document.getElementById('rf_job_id');
         const rf_job_title = document.getElementById('rf_job_title');
@@ -3523,8 +3654,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (rf_full_name) rf_full_name.value = app.full_name || '';
         if (rf_email) rf_email.value = app.applicant_email || '';
         if (rf_cellphone) rf_cellphone.value = app.contact_num || '';
+        const rf_application_type = document.getElementById('rf_application_type');
+        if (rf_application_type) rf_application_type.value = app.application_type || 'new';
         
-        console.log('✅ Step 2 job info populated - job_id:', app.job_id);
+        console.log('? Step 2 job info populated - job_id:', app.job_id);
       }, 200);
       
       // Display work experience, skills, and education
@@ -3548,7 +3681,9 @@ document.addEventListener('DOMContentLoaded', function() {
               'professional_license': 'Professional License',
               'coe': 'Certificate of Employment',
               'seminars_trainings': 'Seminars/Training Certificates',
-              'masteral_cert': 'Masteral Certificate'
+              'masteral_cert': 'Masteral Certificate',
+              'certificate_of_grades': 'Certificate of Grades',
+              'proof_of_enrollment': 'Proof of Enrollment'
             };
             
             const requestedDocsList = resubmissionDocs.map(doc => 
@@ -3561,14 +3696,14 @@ document.addEventListener('DOMContentLoaded', function() {
               <div class="flex items-start">
                 <i class="ri-alert-line text-orange-600 text-2xl mr-4 mt-0.5"></i>
                 <div class="flex-1">
-                  <h3 class="font-bold text-orange-900 mb-2 text-lg">📋 Document Resubmission Required</h3>
+                  <h3 class="font-bold text-orange-900 mb-2 text-lg">?? Document Resubmission Required</h3>
                   <p class="text-sm text-orange-800 mb-3">The admin has requested you to resubmit the following ${resubmissionDocs.length} document(s):</p>
                   <ul class="space-y-1 text-sm text-orange-900 font-medium mb-3">
                     ${requestedDocsList}
                   </ul>
                   ${app.resubmission_notes ? `
                     <div class="mt-3 p-3 bg-white bg-opacity-60 rounded-lg border border-orange-300">
-                      <p class="text-xs text-orange-700 font-semibold mb-1">📝 Reason from Admin:</p>
+                      <p class="text-xs text-orange-700 font-semibold mb-1">?? Reason from Admin:</p>
                       <p class="text-sm text-orange-800 italic">${app.resubmission_notes}</p>
                     </div>
                   ` : ''}
@@ -3587,7 +3722,7 @@ document.addEventListener('DOMContentLoaded', function() {
             submitBtn.style.display = 'flex';
             submitBtn.disabled = false;
             submitBtn.textContent = 'Resubmit Files';
-            console.log('✅ Enabled submit button for resubmission');
+            console.log('? Enabled submit button for resubmission');
           }
           
           // Add resubmission hidden fields
@@ -3611,7 +3746,7 @@ document.addEventListener('DOMContentLoaded', function() {
               form.appendChild(appIdInput);
             }
             
-            console.log('✅ Added resubmission hidden fields');
+            console.log('? Added resubmission hidden fields');
           }
         }, 500);
       }
@@ -3623,9 +3758,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }, 600);
       
-      console.log('✅ Wizard opened successfully at step', workflowStep);
+      console.log('? Wizard opened successfully at step', workflowStep);
     } catch (error) {
-      console.error('💥 Error loading application:', error);
+      console.error('?? Error loading application:', error);
       console.error('Error details:', {
         name: error.name,
         message: error.message,
@@ -3704,10 +3839,10 @@ document.addEventListener('DOMContentLoaded', function() {
     if (saveDraftBtn) {
       if (viewMode) {
         saveDraftBtn.style.display = 'none';
-        console.log('✅ Save Draft button hidden (view mode)');
+        console.log('? Save Draft button hidden (view mode)');
       } else {
         saveDraftBtn.style.display = '';
-        console.log('✅ Save Draft button visible (new application mode)');
+        console.log('? Save Draft button visible (new application mode)');
       }
     }
     
@@ -3737,7 +3872,7 @@ document.addEventListener('DOMContentLoaded', function() {
       console.log('Wizard bounding rect:', wizardRect);
       
       if (wizardRect.width === 0 || wizardRect.height === 0) {
-        console.error('⚠️ Wizard has zero dimensions!');
+        console.error('?? Wizard has zero dimensions!');
         console.log('Wizard parent:', wizard.parentElement);
         console.log('Wizard offsetParent:', wizard.offsetParent);
         console.log('Document body contains wizard:', document.body.contains(wizard));
@@ -3753,10 +3888,10 @@ document.addEventListener('DOMContentLoaded', function() {
         // Check again
         const newRect = wizard.getBoundingClientRect();
         if (newRect.width === 0 || newRect.height === 0) {
-          console.error('❌ Still has zero dimensions after fix attempt');
+          console.error('? Still has zero dimensions after fix attempt');
           alert('Wizard is not displaying properly. The wizard element may not be available on this page. Please go to the Jobs page to view your application.');
         } else {
-          console.log('✅ Fixed! New dimensions:', newRect.width, 'x', newRect.height);
+          console.log('? Fixed! New dimensions:', newRect.width, 'x', newRect.height);
         }
       }
     }, 100);
@@ -3785,7 +3920,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // CRITICAL FIX: Clean up all file upload containers in Step 2 to prevent duplication
     const step2 = document.getElementById('step2');
     if (step2) {
-      console.log('🧹 Cleaning up Step 2 file containers...');
+      console.log('?? Cleaning up Step 2 file containers...');
       const allInputs = step2.querySelectorAll('input[type="file"]');
       
       allInputs.forEach((input) => {
@@ -3820,7 +3955,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       });
       
-      console.log('✅ Step 2 cleaned up successfully');
+      console.log('? Step 2 cleaned up successfully');
     }
     
     // Restore other elements
@@ -3882,7 +4017,9 @@ document.addEventListener('DOMContentLoaded', function() {
           'license': 'professional_license',
           'coe': 'coe',
           'certificates[]': 'seminars_trainings',
-          'masteral_cert': 'masteral_cert'
+          'masteral_cert': 'masteral_cert',
+          'certificate_of_grades': 'certificate_of_grades',
+          'proof_of_enrollment': 'proof_of_enrollment'
         };
         
         const documentField = docInputMap[inputName];
@@ -4075,7 +4212,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const container = document.getElementById('workExperienceDisplay');
     const countBadge = document.getElementById('workExpCount');
     
-    console.log('📝 displayWorkExperienceFromData called with:', workExperienceArray);
+    console.log('?? displayWorkExperienceFromData called with:', workExperienceArray);
     
     if (!workExperienceArray || workExperienceArray.length === 0) {
       container.innerHTML = `
@@ -4135,14 +4272,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     container.innerHTML = experiencesHTML;
     if (countBadge) countBadge.textContent = workExperienceArray.length.toString();
-    console.log('✅ Work experience displayed:', workExperienceArray.length, 'items');
+    console.log('? Work experience displayed:', workExperienceArray.length, 'items');
   }
 
   window.displaySkillsFromData = function(skillsArray) {
     const container = document.getElementById('skillsDisplay');
     const countBadge = document.getElementById('skillsCount');
     
-    console.log('📝 displaySkillsFromData called with:', skillsArray);
+    console.log('?? displaySkillsFromData called with:', skillsArray);
     
     if (!skillsArray || skillsArray.length === 0) {
       container.innerHTML = `
@@ -4163,14 +4300,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     container.innerHTML = skillTags;
     if (countBadge) countBadge.textContent = skillsArray.length.toString();
-    console.log('✅ Skills displayed:', skillsArray.length, 'items');
+    console.log('? Skills displayed:', skillsArray.length, 'items');
   }
 
   window.displayEducationFromData = function(educationArray) {
     const container = document.getElementById('educationDisplay');
     const countBadge = document.getElementById('educationCount');
     
-    console.log('📝 displayEducationFromData called with:', educationArray);
+    console.log('?? displayEducationFromData called with:', educationArray);
     
     if (!educationArray || educationArray.length === 0) {
       container.innerHTML = `
@@ -4220,7 +4357,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     container.innerHTML = educationHTML;
     if (countBadge) countBadge.textContent = educationArray.length.toString();
-    console.log('✅ Education displayed:', educationArray.length, 'items');
+    console.log('? Education displayed:', educationArray.length, 'items');
   }
   
   function displayWorkExperience() {
@@ -4399,7 +4536,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Helper function to hide all document upload sections in step 2 (GLOBAL)
   window.hideAllDocumentSections = function() {
-    console.log('🚫 Hiding all document sections...');
+    console.log('?? Hiding all document sections...');
     
     // Find all document upload sections in step 2
     const step2 = document.getElementById('step2');
@@ -4423,7 +4560,7 @@ document.addEventListener('DOMContentLoaded', function() {
       section.classList.add('hidden');
     });
     
-    console.log('✅ All document sections hidden');
+    console.log('? All document sections hidden');
   };
 
   // Helper function to update step 2 UI for resubmission mode (GLOBAL)
@@ -4444,7 +4581,7 @@ document.addEventListener('DOMContentLoaded', function() {
       description.className = 'text-orange-800 mb-4 font-medium';
     }
     
-    console.log('✅ Step 2 UI updated for resubmission mode');
+    console.log('? Step 2 UI updated for resubmission mode');
   };
 
   // Public API: call after Terms & Conditions are accepted
@@ -4595,7 +4732,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // IMPORTANT: Prefill AFTER wizard is shown to ensure DOM elements exist
     setTimeout(() => {
       try {
-        console.log('📋 Calling prefillPersonal() after wizard is shown...');
+        console.log('?? Calling prefillPersonal() after wizard is shown...');
         prefillPersonal();
         // also prefill hidden submit fields when known
         if (rf_full_name && pf_first && pf_last) {
@@ -4646,7 +4783,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('button').forEach(button => {
       const buttonJobId = button.getAttribute('data-job-id');
       
-      if (buttonJobId == jobId && button.textContent.trim() === 'Apply Now') {
+      if (buttonJobId == jobId && ['Apply Now', 'Apply'].includes(button.textContent.trim())) {
         console.log('Found Apply Now button for job', jobId, '- changing to View Application');
         
         // Change to View Application
@@ -4717,7 +4854,7 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('toStep2').addEventListener('click', () => {
     // If viewing an existing application (view mode), just navigate without validation
     if (window.currentApplicationData && window.currentApplicationData.id) {
-      console.log('📖 View mode - navigating to step 2 without validation');
+      console.log('?? View mode - navigating to step 2 without validation');
       setStep(2);
       return;
     }
@@ -4757,7 +4894,7 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Load Saved Documents button handler
   document.getElementById('loadDraftBtn').addEventListener('click', async function() {
-    console.log('📥 Loading saved documents...');
+    console.log('?? Loading saved documents...');
     
     const btn = this;
     const originalHtml = btn.innerHTML;
@@ -4769,8 +4906,8 @@ document.addEventListener('DOMContentLoaded', function() {
       const data = await response.json();
       
       if (data.success && data.has_draft) {
-        console.log('✅ Draft found!', data.draft);
-        console.log('📋 Current user_id:', data.user_id);
+        console.log('? Draft found!', data.draft);
+        console.log('?? Current user_id:', data.user_id);
         
         // Validate that all filenames belong to the current user
         const validateFilename = (filename, userId) => {
@@ -4779,7 +4916,7 @@ document.addEventListener('DOMContentLoaded', function() {
           const pattern = new RegExp(`^draft_${userId}_\\d+_`);
           const isValid = pattern.test(filename);
           if (!isValid) {
-            console.warn(`⚠️ Filename validation failed for: ${filename} (expected user_id: ${userId})`);
+            console.warn(`?? Filename validation failed for: ${filename} (expected user_id: ${userId})`);
           }
           return isValid;
         };
@@ -4793,7 +4930,7 @@ document.addEventListener('DOMContentLoaded', function() {
             for (const filename of filenames) {
               if (!validateFilename(filename, data.user_id)) {
                 hasInvalidFiles = true;
-                console.error(`❌ SECURITY ALERT: File "${filename}" does not belong to user ${data.user_id}`);
+                console.error(`? SECURITY ALERT: File "${filename}" does not belong to user ${data.user_id}`);
               }
             }
           }
@@ -4802,7 +4939,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // If any files fail validation, don't load the draft
         if (hasInvalidFiles) {
           showToast('Draft data validation failed. Please re-upload your documents for security.', 'error');
-          console.error('❌ Draft loading aborted due to filename validation failure');
+          console.error('? Draft loading aborted due to filename validation failure');
           return;
         }
         
@@ -4831,7 +4968,9 @@ document.addEventListener('DOMContentLoaded', function() {
           'professional_license': { name: 'license', label: 'Professional License' },
           'coe': { name: 'coe', label: 'Certificate of Employment' },
           'seminars_trainings': { name: 'certificates[]', label: 'Seminars/Trainings' },
-          'masteral_cert': { name: 'masteral_cert', label: 'Masteral Certificate' }
+          'masteral_cert': { name: 'masteral_cert', label: 'Masteral Certificate' },
+          'certificate_of_grades': { name: 'certificate_of_grades', label: 'Certificate of Grades' },
+          'proof_of_enrollment': { name: 'proof_of_enrollment', label: 'Proof of Enrollment' }
         };
         
         Object.keys(docMap).forEach(dbField => {
@@ -4949,7 +5088,7 @@ document.addEventListener('DOMContentLoaded', function() {
         showToast('No saved documents found. Please upload your documents.', 'info');
       }
     } catch (error) {
-      console.error('❌ Error loading draft:', error);
+      console.error('? Error loading draft:', error);
       showToast('Failed to load saved documents', 'error');
     } finally {
       btn.disabled = false;
@@ -4960,7 +5099,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Save Draft button handler
   document.getElementById('saveDraftBtn').addEventListener('click', async function(e) {
     e.preventDefault();
-    console.log('💾 Saving draft...');
+    console.log('?? Saving draft...');
     
     const btn = this;
     const originalHtml = btn.innerHTML;
@@ -4971,7 +5110,7 @@ document.addEventListener('DOMContentLoaded', function() {
       const formData = new FormData(requirementsForm);
       
       // Debug: Log what files are being sent
-      console.log('📦 FormData contents:');
+      console.log('?? FormData contents:');
       for (let [key, value] of formData.entries()) {
         if (value instanceof File) {
           console.log(`  ${key}: File(${value.name}, ${value.size} bytes)`);
@@ -4983,17 +5122,17 @@ document.addEventListener('DOMContentLoaded', function() {
       // Specifically check letter_of_intent
       const letterOfIntentInput = requirementsForm.querySelector('input[name="letter_of_intent"]');
       if (letterOfIntentInput) {
-        console.log('📄 Letter of Intent input found:');
+        console.log('?? Letter of Intent input found:');
         console.log('  Files:', letterOfIntentInput.files);
         console.log('  File count:', letterOfIntentInput.files.length);
         if (letterOfIntentInput.files.length > 0) {
           console.log('  File name:', letterOfIntentInput.files[0].name);
           console.log('  File size:', letterOfIntentInput.files[0].size);
         } else {
-          console.warn('⚠️ Letter of Intent input has NO files selected');
+          console.warn('?? Letter of Intent input has NO files selected');
         }
       } else {
-        console.error('❌ Letter of Intent input NOT FOUND in form');
+        console.error('? Letter of Intent input NOT FOUND in form');
       }
       
       // Submit to save_draft.php
@@ -5003,7 +5142,7 @@ document.addEventListener('DOMContentLoaded', function() {
       });
       
       const data = await response.json();
-      console.log('📥 Response from save_draft.php:', data);
+      console.log('?? Response from save_draft.php:', data);
       
       if (data.success) {
         // Show success notification
@@ -5018,10 +5157,10 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.appendChild(successNotif);
         setTimeout(() => successNotif.remove(), 5000);
         
-        console.log('✅ Draft saved successfully');
-        console.log('📋 Draft data received:', data.draft);
-        console.log('📋 Fields in draft:', Object.keys(data.draft));
-        console.log('📋 letter_of_intent value:', data.draft.letter_of_intent);
+        console.log('? Draft saved successfully');
+        console.log('?? Draft data received:', data.draft);
+        console.log('?? Fields in draft:', Object.keys(data.draft));
+        console.log('?? letter_of_intent value:', data.draft.letter_of_intent);
         
         // Immediately update UI to show saved draft indicators
         const docMap = {
@@ -5033,16 +5172,18 @@ document.addEventListener('DOMContentLoaded', function() {
           'professional_license': { name: 'license', label: 'Professional License' },
           'coe': { name: 'coe', label: 'Certificate of Employment' },
           'seminars_trainings': { name: 'certificates[]', label: 'Seminars/Trainings' },
-          'masteral_cert': { name: 'masteral_cert', label: 'Masteral Certificate' }
+          'masteral_cert': { name: 'masteral_cert', label: 'Masteral Certificate' },
+          'certificate_of_grades': { name: 'certificate_of_grades', label: 'Certificate of Grades' },
+          'proof_of_enrollment': { name: 'proof_of_enrollment', label: 'Proof of Enrollment' }
         };
         
         // Update UI for each saved file
         Object.keys(data.draft).forEach(dbField => {
-          console.log(`🔍 Processing field: ${dbField}, value: ${data.draft[dbField]}`);
+          console.log(`?? Processing field: ${dbField}, value: ${data.draft[dbField]}`);
           
           if (data.draft[dbField] && docMap[dbField]) {
             const inputInfo = docMap[dbField];
-            console.log(`  ✓ Field ${dbField} has value and is in docMap`);
+            console.log(`  ? Field ${dbField} has value and is in docMap`);
             console.log(`  Looking for input with name: ${inputInfo.name}`);
             
             const input = document.querySelector(`input[name="${inputInfo.name}"], input[name="${inputInfo.name}[]"]`);
@@ -5053,19 +5194,19 @@ document.addEventListener('DOMContentLoaded', function() {
               console.log(`  Container found:`, container ? 'YES' : 'NO');
               
               if (container) {
-                console.log(`  📝 Updating UI for ${dbField}...`);
+                console.log(`  ?? Updating UI for ${dbField}...`);
                 
                 // Check if draft display already exists
                 let existingDraftDisplay = container.querySelector('.draft-file-display');
                 if (existingDraftDisplay) {
-                  console.log(`  ⚠️ Draft display already exists for ${dbField}, skipping`);
+                  console.log(`  ?? Draft display already exists for ${dbField}, skipping`);
                   return;
                 }
                 
                 // Check if hidden input already exists (already showing draft)
                 let existingHiddenInput = container.querySelector('.existing-draft-input');
                 if (existingHiddenInput) {
-                  console.log(`  ⚠️ Hidden input already exists for ${dbField}, skipping`);
+                  console.log(`  ?? Hidden input already exists for ${dbField}, skipping`);
                   return;
                 }
                 
@@ -5161,7 +5302,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   setTimeout(() => notif.remove(), 3000);
                 });
                 
-                console.log(`✅ UI updated for ${dbField}`);
+                console.log(`? UI updated for ${dbField}`);
               }
             }
           }
@@ -5171,7 +5312,7 @@ document.addEventListener('DOMContentLoaded', function() {
         throw new Error(data.error || 'Failed to save draft');
       }
     } catch (error) {
-      console.error('❌ Error saving draft:', error);
+      console.error('? Error saving draft:', error);
       
       // Show error notification
       const errorNotif = document.createElement('div');
@@ -5195,18 +5336,18 @@ document.addEventListener('DOMContentLoaded', function() {
   if (requirementsForm) {
     requirementsForm.addEventListener('submit', async function(e) {
       e.preventDefault();
-      console.log('📝 Form submitted - uploading files...');
-      console.log('📋 Form element:', this);
+      console.log('?? Form submitted - uploading files...');
+      console.log('?? Form element:', this);
       
       const submitBtn = this.querySelector('button[type="submit"]');
       const originalBtnHtml = submitBtn.innerHTML;
       
-      // ✅ CLIENT-SIDE VALIDATION: Check required files BEFORE submission
+      // ? CLIENT-SIDE VALIDATION: Check required files BEFORE submission
       // Check if this is resubmission mode first
       const isResubmission = this.querySelector('input[name="is_resubmission"]');
       const isResubmissionMode = isResubmission && isResubmission.value === '1';
       
-      console.log('📋 Validation mode:', isResubmissionMode ? 'RESUBMISSION' : 'NEW APPLICATION');
+      console.log('?? Validation mode:', isResubmissionMode ? 'RESUBMISSION' : 'NEW APPLICATION');
       
       const requiredFields = [
         { name: 'applicationLetter', label: 'Application Letter', dbField: 'application_letter' },
@@ -5224,7 +5365,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // In resubmission mode, only validate requested documents
         if (isResubmissionMode && window.currentResubmissionDocs) {
           if (!window.currentResubmissionDocs.includes(field.dbField)) {
-            console.log(`⏩ Skipping ${field.label} - not requested for resubmission`);
+            console.log(`? Skipping ${field.label} - not requested for resubmission`);
             continue; // Skip this field, it's not requested for resubmission
           }
         }
@@ -5253,13 +5394,13 @@ document.addEventListener('DOMContentLoaded', function() {
         return; // Stop submission
       }
       
-      console.log('✅ All required files validated successfully!');
+      console.log('? All required files validated successfully!');
       
       // Hide the Save Draft button since user is submitting the application
       const saveDraftBtn = document.getElementById('saveDraftBtn');
       if (saveDraftBtn) {
         saveDraftBtn.style.display = 'none';
-        console.log('✅ Save Draft button hidden');
+        console.log('? Save Draft button hidden');
       }
       
       submitBtn.disabled = true;
@@ -5269,7 +5410,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData(this);
         
         // Debug: Log all form data
-        console.log('📦 Form Data Contents:');
+        console.log('?? Form Data Contents:');
         for (let [key, value] of formData.entries()) {
           if (value instanceof File) {
             console.log(`  ${key}: File(${value.name}, ${value.size} bytes)`);
@@ -5299,9 +5440,9 @@ document.addEventListener('DOMContentLoaded', function() {
         let data;
         try {
           data = JSON.parse(responseText);
-          console.log('✅ Parsed JSON successfully:', data);
+          console.log('? Parsed JSON successfully:', data);
         } catch(e) {
-          console.error('❌ JSON parse error:', e);
+          console.error('? JSON parse error:', e);
           console.error('Response text (first 500 chars):', responseText.substring(0, 500));
           
           data = { 
@@ -5314,7 +5455,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Check if successful
         if (data.success) {
-          console.log('✅ Upload successful! Application ID:', data.application_id);
+          console.log('? Upload successful! Application ID:', data.application_id);
           
           // Show success notification
           const successNotif = document.createElement('div');
@@ -5434,7 +5575,7 @@ document.addEventListener('DOMContentLoaded', function() {
           }
           
         } else {
-          console.error('❌ Upload failed - Response data:', data);
+          console.error('? Upload failed - Response data:', data);
           const errorMsg = data.error || data.message || 'Upload failed - no success response';
           
           // If there's a raw response, log it
@@ -5446,7 +5587,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
       } catch (error) {
-        console.error('❌ Upload error:', error);
+        console.error('? Upload error:', error);
         console.error('Error stack:', error.stack);
         
         // Show error with specific message
@@ -5790,10 +5931,10 @@ document.addEventListener('DOMContentLoaded', function() {
             container.parentElement.removeAttribute('style');
           }
           
-          console.log(`✓ Container ${index + 1} REBUILT from scratch`);
+          console.log(`? Container ${index + 1} REBUILT from scratch`);
         });
         
-        console.log('✓ All containers cleared');
+        console.log('? All containers cleared');
         
         // Update the last loaded app ID
         window._lastLoadedAppId = app.application_id || app.id;
@@ -5820,7 +5961,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (needsResubmission) {
           // Document needs resubmission - NO GREEN, show orange styling
-          console.log(`🟧 ${documentField} needs resubmission - NO GREEN indicator, showing file input`);
+          console.log(`?? ${documentField} needs resubmission - NO GREEN indicator, showing file input`);
           
           // Orange border styling
           container.classList.remove('border-gray-300', 'border-green-400', 'bg-green-50', 'hover:border-blue-400');
@@ -5891,7 +6032,7 @@ document.addEventListener('DOMContentLoaded', function() {
           const licenseContainer = document.querySelector('input[name="license"]')?.closest('.space-y-2');
           if (licenseContainer) {
             licenseContainer.style.display = 'none';
-            console.log('✓ Hidden Professional License (not uploaded)');
+            console.log('? Hidden Professional License (not uploaded)');
           }
         }
         if (app.coe) addUploadedIndicator('coe', app.coe, 'coe');
@@ -5903,11 +6044,13 @@ document.addEventListener('DOMContentLoaded', function() {
           const masteralContainer = document.querySelector('input[name="masteral_cert"]')?.closest('.space-y-2');
           if (masteralContainer) {
             masteralContainer.style.display = 'none';
-            console.log('✓ Hidden Masteral Certificate (not uploaded)');
+            console.log('? Hidden Masteral Certificate (not uploaded)');
           }
+        if (app.certificate_of_grades) addUploadedIndicator('certificate_of_grades', app.certificate_of_grades, 'certificate_of_grades');
+        if (app.proof_of_enrollment) addUploadedIndicator('proof_of_enrollment', app.proof_of_enrollment, 'proof_of_enrollment');
         }
         
-        console.log('✓ File indicators added successfully');
+        console.log('? File indicators added successfully');
         
       } catch (error) {
         console.error('Error adding file indicators:', error);
@@ -5925,7 +6068,7 @@ window.closeWizardAndRefresh = function() {
   
   // Check if wizard was opened from My Applications
   if (window.wizardOpenedFromMyApplications) {
-    console.log('✅ Returning to My Applications tab');
+    console.log('? Returning to My Applications tab');
     
     // Hide wizard
     if (typeof hideWizard === 'function') {
@@ -5959,7 +6102,7 @@ window.closeWizardAndRefresh = function() {
       console.log('Clicking My Applications link...');
       applicationsLink.click();
     } else {
-      console.log('⚠️ Could not find My Applications link, reloading page...');
+      console.log('?? Could not find My Applications link, reloading page...');
       location.reload();
     }
   } else {
@@ -6268,7 +6411,7 @@ document.getElementById('detailEligibility').textContent = job.eligibility || 'N
 const requirementsContainer = document.getElementById('detailJobRequirements');
 if (job.job_requirements && job.job_requirements.trim()) {
 const requirementPoints = job.job_requirements.split('\n').filter(point => point.trim().length > 0);
-requirementsContainer.innerHTML = requirementPoints.map(point => `<p>• ${point.trim()}</p>`).join('');
+requirementsContainer.innerHTML = requirementPoints.map(point => `<p>� ${point.trim()}</p>`).join('');
 document.getElementById('requirementsSection').style.display = 'block';
 } else {
 document.getElementById('requirementsSection').style.display = 'none';
@@ -6281,7 +6424,7 @@ document.getElementById('detailCompetency').textContent = job.competency || 'Not
 const descriptionContainer = document.getElementById('detailJobDescription');
 if (job.job_description && job.job_description.trim()) {
 const descriptionPoints = job.job_description.split('\n').filter(point => point.trim().length > 0);
-descriptionContainer.innerHTML = descriptionPoints.map(point => `<p>• ${point.trim()}</p>`).join('');
+descriptionContainer.innerHTML = descriptionPoints.map(point => `<p>� ${point.trim()}</p>`).join('');
 } else {
 descriptionContainer.innerHTML = '<p>No description available</p>';
 }
@@ -6548,7 +6691,7 @@ document.addEventListener('DOMContentLoaded', function () {
           });
           newScript.textContent = oldScript.textContent;
           oldScript.parentNode.replaceChild(newScript, oldScript);
-          console.log('✅ Script executed from loaded content');
+          console.log('? Script executed from loaded content');
         });
 
         // Reinitialize event listeners for the loaded content
@@ -6608,7 +6751,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     // If initialSection is 'dashboard', do nothing (default content is already shown)
   } else {
-    console.log('⏭️ Skipping content auto-load - wizard pending');
+    console.log('?? Skipping content auto-load - wizard pending');
   }
 
   // Notification functionality - ensure DOM elements exist
@@ -6876,7 +7019,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // Auto-open job details if coming from shared link (reuse urlParams from above)
   const sharedJobId = urlParams.get('job_id');
   if (sharedJobId) {
-    console.log('📎 Shared link detected, opening job details for ID:', sharedJobId);
+    console.log('?? Shared link detected, opening job details for ID:', sharedJobId);
     // Wait a moment for page to fully load
     setTimeout(function() {
       if (typeof showJobDetails === 'function') {
@@ -7443,11 +7586,11 @@ document.addEventListener('DOMContentLoaded', function () {
           workingTextarea.style.backgroundColor = '';
           workingTextarea.style.cursor = '';
           workingTextarea.style.color = '';
-          console.log('✅ Enabled textarea:', workingTextarea.value);
+          console.log('? Enabled textarea:', workingTextarea.value);
           console.log('Textarea disabled status:', workingTextarea.disabled);
           console.log('Textarea readonly status:', workingTextarea.readOnly);
         } else {
-          console.log('❌ NO TEXTAREA FOUND AT ALL!');
+          console.log('? NO TEXTAREA FOUND AT ALL!');
           console.log('DOM ready state:', document.readyState);
           console.log('Personal info container:', document.getElementById('personalInfo'));
         }
@@ -7584,12 +7727,12 @@ document.addEventListener('DOMContentLoaded', function () {
     
     // Find and update the specific job button
     document.querySelectorAll('button').forEach(button => {
-      if (button.textContent.trim() === 'Apply Now' && !button.disabled) {
+      if (['Apply Now', 'Apply'].includes(button.textContent.trim()) && !button.disabled) {
         const buttonJobId = button.getAttribute('data-job-id');
         console.log('Checking job card with ID:', buttonJobId);
         
         if (buttonJobId === appliedJobId) {
-          console.log('✅ Found matching job! Updating button for job ID:', buttonJobId);
+          console.log('? Found matching job! Updating button for job ID:', buttonJobId);
             
           // Change button to "View Application" state - keep it clickable
           button.textContent = 'View Application';
@@ -7628,14 +7771,14 @@ document.addEventListener('DOMContentLoaded', function () {
         
         // Update buttons for jobs user has already applied to
         document.querySelectorAll('button').forEach(button => {
-          if (button.textContent.trim() === 'Apply Now' && !button.disabled) {
+          if (['Apply Now', 'Apply'].includes(button.textContent.trim()) && !button.disabled) {
             const buttonJobId = button.getAttribute('data-job-id');
             
             // Find matching application
             const application = data.applications.find(app => app.job_id == buttonJobId);
             
             if (application) {
-              console.log('✅ Found existing application for job ID:', buttonJobId, 'Status:', application.status);
+              console.log('? Found existing application for job ID:', buttonJobId, 'Status:', application.status);
               
               const status = (application.status || '').toLowerCase();
               const isCancelled = status.includes('cancel');
@@ -7648,7 +7791,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 button.disabled = true;
               } else if (isCompleted) {
                 // Application is completed (hired or rejected) - disable button
-                button.textContent = status.includes('hired') ? 'Hired' : 'Rejected';
+                button.textContent = status.includes('hired') ? 'Application Passed' : 'Rejected';
                 button.className = 'px-5 py-2.5 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed text-base whitespace-nowrap';
                 button.disabled = true;
               } else {
@@ -7666,7 +7809,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const statusElements = jobCard.querySelectorAll('*');
                 statusElements.forEach(el => {
                   if (el.textContent.trim() === 'Open') {
-                    el.textContent = isCompleted ? (status.includes('hired') ? 'Hired' : 'Rejected') : 'In Progress';
+                    el.textContent = isCompleted ? (status.includes('hired') ? 'Application Passed' : 'Rejected') : 'In Progress';
                     el.className = el.className.replace(/green/g, isCompleted ? 'gray' : 'blue');
                   }
                 });
@@ -7744,6 +7887,10 @@ function loadJobs(page = 1, filters = {}) {
     .then(data => {
       // Hide loading state
       if (jobsLoading) jobsLoading.style.display = 'none';
+      const teachingLoadsTitle = document.getElementById('teachingLoadsTitle');
+      if (teachingLoadsTitle && data.teaching_loads_title) {
+        teachingLoadsTitle.textContent = data.teaching_loads_title;
+      }
       
       if (data.success && data.jobs.length > 0) {
         displayJobs(data.jobs);
@@ -7772,7 +7919,7 @@ function truncateText(text, maxLength = 600) {
   return cleanText.substring(0, maxLength) + '...';
 }
 
-// Display jobs in the container
+// Display teaching loads in the container
 function displayJobs(jobs) {
   const container = document.getElementById('jobsContainer');
   if (!container) {
@@ -7783,51 +7930,68 @@ function displayJobs(jobs) {
   container.innerHTML = '';
   
   jobs.forEach(job => {
+    const title = job.teaching_load_title || job.subject_name || job.subject || job.job_title || 'Teaching Load';
+    const schedule = job.teaching_schedule || 'Schedule to be announced';
+    const hours = job.teaching_hours_per_week ? `${Number(job.teaching_hours_per_week).toFixed(2).replace(/\.00$/, '')} hrs/week` : 'Hours not configured';
+    const units = job.load_units ? `${Number(job.load_units).toFixed(2).replace(/\.00$/, '')} units` : '';
+    const remaining = Number(job.remaining_vacancies || 0);
+    const required = Number(job.required_instructors || 1);
+    const slotsText = `${remaining} of ${required} instructor slot${required === 1 ? '' : 's'} available`;
+    const subjectLine = [job.subject_code, job.subject_name || job.subject].filter(Boolean).join(' - ');
+    const description = truncateText(job.job_description || '', 360);
+    const applyDisabled = remaining <= 0;
+
     const jobCard = document.createElement('div');
-    jobCard.className = 'bg-white rounded-xl shadow-sm border border-gray-200 p-8 hover:shadow-md transition-shadow mb-6';
+    jobCard.className = 'bg-white rounded-xl shadow-sm border border-gray-200 p-7 hover:shadow-md transition-shadow mb-6';
     jobCard.innerHTML = `
-      <div class="flex justify-between items-start mb-4">
-        <div>
-          <h3 class="text-2xl font-semibold text-gray-900 mb-3">${escapeHtml(job.job_title)}</h3>
-          <div class="flex items-center text-base text-gray-600 space-x-5 flex-wrap gap-y-2">
-            <span class="flex items-center">
-              <div class="w-5 h-5 flex items-center justify-center mr-2">
-                <i class="ri-building-line text-lg"></i>
-              </div>${escapeHtml(job.department_role)}
-            </span>
-            <span class="flex items-center">
-              <div class="w-5 h-5 flex items-center justify-center mr-2">
-                <i class="ri-time-line text-lg"></i>
-              </div>${escapeHtml(job.job_type)}
-            </span>
-            <span class="flex items-center">
-              <div class="w-5 h-5 flex items-center justify-center mr-2">
-                <i class="ri-map-pin-line text-lg"></i>
-              </div>${escapeHtml(job.locations)}
-            </span>
-            ${job.subject ? `<span class="flex items-center">
-              <div class="w-5 h-5 flex items-center justify-center mr-2">
-                <i class="ri-book-2-line text-lg"></i>
-              </div>${escapeHtml(job.subject)}
-            </span>` : ''}
+      <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-5">
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-2 mb-3">
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">Open</span>
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-50 text-blue-800 border border-blue-100">${escapeHtml(job.job_type || 'Teaching Load')}</span>
+          </div>
+          <h3 class="text-2xl font-semibold text-gray-900 mb-2">${escapeHtml(title)}</h3>
+          ${subjectLine && subjectLine !== title ? `<p class="text-base text-gray-700 mb-2">${escapeHtml(subjectLine)}</p>` : ''}
+          <div class="flex flex-wrap items-center text-sm text-gray-600 gap-x-5 gap-y-2">
+            <span class="inline-flex items-center"><i class="ri-building-line mr-2 text-base"></i>${escapeHtml(job.department_role || 'Department not set')}</span>
+            <span class="inline-flex items-center"><i class="ri-community-line mr-2 text-base"></i>${escapeHtml(job.program || job.department_role || 'Program not set')}</span>
+            <span class="inline-flex items-center"><i class="ri-calendar-event-line mr-2 text-base"></i>${escapeHtml(job.academic_period_label || `${job.academic_year || ''} ${job.semester || ''}`.trim())}</span>
           </div>
         </div>
-        <span class="bg-green-100 text-green-800 px-4 py-1.5 rounded-full text-base font-medium">Open</span>
+        <div class="lg:text-right shrink-0">
+          <p class="text-sm text-gray-500">Vacancy</p>
+          <p class="text-lg font-semibold text-gray-900">${escapeHtml(slotsText)}</p>
+        </div>
       </div>
-      <p class="text-base text-gray-700 mb-5 leading-relaxed">${escapeHtml(truncateText(job.job_description, 600))}</p>
-      <div class="flex items-center justify-between">
-        <div class="text-xl font-semibold text-gray-900">${escapeHtml(job.salary_range)}</div>
+
+      ${description ? `<p class="text-base text-gray-700 mb-5 leading-relaxed">${escapeHtml(description)}</p>` : ''}
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+        <div class="border border-gray-200 rounded-lg p-3">
+          <p class="text-xs uppercase text-gray-500 font-medium">Schedule</p>
+          <p class="text-sm text-gray-900 mt-1">${escapeHtml(schedule)}</p>
+        </div>
+        <div class="border border-gray-200 rounded-lg p-3">
+          <p class="text-xs uppercase text-gray-500 font-medium">Load Hours</p>
+          <p class="text-sm text-gray-900 mt-1">${escapeHtml(hours)}${units ? ` | ${escapeHtml(units)}` : ''}</p>
+        </div>
+        <div class="border border-gray-200 rounded-lg p-3">
+          <p class="text-xs uppercase text-gray-500 font-medium">Compensation</p>
+          <p class="text-sm text-gray-900 mt-1">${escapeHtml(job.salary_display || job.salary_range || 'Computed after qualification review')}</p>
+        </div>
+      </div>
+
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <p class="text-sm text-gray-500">Application deadline: ${escapeHtml(job.application_deadline || 'Not set')}</p>
         <div class="flex space-x-3">
-          <button class="px-5 py-2.5 text-primary border border-primary rounded-lg hover:bg-primary hover:text-white transition-colors text-base whitespace-nowrap view-details-btn" 
-                  data-job-id="${job.id}">View Details</button>
-          <button class="px-7 py-2.5 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors text-base apply-btn" data-job-id="${job.id}">Apply Now</button>
+          <button class="px-5 py-2.5 text-primary border border-primary rounded-lg hover:bg-primary hover:text-white transition-colors text-base whitespace-nowrap view-details-btn" data-job-id="${job.id}">View Teaching Load</button>
+          <button class="px-7 py-2.5 ${applyDisabled ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-primary text-white hover:bg-blue-700'} rounded-lg transition-colors text-base apply-btn" data-job-id="${job.id}" ${applyDisabled ? 'disabled' : ''}>Apply</button>
         </div>
       </div>
     `;
     container.appendChild(jobCard);
   });
   
-  // Re-attach event listeners for new buttons
   attachJobEventListeners();
 }
 
@@ -7838,7 +8002,7 @@ function updatePagination(pagination) {
   // Update pagination info
   const paginationInfo = document.getElementById('paginationInfo');
   if (paginationInfo) {
-    paginationInfo.textContent = `Showing ${pagination.showing_from}-${pagination.showing_to} of ${pagination.total_jobs} jobs`;
+    paginationInfo.textContent = `Showing ${pagination.showing_from}-${pagination.showing_to} of ${pagination.total_jobs} teaching loads`;
   }
   
   // Update previous button
@@ -7932,12 +8096,12 @@ function addEllipsis() {
 function attachJobEventListeners() {
   // View Details buttons
   const viewDetailsBtns = document.querySelectorAll('.view-details-btn');
-  console.log('🔗 Attaching event listeners to', viewDetailsBtns.length, 'View Details buttons');
+  console.log('?? Attaching event listeners to', viewDetailsBtns.length, 'View Details buttons');
   
   viewDetailsBtns.forEach((btn, index) => {
     btn.addEventListener('click', function() {
       const jobId = this.getAttribute('data-job-id');
-      console.log('👆 View Details clicked for job ID:', jobId);
+      console.log('?? View Details clicked for job ID:', jobId);
       showJobDetails(jobId);
     });
   });
@@ -7958,7 +8122,7 @@ function attachJobEventListeners() {
         
         // If no application ID is set, try to fetch it from user applications
         if (!applicationId) {
-          console.log('⚠️ No application ID on button - fetching from user applications...');
+          console.log('?? No application ID on button - fetching from user applications...');
           
           // Show loading toast
           showToast('Loading your application...', 'info');
@@ -7972,21 +8136,21 @@ function attachJobEventListeners() {
               
               if (application) {
                 applicationId = application.id;
-                console.log('✅ Found application ID:', applicationId);
+                console.log('? Found application ID:', applicationId);
                 // Update button with the application ID for future clicks
                 this.setAttribute('data-application-id', applicationId);
               } else {
-                console.error('❌ No application found for this job');
+                console.error('? No application found for this job');
                 showToast('Application not found. Please try again.', 'error');
                 return;
               }
             } else {
-              console.error('❌ Failed to fetch applications');
+              console.error('? Failed to fetch applications');
               showToast('Failed to load application data. Please try again.', 'error');
               return;
             }
           } catch (error) {
-            console.error('❌ Error fetching application:', error);
+            console.error('? Error fetching application:', error);
             showToast('Error loading application. Please try again.', 'error');
             return;
           }
@@ -8051,10 +8215,10 @@ function attachJobEventListeners() {
           const res = await fetch(`get_application_details.php?id=${applicationId}`);
           const data = await res.json();
           
-          console.log('📦 API Response data (location 2):', data);
-          console.log('📦 Work Experience from API:', data.work_experience);
-          console.log('📦 Education from API:', data.education);
-          console.log('📦 Skills from API:', data.skills);
+          console.log('?? API Response data (location 2):', data);
+          console.log('?? Work Experience from API:', data.work_experience);
+          console.log('?? Education from API:', data.education);
+          console.log('?? Skills from API:', data.skills);
           
           if (!data.success) {
             throw new Error(data.error || 'Failed to load application');
@@ -8103,7 +8267,7 @@ function attachJobEventListeners() {
             if (app.interview_date) {
               const interviewDate = new Date(app.interview_date);
               const detailsHtml = `
-                <p class="text-sm text-green-600 font-medium">✓ Interview scheduled</p>
+                <p class="text-sm text-green-600 font-medium">? Interview scheduled</p>
                 <p class="text-sm text-gray-700 mt-2">
                   <i class="ri-calendar-event-line mr-1"></i>
                   ${interviewDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
@@ -8142,7 +8306,7 @@ function attachJobEventListeners() {
             if (app.demo_date) {
               const demoDate = new Date(app.demo_date);
               const detailsHtml = `
-                <p class="text-sm text-green-600 font-medium">✓ Demo teaching scheduled</p>
+                <p class="text-sm text-green-600 font-medium">? Demo teaching scheduled</p>
                 <p class="text-sm text-gray-700 mt-2">
                   <i class="ri-calendar-event-line mr-1"></i>
                   ${demoDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
@@ -8213,9 +8377,9 @@ function attachJobEventListeners() {
                 document.getElementById('psych_approved_status').classList.remove('hidden');
                 
                 // Only enable next button if status is "Initially Hired"
-                console.log('📋 Checking hiring status:', app.status);
+                console.log('?? Checking hiring status:', app.status);
                 if (app.status && (app.status.toLowerCase().includes('initially hired') || app.status.toLowerCase().includes('hired'))) {
-                  console.log('✅ STATUS IS "INITIALLY HIRED" - Enabling button!');
+                  console.log('? STATUS IS "INITIALLY HIRED" - Enabling button!');
                   const nextBtn = document.getElementById('psych_next_btn');
                   if (nextBtn) {
                     nextBtn.disabled = false;
@@ -8226,11 +8390,11 @@ function attachJobEventListeners() {
                     nextBtn.style.cursor = 'pointer';
                     nextBtn.style.opacity = '1';
                     
-                    console.log('🎉 Button is now CLICKABLE! Status:', app.status);
+                    console.log('?? Button is now CLICKABLE! Status:', app.status);
                   }
                 } else {
                   // Receipt approved but not hired yet - keep button disabled
-                  console.log('⏳ Receipt uploaded but status is not "Initially Hired" yet');
+                  console.log('? Receipt uploaded but status is not "Initially Hired" yet');
                   console.log('Current status:', app.status);
                   console.log('Button will be enabled once admin marks you as "Initially Hired"');
                 }
@@ -8266,32 +8430,32 @@ function attachJobEventListeners() {
           // Parse resubmission documents list (if status is "Resubmission Required")
           let resubmissionDocs = [];
           if (app.status === 'Resubmission Required' && app.resubmission_documents) {
-            console.log('📋 Raw resubmission_documents from database:', app.resubmission_documents);
-            console.log('📋 Type:', typeof app.resubmission_documents);
+            console.log('?? Raw resubmission_documents from database:', app.resubmission_documents);
+            console.log('?? Type:', typeof app.resubmission_documents);
             
             try {
               // If already an array (parsed by API), use it directly
               if (Array.isArray(app.resubmission_documents)) {
                 resubmissionDocs = app.resubmission_documents;
-                console.log('✅ Resubmission docs (already array):', resubmissionDocs);
+                console.log('? Resubmission docs (already array):', resubmissionDocs);
               } else {
                 // Try parsing as JSON first (new format from admin)
                 resubmissionDocs = JSON.parse(app.resubmission_documents);
-                console.log('✅ Resubmission docs parsed (JSON):', resubmissionDocs);
+                console.log('? Resubmission docs parsed (JSON):', resubmissionDocs);
               }
             } catch (e) {
-              console.log('⚠️ JSON parse failed, trying CSV format...');
+              console.log('?? JSON parse failed, trying CSV format...');
               // Fallback to comma-separated format
               try {
                 resubmissionDocs = app.resubmission_documents.split(',').map(doc => doc.trim());
-                console.log('✅ Resubmission docs parsed (CSV):', resubmissionDocs);
+                console.log('? Resubmission docs parsed (CSV):', resubmissionDocs);
               } catch (e2) {
-                console.error('❌ Error parsing resubmission documents:', e2);
+                console.error('? Error parsing resubmission documents:', e2);
                 console.error('Raw value:', app.resubmission_documents);
               }
             }
           } else {
-            console.log('ℹ️ No resubmission required or status is not "Resubmission Required"');
+            console.log('?? No resubmission required or status is not "Resubmission Required"');
             console.log('Status:', app.status);
             console.log('Resubmission documents:', app.resubmission_documents);
           }
@@ -8307,11 +8471,11 @@ function attachJobEventListeners() {
           
           // CRITICAL: If resubmission mode, prepare CSS to hide only resubmission document indicators
           if (app.status === 'Resubmission Required') {
-            console.log('⚠️ RESUBMISSION MODE DETECTED - Will selectively hide indicators');
+            console.log('?? RESUBMISSION MODE DETECTED - Will selectively hide indicators');
             
             // DON'T add blanket CSS - we want to show approved files normally
             // Only specific resubmission documents will get orange overlays
-            console.log('✅ Approved documents will show green indicators normally');
+            console.log('? Approved documents will show green indicators normally');
           }
           
           // IMPORTANT: Open wizard FIRST in view mode
@@ -8334,6 +8498,8 @@ function attachJobEventListeners() {
             document.getElementById('rf_full_name').value = app.full_name || '';
             document.getElementById('rf_email').value = app.applicant_email || '';
             document.getElementById('rf_cellphone').value = app.contact_num || '';
+            const rf_application_type = document.getElementById('rf_application_type');
+            if (rf_application_type) rf_application_type.value = app.application_type || 'new';
             
             // Display work experience, skills, and education from API data
             displayWorkExperienceFromData(data.work_experience || []);
@@ -8358,7 +8524,7 @@ function attachJobEventListeners() {
             if (fileName) {
               if (needsResubmission) {
                 // Document needs resubmission - NO GREEN, show orange styling
-                console.log(`🟧 ${documentField} needs resubmission - NO GREEN indicator, showing file input`);
+                console.log(`?? ${documentField} needs resubmission - NO GREEN indicator, showing file input`);
                 
                 // Orange border styling
                 container.classList.remove('border-gray-300', 'border-green-400', 'bg-green-50');
@@ -8405,16 +8571,16 @@ function attachJobEventListeners() {
             }
           };
           
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          console.log('🔍 INDICATOR DECISION POINT');
+          console.log('?????????????????????????????????????????????');
+          console.log('?? INDICATOR DECISION POINT');
           console.log('  App Status:', app.status);
           console.log('  Is Resubmission Mode:', isResubmissionMode);
           console.log('  Resubmission Docs:', resubmissionDocs);
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('?????????????????????????????????????????????');
           
           // ALWAYS add indicators to show what was uploaded
           // The addUploadedIndicator function will handle resubmission mode internally
-          console.log('✅ ADDING indicators for all uploaded files...');
+          console.log('? ADDING indicators for all uploaded files...');
           if (app.application_letter) addUploadedIndicator('applicationLetter', app.application_letter, 'application_letter');
           if (app.resume) addUploadedIndicator('resume_file', app.resume, 'resume');
           if (app.tor) addUploadedIndicator('transcript', app.tor, 'tor');
@@ -8423,12 +8589,14 @@ function attachJobEventListeners() {
           if (app.coe) addUploadedIndicator('coe', app.coe, 'coe');
           if (app.seminars_trainings) addUploadedIndicator('certificates[]', app.seminars_trainings, 'seminars_trainings');
           if (app.masteral_cert) addUploadedIndicator('masteral_cert', app.masteral_cert, 'masteral_cert');
+          if (app.certificate_of_grades) addUploadedIndicator('certificate_of_grades', app.certificate_of_grades, 'certificate_of_grades');
+          if (app.proof_of_enrollment) addUploadedIndicator('proof_of_enrollment', app.proof_of_enrollment, 'proof_of_enrollment');
           
           // If resubmission mode, the indicator function already handles showing file inputs
           if (isResubmissionMode) {
-            console.log('🔄 RESUBMISSION MODE');
-            console.log('   ✅ Approved documents: Green border + "Uploaded: filename" (no file input)');
-            console.log('   🟧 Resubmission documents: Orange border + file input + "Previous file: filename"');
+            console.log('?? RESUBMISSION MODE');
+            console.log('   ? Approved documents: Green border + "Uploaded: filename" (no file input)');
+            console.log('   ?? Resubmission documents: Orange border + file input + "Previous file: filename"');
             console.log('   Requested documents:', resubmissionDocs);
             
             // Add hidden fields to indicate resubmission mode
@@ -8454,7 +8622,7 @@ function attachJobEventListeners() {
                 form.appendChild(appIdInput);
               }
               
-              console.log('✅ Added resubmission hidden fields to form');
+              console.log('? Added resubmission hidden fields to form');
             }
             
             // Update step 2 heading and description for resubmission mode
@@ -8480,7 +8648,7 @@ function attachJobEventListeners() {
                 }
               }
               
-              console.log('✅ Submit button updated to "Resubmit Files"');
+              console.log('? Submit button updated to "Resubmit Files"');
             }
             
             // Show enhanced resubmission notice at top of step 2
@@ -8497,7 +8665,9 @@ function attachJobEventListeners() {
                   'professional_license': 'Professional License',
                   'coe': 'Certificate of Employment',
                   'seminars_trainings': 'Seminars/Training Certificates',
-                  'masteral_cert': 'Masteral Certificate'
+                  'masteral_cert': 'Masteral Certificate',
+                  'certificate_of_grades': 'Certificate of Grades',
+                  'proof_of_enrollment': 'Proof of Enrollment'
                 };
                 
                 const requestedDocsList = resubmissionDocs.map(doc => 
@@ -8510,14 +8680,14 @@ function attachJobEventListeners() {
                   <div class="flex items-start">
                     <i class="ri-alert-line text-orange-600 text-2xl mr-4 mt-0.5"></i>
                     <div class="flex-1">
-                      <h3 class="font-bold text-orange-900 mb-2 text-lg">📋 Document Resubmission Required</h3>
+                      <h3 class="font-bold text-orange-900 mb-2 text-lg">?? Document Resubmission Required</h3>
                       <p class="text-sm text-orange-800 mb-3">The admin has requested you to resubmit the following ${resubmissionDocs.length} document(s). Only the requested documents are shown below:</p>
                       <ul class="space-y-1 text-sm text-orange-900 font-medium mb-3">
                         ${requestedDocsList}
                       </ul>
                       ${app.resubmission_notes ? `
                         <div class="mt-3 p-3 bg-white bg-opacity-60 rounded-lg border border-orange-300">
-                          <p class="text-xs text-orange-700 font-semibold mb-1">📝 Reason from Admin:</p>
+                          <p class="text-xs text-orange-700 font-semibold mb-1">?? Reason from Admin:</p>
                           <p class="text-sm text-orange-800 italic">${app.resubmission_notes}</p>
                         </div>
                       ` : ''}
@@ -8531,7 +8701,7 @@ function attachJobEventListeners() {
               }
             }
             
-            console.log('✅ Resubmission mode setup complete!');
+            console.log('? Resubmission mode setup complete!');
           }
           
         } catch (err) {
@@ -8594,7 +8764,7 @@ function populateWizardWithApplicationData(app, data) {
 
 // Show job details function
 function showJobDetails(jobId) {
-  console.log('🔍 Showing job details for ID:', jobId);
+  console.log('?? Showing job details for ID:', jobId);
   
   // Check if elements exist
   const jobListings = document.getElementById('jobListings');
@@ -8606,7 +8776,7 @@ function showJobDetails(jobId) {
   });
   
   if (!jobListings || !jobDetailView) {
-    console.error('❌ Required elements not found!');
+    console.error('? Required elements not found!');
     return;
   }
   
@@ -8617,27 +8787,27 @@ function showJobDetails(jobId) {
   document.getElementById('searchFilters').style.display = 'none';
   jobDetailView.classList.remove('hidden');
   
-  console.log('✅ Switched to detail view, fetching data...');
+  console.log('? Switched to detail view, fetching data...');
   
   // Load job details via API
   fetch(`get_job_details.php?job_id=${jobId}`)
     .then(response => {
-      console.log('📡 Response received:', response.status);
+      console.log('?? Response received:', response.status);
       return response.json();
     })
     .then(data => {
-      console.log('📦 Data received:', data);
+      console.log('?? Data received:', data);
       if (data.success && data.job) {
-        console.log('✅ Populating job details...');
+        console.log('? Populating job details...');
         populateJobDetails(data.job);
       } else {
-        console.error('❌ Failed to load job details:', data.message || data.error);
+        console.error('? Failed to load job details:', data.message || data.error);
         showToast('Failed to load job details', 'error');
         showJobListings();
       }
     })
     .catch(error => {
-      console.error('❌ Error loading job details:', error);
+      console.error('? Error loading job details:', error);
       showToast('Error loading job details', 'error');
       showJobListings();
     });
@@ -8756,10 +8926,10 @@ function populateJobDetails(job) {
     applyBtn.setAttribute('data-application-status', job.application_status || '');
     applyBtn.onclick = async function() {
       const applicationId = this.getAttribute('data-application-id');
-      console.log('🔍 View Application clicked, ID:', applicationId);
+      console.log('?? View Application clicked, ID:', applicationId);
       
       if (applicationId) {
-        console.log('📂 Opening existing application:', applicationId);
+        console.log('?? Opening existing application:', applicationId);
         
         // Clear previous data
         window._lastLoadedAppId = null;
@@ -8767,23 +8937,23 @@ function populateJobDetails(job) {
         globalResubmissionDocs = [];
         
         try {
-          console.log('📡 Fetching application details...');
+          console.log('?? Fetching application details...');
           const res = await fetch(`get_application_details.php?id=${applicationId}`);
-          console.log('📡 Response status:', res.status);
+          console.log('?? Response status:', res.status);
           
           const data = await res.json();
-          console.log('📦 Application data received:', data);
+          console.log('?? Application data received:', data);
           
           if (!data.success) {
-            console.error('❌ API returned error:', data.error);
+            console.error('? API returned error:', data.error);
             throw new Error(data.error || 'Failed to load application');
           }
           
           const app = data.application;
-          console.log('✅ Application loaded:', app);
+          console.log('? Application loaded:', app);
           
           // Hide job detail view, show wizard
-          console.log('🔄 Hiding job detail view, showing wizard...');
+          console.log('?? Hiding job detail view, showing wizard...');
           document.getElementById('jobDetailView').classList.add('hidden');
           
           // Show wizard in view mode
@@ -8794,10 +8964,10 @@ function populateJobDetails(job) {
           let workflowStep = 3; // Default to step 3 (Interview)
           const status = (app.status || '').toLowerCase();
           
-          console.log('🔍 Application status:', status);
-          console.log('📋 Has interview_date:', !!app.interview_date);
-          console.log('📋 Has demo_date:', !!app.demo_date);
-          console.log('📋 Has psych_exam_receipt:', !!app.psych_exam_receipt);
+          console.log('?? Application status:', status);
+          console.log('?? Has interview_date:', !!app.interview_date);
+          console.log('?? Has demo_date:', !!app.demo_date);
+          console.log('?? Has psych_exam_receipt:', !!app.psych_exam_receipt);
           
           if (status.includes('initially hired') || status.includes('hired')) {
             workflowStep = 6; // Admin has marked as hired - show step 6
@@ -8813,20 +8983,20 @@ function populateJobDetails(job) {
             workflowStep = 3;
           }
           
-          console.log('📍 Opening wizard at step:', workflowStep, 'based on status:', status);
+          console.log('?? Opening wizard at step:', workflowStep, 'based on status:', status);
           window.currentWorkflowStep = workflowStep;
           window.currentApplicationData = app;
           
           // Navigate to current workflow step
           setStep(workflowStep);
-          console.log('✅ Application view opened at step', workflowStep);
+          console.log('? Application view opened at step', workflowStep);
           
         } catch (error) {
-          console.error('❌ Error loading application:', error);
+          console.error('? Error loading application:', error);
           showToast('Error loading application details: ' + error.message, 'error');
         }
       } else {
-        console.error('❌ No application ID found!');
+        console.error('? No application ID found!');
         showToast('Application ID not found', 'error');
       }
     };
@@ -9005,7 +9175,7 @@ function updateExistingApplicationStates() {
               button.disabled = true;
             } else if (isCompleted) {
               // Application is completed - disable button
-              button.textContent = status.includes('hired') ? 'Hired' : 'Rejected';
+              button.textContent = status.includes('hired') ? 'Application Passed' : 'Rejected';
               button.className = 'px-5 py-2.5 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed text-base whitespace-nowrap';
               button.disabled = true;
             } else {
@@ -9026,7 +9196,7 @@ function updateExistingApplicationStates() {
                   statusBadge.textContent = 'Cancelled';
                   statusBadge.className = 'bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-medium';
                 } else {
-                  statusBadge.textContent = isCompleted ? (status.includes('hired') ? 'Hired' : 'Rejected') : 'In Progress';
+                  statusBadge.textContent = isCompleted ? (status.includes('hired') ? 'Application Passed' : 'Rejected') : 'In Progress';
                   statusBadge.className = isCompleted ? 'bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-medium' : 'bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium';
                 }
               }
@@ -9176,8 +9346,8 @@ document.addEventListener('DOMContentLoaded', function() {
   // Do this BEFORE loading jobs to prevent dashboard flash
   const openApplicationId = sessionStorage.getItem('openApplicationId');
   if (openApplicationId) {
-    console.log('🔄 Found pending application to open:', openApplicationId);
-    console.log('📊 Current state:', {
+    console.log('?? Found pending application to open:', openApplicationId);
+    console.log('?? Current state:', {
       wizardExists: !!document.getElementById('applicationWizard'),
       functionExists: typeof window.viewExistingApplication,
       retryCount: sessionStorage.getItem('wizardOpenRetry')
@@ -9186,7 +9356,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Check retry count to prevent infinite loops
     const retryCount = parseInt(sessionStorage.getItem('wizardOpenRetry') || '0');
     if (retryCount >= 3) {
-      console.error('❌ Too many retry attempts. Clearing state.');
+      console.error('? Too many retry attempts. Clearing state.');
       console.error('Debug info:');
       console.error('- Application ID:', openApplicationId);
       console.error('- Wizard element exists:', !!document.getElementById('applicationWizard'));
@@ -9202,13 +9372,13 @@ document.addEventListener('DOMContentLoaded', function() {
       // Check if we should return to My Applications when closing
       const returnToMyApplications = sessionStorage.getItem('returnToMyApplications');
       if (returnToMyApplications === 'true') {
-        console.log('✅ Will return to My Applications when wizard closes');
+        console.log('? Will return to My Applications when wizard closes');
         window.wizardOpenedFromMyApplications = true;
         sessionStorage.removeItem('returnToMyApplications');
       }
     
     // IMMEDIATELY hide dashboard content to prevent flash
-    console.log('🔒 Hiding dashboard content...');
+    console.log('?? Hiding dashboard content...');
     const jobHeader = document.getElementById('jobHeader');
     const searchFilters = document.getElementById('searchFilters');
     const listings = document.getElementById('listings');
@@ -9244,7 +9414,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Open wizard immediately (no delay)
     setTimeout(() => {
       if (typeof window.viewExistingApplication === 'function') {
-        console.log('📖 Opening application wizard...');
+        console.log('?? Opening application wizard...');
         window.viewExistingApplication(openApplicationId);
         
         // Remove loading overlay after wizard opens
@@ -9255,7 +9425,7 @@ document.addEventListener('DOMContentLoaded', function() {
           sessionStorage.removeItem('wizardOpenRetry');
         }, 500);
       } else {
-        console.error('❌ viewExistingApplication function not available yet');
+        console.error('? viewExistingApplication function not available yet');
         const overlay = document.getElementById('wizardLoadingOverlay');
         if (overlay) overlay.remove();
       }
@@ -9679,19 +9849,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const viewJobId = urlParams.get('view_job');
     
     if (viewJobId) {
-        console.log('🔗 Redirected from homepage to view job ID:', viewJobId);
+        console.log('?? Redirected from homepage to view job ID:', viewJobId);
         
         // Wait a moment for the page to fully load, then show job details
         setTimeout(function() {
             // Make sure showJobDetails function exists
             if (typeof showJobDetails === 'function') {
-                console.log('✅ Calling showJobDetails for job ID:', viewJobId);
+                console.log('? Calling showJobDetails for job ID:', viewJobId);
                 showJobDetails(parseInt(viewJobId));
                 
                 // Clean up URL (remove the parameter)
                 window.history.replaceState({}, document.title, window.location.pathname);
             } else {
-                console.error('❌ showJobDetails function not found!');
+                console.error('? showJobDetails function not found!');
             }
         }, 500); // Small delay to ensure all scripts are loaded
     }
@@ -9758,3 +9928,4 @@ document.addEventListener('DOMContentLoaded', function() {
 
 </body>
 </html>
+

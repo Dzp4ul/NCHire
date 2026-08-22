@@ -62,10 +62,10 @@ try {
         $stmt->execute();
         $stats['demo_scheduled'] = $stmt->fetchColumn();
 
-        // Hired (Initially Hired, Permanently Hired, Hired)
+        // Passed (current Passed statuses and legacy hired statuses)
         $sql = "SELECT COUNT(*) as count 
                 FROM job_applicants 
-                WHERE status IN ('Initially Hired', 'Permanently Hired', 'Hired')
+                WHERE status IN ('Passed', 'Application Passed', 'Initially Hired', 'Permanently Hired', 'Hired')
                 AND workflow_stage != 'rejected'
                 AND (secretary_id IS NULL OR secretary_id = 0 OR workflow_stage = 'secretary_review' 
                      OR secretary_id = :secretary_id)";
@@ -114,7 +114,7 @@ try {
         // Hired
         $sql = "SELECT COUNT(*) as count 
                 FROM job_applicants 
-                WHERE status IN ('Initially Hired', 'Permanently Hired', 'Hired')
+                WHERE status IN ('Passed', 'Application Passed', 'Initially Hired', 'Permanently Hired', 'Hired')
                 AND assigned_to_department IN (:department, :department_alias)";
         $stmt = $pdo->prepare($sql);
         $stmt->bindValue(':department', $admin_department);
@@ -160,7 +160,7 @@ try {
         // Hired
         $sql = "SELECT COUNT(*) as count 
                 FROM job_applicants 
-                WHERE status IN ('Initially Hired', 'Permanently Hired', 'Hired')
+                WHERE status IN ('Passed', 'Application Passed', 'Initially Hired', 'Permanently Hired', 'Hired')
                 AND assigned_to_department IN (:department, :department_alias)";
         $stmt = $pdo->prepare($sql);
         $stmt->bindValue(':department', $admin_department);

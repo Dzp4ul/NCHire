@@ -141,7 +141,8 @@ function handleTransferToDeptHead($conn, $application_id, $application, $secreta
         
         // Update application workflow
         $stmt = $conn->prepare("UPDATE job_applicants 
-                               SET workflow_stage = 'department_head_review',
+                               SET workflow_stage = 'waiting_interview_schedule',
+                                   status = 'Waiting for Interview Schedule',
                                    secretary_id = ?,
                                    secretary_review_date = NOW(),
                                    secretary_notes = ?,
@@ -163,7 +164,7 @@ function handleTransferToDeptHead($conn, $application_id, $application, $secreta
         
         // Log workflow history (optional - won't fail if table doesn't exist)
         try {
-            logWorkflowHistory($conn, $application_id, 'secretary_review', 'department_head_review', 
+            logWorkflowHistory($conn, $application_id, 'secretary_review', 'waiting_interview_schedule', 
                               $secretary_id, 'Secretary', 'transfer', $notes);
         } catch (Exception $e) {
             error_log("Workflow history logging failed: " . $e->getMessage());
@@ -172,7 +173,7 @@ function handleTransferToDeptHead($conn, $application_id, $application, $secreta
         // Log admin activity (optional - won't fail if table doesn't exist)
         try {
             logAdminActivity($conn, 'applicant_transferred', 
-                            "$secretary_name transferred application for {$application['full_name']} to Department Head",
+                            "$secretary_name moved application for {$application['full_name']} to Waiting for Interview Schedule",
                             $secretary_name, 'job_applicants', $application_id);
         } catch (Exception $e) {
             error_log("Admin activity logging failed: " . $e->getMessage());
@@ -192,8 +193,8 @@ function handleTransferToDeptHead($conn, $application_id, $application, $secreta
                 if (!$notif_stmt) {
                     throw new Exception("Prepare failed: " . $conn->error);
                 }
-                $notif_title = "Application Transferred to Dean";
-                $notif_message = "Your application for {$application['position']} has been reviewed and forwarded to the dean for evaluation. You will be notified of the next steps.";
+                $notif_title = "Waiting for Interview Schedule";
+                $notif_message = "Your application for {$application['position']} has passed document review and is now waiting for an interview schedule. You will be notified once the schedule is set.";
                 $notif_type = "info";
                 $notif_stmt->bind_param("sssss", $applicant_email, $applicant_name, $notif_title, $notif_message, $notif_type);
                 
@@ -221,9 +222,9 @@ function handleTransferToDeptHead($conn, $application_id, $application, $secreta
                 $email_result = sendEmailNotification(
                     $applicant_email,
                     $applicant_name,
-                    'Application Transferred to Dean',
+                    'Waiting for Interview Schedule',
                     'Application Under Review',
-                    'Your application for ' . $application['position'] . ' has been reviewed by our secretary and forwarded to the dean for further evaluation. You will be notified of the next steps.',
+                    'Your application for ' . $application['position'] . ' has passed document review and is now waiting for an interview schedule. You will be notified once the schedule is set.',
                     'info'
                 );
                 if ($email_result) {
@@ -274,8 +275,8 @@ function handleTransferToDeptHead($conn, $application_id, $application, $secreta
                     if (!$admin_notif_stmt) {
                         throw new Exception("Admin notification prepare failed: " . $conn->error);
                     }
-                    $admin_title = "New Application Transferred";
-                    $admin_message = "Application from {$application['full_name']} for {$application['position']} has been transferred to you by $secretary_name for review." . ($notes ? " Notes: $notes" : "");
+                    $admin_title = "Application Ready for Interview Scheduling";
+                    $admin_message = "Application from {$application['full_name']} for {$application['position']} is ready for interview scheduling after secretary document review." . ($notes ? " Notes: $notes" : "");
                     $admin_type = "info";
                     $admin_action_type = "application_transferred";
                     $admin_notif_stmt->bind_param("isssiis", $dept_head_id, $admin_title, $admin_message, $admin_type, $admin_action_type, $application_id, $application['full_name']);
@@ -298,9 +299,9 @@ function handleTransferToDeptHead($conn, $application_id, $application, $secreta
                             $dept_email_result = sendEmailNotification(
                                 $dept_head_email,
                                 $dept_head_name,
-                                'New Application Transferred - NCHire',
-                                'New Application for Review',
-                                "Hello $dept_head_name,\n\nAn application from {$application['full_name']} for the position of {$application['position']} has been transferred to you by $secretary_name for review." . ($notes ? "\n\nSecretary Notes: $notes" : "") . "\n\nPlease log in to the admin panel to review the application.",
+                                'Application Ready for Interview Scheduling - NCHire',
+                                'Application Ready for Interview Scheduling',
+                                "Hello $dept_head_name,\n\nAn application from {$application['full_name']} for the position of {$application['position']} is ready for interview scheduling after secretary document review." . ($notes ? "\n\nSecretary Notes: $notes" : "") . "\n\nPlease log in to the admin panel to review the application.",
                                 'info'
                             );
                             if ($dept_email_result) {
@@ -542,3 +543,5 @@ function logAdminActivity($conn, $activity_type, $description, $user_name, $rela
 }
 
 $conn->close();
+
+

@@ -5,6 +5,7 @@ header('Content-Type: application/json');
 // Include email helper and admin notification helper
 require_once __DIR__ . '/email_helper.php';
 require_once __DIR__ . '/admin_notification_helper.php';
+require_once __DIR__ . '/../shared/helpers/recruitment.php';
 
 // Database connection
 $servername = "127.0.0.1";
@@ -39,14 +40,29 @@ try {
             $interview_location = $_POST['interview_location'] ?? '';
             $interview_room = $_POST['interview_room'] ?? '';
             $interview_notes = $_POST['interview_notes'] ?? '';
+            $interview_room_id = (int)($_POST['interview_room_id'] ?? 0);
+            if ($interview_room_id > 0) {
+                $room = nc_get_room_by_id($conn, $interview_room_id);
+                if (!$room) {
+                    echo json_encode(['success' => false, 'error' => 'Selected interview room is not available']);
+                    exit;
+                }
+                $interview_room = $room['room_name'];
+                $interview_location = $room['campus_location'] ?? '';
+            }
             
             if (empty($interview_date) || empty($interview_time)) {
                 echo json_encode(['success' => false, 'error' => 'Interview date and time are required']);
                 exit;
             }
             
-            if (empty($interview_location) || empty($interview_room)) {
-                echo json_encode(['success' => false, 'error' => 'Interview location and room are required']);
+
+            if (!nc_is_weekday_date($interview_date)) {
+                echo json_encode(['success' => false, 'error' => 'Interview schedules are only available on weekdays']);
+                exit;
+            }
+            if (empty($interview_room)) {
+                echo json_encode(['success' => false, 'error' => 'Interview room is required']);
                 exit;
             }
             
@@ -85,6 +101,16 @@ try {
             $stmt->bind_param("ssssi", $interview_datetime, $interview_location, $interview_room, $interview_notes, $applicant_id);
             
             if ($stmt->execute()) {
+                if ($interview_room_id > 0 && nc_column_exists($conn, 'job_applicants', 'interview_room_id')) {
+                    $room_id_stmt = $conn->prepare("UPDATE job_applicants SET interview_room_id = ? WHERE id = ?");
+                    if ($room_id_stmt) {
+                        $room_id_stmt->bind_param("ii", $interview_room_id, $applicant_id);
+                        if (!$room_id_stmt->execute()) {
+                            error_log("interview_room_id update failed: " . $room_id_stmt->error);
+                        }
+                        $room_id_stmt->close();
+                    }
+                }
                 // Simple notification system using email matching
                 $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name, position FROM job_applicants WHERE id = ?");
                 $applicant_stmt->bind_param("i", $applicant_id);
@@ -549,10 +575,10 @@ try {
         case 'mark_initially_hired':
             $initially_hired_notes = $_POST['initially_hired_notes'] ?? '';
             
-            // Update applicant record - mark as initially hired, not final hired yet.
+            // Update applicant record - mark as passed, not final approval yet.
             $stmt = $conn->prepare("UPDATE job_applicants SET 
-                                    status = 'Initially Hired',
-                                    workflow_stage = 'initially_hired',
+                                    status = 'Passed',
+                                    workflow_stage = 'passed',
                                     initially_hired_date = NOW(),
                                     initially_hired_notes = ?
                                     WHERE id = ?");
@@ -572,8 +598,8 @@ try {
                     $position = $applicant_data['position'];
                     
                     $notif_stmt = $conn->prepare("INSERT INTO notifications (user_email, user_name, title, message, type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-                    $title = "Marked as Initially Hired";
-                    $message = "Congratulations! You have been marked as initially hired for the position. " . ($initially_hired_notes ? "Notes: " . $initially_hired_notes : "Please wait for the final hiring update.");
+                    $title = "Application Passed";
+                    $message = "Congratulations! You have been marked as passed for the position. " . ($initially_hired_notes ? "Notes: " . $initially_hired_notes : "Please wait for further instructions.");
                     $type = "success";
                     $notif_stmt->bind_param("sssss", $applicant_email, $applicant_name, $title, $message, $type);
                     $notif_stmt->execute();
@@ -585,26 +611,26 @@ try {
                     
                     // Log admin activity
                     $activity_stmt = $conn->prepare("INSERT INTO admin_activity (activity_type, description, user_name, related_table, related_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-                    $activity_type = "applicant_initially_hired";
-                    $activity_desc = "$admin_name marked $applicant_name as initially hired for $position";
+                    $activity_type = "application_passed";
+                    $activity_desc = "$admin_name marked $applicant_name as passed for $position";
                     $related_table = "job_applicants";
                     $activity_stmt->bind_param("ssssi", $activity_type, $activity_desc, $admin_name, $related_table, $applicant_id);
                     $activity_stmt->execute();
                 }
                 
-                echo json_encode(['success' => true, 'message' => 'Applicant marked as initially hired successfully']);
+                echo json_encode(['success' => true, 'message' => 'Application marked as passed successfully']);
             } else {
-                echo json_encode(['success' => false, 'error' => 'Failed to mark applicant as initially hired']);
+                echo json_encode(['success' => false, 'error' => 'Failed to mark applicant as passed']);
             }
             break;
             
         case 'mark_permanently_hired':
             $hired_notes = $_POST['hired_notes'] ?? '';
             
-            // Update applicant record to final Hired status
+            // Update applicant record to final Passed status
             $stmt = $conn->prepare("UPDATE job_applicants SET 
-                                    status = 'Hired',
-                                    workflow_stage = 'hired',
+                                    status = 'Passed',
+                                    workflow_stage = 'passed',
                                     hired_date = NOW(),
                                     hired_notes = ?
                                     WHERE id = ?");
@@ -624,8 +650,8 @@ try {
                     $position = $applicant_data['position'];
                     
                     $notif_stmt = $conn->prepare("INSERT INTO notifications (user_email, user_name, title, message, type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-                    $title = "Permanently Hired - Welcome Aboard!";
-                    $message = "Congratulations! You have been permanently hired as a regular employee. Welcome to the team! " . ($hired_notes ? "Details: " . $hired_notes : "Please await onboarding instructions.");
+                    $title = "Application Passed";
+                    $message = "Congratulations! Your application has passed the recruitment process. " . ($hired_notes ? "Details: " . $hired_notes : "Please await onboarding instructions.");
                     $type = "success";
                     $notif_stmt->bind_param("sssss", $applicant_email, $applicant_name, $title, $message, $type);
                     $notif_stmt->execute();
@@ -635,16 +661,16 @@ try {
                     
                     // Log admin activity
                     $activity_stmt = $conn->prepare("INSERT INTO admin_activity (activity_type, description, user_name, related_table, related_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-                    $activity_type = "applicant_hired";
-                    $activity_desc = "$admin_name permanently hired $applicant_name for $position";
+                    $activity_type = "application_passed";
+                    $activity_desc = "$admin_name marked $applicant_name as passed for $position";
                     $related_table = "job_applicants";
                     $activity_stmt->bind_param("ssssi", $activity_type, $activity_desc, $admin_name, $related_table, $applicant_id);
                     $activity_stmt->execute();
                 }
                 
-                echo json_encode(['success' => true, 'message' => 'Applicant permanently hired successfully']);
+                echo json_encode(['success' => true, 'message' => 'Application marked as passed successfully']);
             } else {
-                echo json_encode(['success' => false, 'error' => 'Failed to mark as permanently hired']);
+                echo json_encode(['success' => false, 'error' => 'Failed to mark application as passed']);
             }
             break;
             
@@ -653,8 +679,8 @@ try {
             
             // Update applicant record
             $stmt = $conn->prepare("UPDATE job_applicants SET 
-                                    status = 'Hired',
-                                    workflow_stage = 'hired',
+                                    status = 'Passed',
+                                    workflow_stage = 'passed',
                                     hired_date = NOW(),
                                     hire_notes = ?
                                     WHERE id = ?");
@@ -674,29 +700,29 @@ try {
                     
                     // Create notification using email as identifier
                     $notif_stmt = $conn->prepare("INSERT INTO notifications (user_email, user_name, title, message, type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-                    $title = "Congratulations! You're Hired!";
-                    $message = "Congratulations! We are pleased to inform you that you have been selected for the position. " . ($hire_notes ? "Additional information: " . $hire_notes : "Please wait for further instructions regarding your onboarding process.");
+                    $title = "Application Passed";
+                    $message = "Congratulations! Your application has passed the recruitment process. " . ($hire_notes ? "Additional information: " . $hire_notes : "Please wait for further instructions.");
                     $type = "success";
                     $notif_stmt->bind_param("sssss", $applicant_email, $applicant_name, $title, $message, $type);
                     
                     if ($notif_stmt->execute()) {
-                        error_log("Hire notification created for email: $applicant_email");
+                        error_log("Application passed notification created for email: $applicant_email");
                     } else {
-                        error_log("Failed to create hire notification: " . $notif_stmt->error);
+                        error_log("Failed to create application passed notification: " . $notif_stmt->error);
                     }
                     
                     // Send email notification to applicant
                     sendHiredEmail($applicant_email, $applicant_name, $hire_notes);
                     
                     // Create admin notification for all admins
-                    $admin_title = "Applicant Hired";
-                    $admin_message = $applicant_name . " has been hired!";
+                    $admin_title = "Application Passed";
+                    $admin_message = $applicant_name . " has passed the application process.";
                     createAdminNotification($conn, $admin_title, $admin_message, 'success', 'hired', $applicant_id, $applicant_name, true);
                 }
                 
-                echo json_encode(['success' => true, 'message' => 'Applicant hired successfully']);
+                echo json_encode(['success' => true, 'message' => 'Application marked as passed successfully']);
             } else {
-                echo json_encode(['success' => false, 'error' => 'Failed to hire applicant']);
+                echo json_encode(['success' => false, 'error' => 'Failed to mark application as passed']);
             }
             break;
             
@@ -706,14 +732,29 @@ try {
             $interview_location = $_POST['interview_location'] ?? '';
             $interview_room = $_POST['interview_room'] ?? '';
             $interview_notes = $_POST['interview_notes'] ?? '';
+            $interview_room_id = (int)($_POST['interview_room_id'] ?? 0);
+            if ($interview_room_id > 0) {
+                $room = nc_get_room_by_id($conn, $interview_room_id);
+                if (!$room) {
+                    echo json_encode(['success' => false, 'error' => 'Selected interview room is not available']);
+                    exit;
+                }
+                $interview_room = $room['room_name'];
+                $interview_location = $room['campus_location'] ?? '';
+            }
             
             if (empty($interview_date) || empty($interview_time)) {
                 echo json_encode(['success' => false, 'error' => 'Interview date and time are required']);
                 exit;
             }
             
-            if (empty($interview_location) || empty($interview_room)) {
-                echo json_encode(['success' => false, 'error' => 'Interview location and room are required']);
+
+            if (!nc_is_weekday_date($interview_date)) {
+                echo json_encode(['success' => false, 'error' => 'Interview schedules are only available on weekdays']);
+                exit;
+            }
+            if (empty($interview_room)) {
+                echo json_encode(['success' => false, 'error' => 'Interview room is required']);
                 exit;
             }
             
@@ -750,6 +791,16 @@ try {
             $stmt->bind_param("ssssi", $interview_datetime, $interview_location, $interview_room, $interview_notes, $applicant_id);
             
             if ($stmt->execute()) {
+                if ($interview_room_id > 0 && nc_column_exists($conn, 'job_applicants', 'interview_room_id')) {
+                    $room_id_stmt = $conn->prepare("UPDATE job_applicants SET interview_room_id = ? WHERE id = ?");
+                    if ($room_id_stmt) {
+                        $room_id_stmt->bind_param("ii", $interview_room_id, $applicant_id);
+                        if (!$room_id_stmt->execute()) {
+                            error_log("reschedule interview_room_id update failed: " . $room_id_stmt->error);
+                        }
+                        $room_id_stmt->close();
+                    }
+                }
                 // Get applicant info for notification
                 $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name FROM job_applicants WHERE id = ?");
                 $applicant_stmt->bind_param("i", $applicant_id);
@@ -877,3 +928,5 @@ try {
 
 $conn->close();
 ?>
+
+

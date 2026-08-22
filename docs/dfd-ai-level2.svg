@@ -1,0 +1,292 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1480" viewBox="0 0 2200 1480">
+  <defs>
+    <pattern id="smallGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#242424" stroke-width="1"/>
+    </pattern>
+    <pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse">
+      <rect width="100" height="100" fill="url(#smallGrid)"/>
+      <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#343434" stroke-width="1.4"/>
+    </pattern>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#f2f2f2"/>
+    </marker>
+    <style>
+      .bg { fill: #101010; }
+      .grid { fill: url(#grid); }
+      .entity, .process { fill: #151515; stroke: #f2f2f2; stroke-width: 2; }
+      .storeLine { stroke: #f2f2f2; stroke-width: 2; fill: none; }
+      .label { fill: #f7f7f7; font-family: Arial, Helvetica, sans-serif; font-size: 16px; }
+      .small { fill: #f7f7f7; font-family: Arial, Helvetica, sans-serif; font-size: 12px; }
+      .title { fill: #ffffff; font-family: Arial, Helvetica, sans-serif; font-size: 26px; font-weight: 700; }
+      .flow { stroke: #f2f2f2; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .contextFlow { stroke: #f2f2f2; stroke-width: 1.6; fill: none; marker-end: url(#arrow); opacity: 0.72; }
+      .flowLabel {
+        fill: #f7f7f7;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 12px;
+        paint-order: stroke fill;
+        stroke: #101010;
+        stroke-width: 7;
+        stroke-linejoin: round;
+      }
+    </style>
+  </defs>
+
+  <rect class="bg" width="2200" height="1480"/>
+  <rect class="grid" width="2200" height="1480" opacity="0.95"/>
+  <text class="title" x="60" y="58">DFD Level 2 - Expanded AI Resume Analysis, Matching, Ranking, Chatbot and Insights</text>
+
+  <!-- External entities -->
+  <rect class="entity" x="70" y="125" width="220" height="84"/>
+  <text class="label" x="180" y="162" text-anchor="middle">Applicant</text>
+  <text class="small" x="180" y="187" text-anchor="middle">Job Seeker</text>
+
+  <rect class="entity" x="1880" y="125" width="240" height="100"/>
+  <text class="label" x="2000" y="162" text-anchor="middle">Recruitment Staff</text>
+  <text class="small" x="2000" y="187" text-anchor="middle">Secretary / Dean / HR</text>
+  <text class="small" x="2000" y="211" text-anchor="middle">Admin Personnel</text>
+
+  <!-- Data stores -->
+  <g>
+    <path class="storeLine" d="M360 105 H660 M360 159 H660 M360 105 V159 M430 105 V159"/>
+    <text class="small" x="395" y="138" text-anchor="middle">D1</text>
+    <text class="small" x="545" y="138" text-anchor="middle">Applicants DB</text>
+  </g>
+  <g>
+    <path class="storeLine" d="M1330 105 H1660 M1330 159 H1660 M1330 105 V159 M1400 105 V159"/>
+    <text class="small" x="1365" y="138" text-anchor="middle">D2</text>
+    <text class="small" x="1530" y="138" text-anchor="middle">Job Postings DB</text>
+  </g>
+  <g>
+    <path class="storeLine" d="M330 315 H640 M330 369 H640 M330 315 V369 M400 315 V369"/>
+    <text class="small" x="365" y="348" text-anchor="middle">D3</text>
+    <text class="small" x="525" y="348" text-anchor="middle">Uploaded Documents</text>
+  </g>
+  <g>
+    <path class="storeLine" d="M870 315 H1200 M870 369 H1200 M870 315 V369 M940 315 V369"/>
+    <text class="small" x="905" y="348" text-anchor="middle">D4</text>
+    <text class="small" x="1065" y="348" text-anchor="middle">AI Extracted Profile DB</text>
+  </g>
+  <g>
+    <path class="storeLine" d="M1100 625 H1420 M1100 679 H1420 M1100 625 V679 M1170 625 V679"/>
+    <text class="small" x="1135" y="658" text-anchor="middle">D5</text>
+    <text class="small" x="1295" y="658" text-anchor="middle">AI Match Scores DB</text>
+  </g>
+  <g>
+    <path class="storeLine" d="M1490 625 H1800 M1490 679 H1800 M1490 625 V679 M1560 625 V679"/>
+    <text class="small" x="1525" y="658" text-anchor="middle">D6</text>
+    <text class="small" x="1680" y="658" text-anchor="middle">Ranking Results DB</text>
+  </g>
+  <g>
+    <path class="storeLine" d="M640 820 H960 M640 874 H960 M640 820 V874 M710 820 V874"/>
+    <text class="small" x="675" y="853" text-anchor="middle">D7</text>
+    <text class="small" x="835" y="853" text-anchor="middle">Applications DB</text>
+  </g>
+  <g>
+    <path class="storeLine" d="M1510 1060 H1840 M1510 1114 H1840 M1510 1060 V1114 M1580 1060 V1114"/>
+    <text class="small" x="1545" y="1093" text-anchor="middle">D8</text>
+    <text class="small" x="1710" y="1093" text-anchor="middle">Insight Reports DB</text>
+  </g>
+  <g>
+    <path class="storeLine" d="M1110 1098 H1430 M1110 1152 H1430 M1110 1098 V1152 M1180 1098 V1152"/>
+    <text class="small" x="1145" y="1131" text-anchor="middle">D9</text>
+    <text class="small" x="1305" y="1131" text-anchor="middle">Chatbot Logs DB</text>
+  </g>
+
+  <!-- AI Resume Analyzer subprocesses -->
+  <circle class="process" cx="200" cy="420" r="72"/>
+  <text class="label" x="200" y="397" text-anchor="middle">4.1</text>
+  <text class="small" x="200" y="422" text-anchor="middle">Receive Resume</text>
+  <text class="small" x="200" y="442" text-anchor="middle">and Documents</text>
+
+  <circle class="process" cx="500" cy="500" r="72"/>
+  <text class="label" x="500" y="477" text-anchor="middle">4.2</text>
+  <text class="small" x="500" y="502" text-anchor="middle">Extract Resume</text>
+  <text class="small" x="500" y="522" text-anchor="middle">Text</text>
+
+  <circle class="process" cx="780" cy="500" r="78"/>
+  <text class="label" x="780" y="472" text-anchor="middle">4.3</text>
+  <text class="small" x="780" y="496" text-anchor="middle">Identify Education,</text>
+  <text class="small" x="780" y="516" text-anchor="middle">Experience, Skills,</text>
+  <text class="small" x="780" y="536" text-anchor="middle">Certificates</text>
+
+  <circle class="process" cx="1060" cy="500" r="72"/>
+  <text class="label" x="1060" y="477" text-anchor="middle">4.4</text>
+  <text class="small" x="1060" y="502" text-anchor="middle">Validate and</text>
+  <text class="small" x="1060" y="522" text-anchor="middle">Normalize Data</text>
+
+  <circle class="process" cx="1060" cy="230" r="72"/>
+  <text class="label" x="1060" y="207" text-anchor="middle">4.5</text>
+  <text class="small" x="1060" y="232" text-anchor="middle">Store AI Resume</text>
+  <text class="small" x="1060" y="252" text-anchor="middle">Summary</text>
+
+  <!-- Matching and ranking subprocesses -->
+  <circle class="process" cx="1350" cy="330" r="72"/>
+  <text class="label" x="1350" y="307" text-anchor="middle">5.1</text>
+  <text class="small" x="1350" y="332" text-anchor="middle">Retrieve Job</text>
+  <text class="small" x="1350" y="352" text-anchor="middle">Requirements</text>
+
+  <circle class="process" cx="1350" cy="515" r="78"/>
+  <text class="label" x="1350" y="487" text-anchor="middle">5.2</text>
+  <text class="small" x="1350" y="511" text-anchor="middle">Compare Applicant</text>
+  <text class="small" x="1350" y="531" text-anchor="middle">Qualifications with</text>
+  <text class="small" x="1350" y="551" text-anchor="middle">Requirements</text>
+
+  <circle class="process" cx="1350" cy="765" r="72"/>
+  <text class="label" x="1350" y="742" text-anchor="middle">5.3</text>
+  <text class="small" x="1350" y="767" text-anchor="middle">Generate</text>
+  <text class="small" x="1350" y="787" text-anchor="middle">Compatibility Score</text>
+
+  <circle class="process" cx="1600" cy="765" r="72"/>
+  <text class="label" x="1600" y="742" text-anchor="middle">5.4</text>
+  <text class="small" x="1600" y="767" text-anchor="middle">Rank</text>
+  <text class="small" x="1600" y="787" text-anchor="middle">Candidates</text>
+
+  <circle class="process" cx="1840" cy="555" r="72"/>
+  <text class="label" x="1840" y="532" text-anchor="middle">5.5</text>
+  <text class="small" x="1840" y="557" text-anchor="middle">Display Ranked</text>
+  <text class="small" x="1840" y="577" text-anchor="middle">Candidate List</text>
+
+  <!-- Chatbot subprocesses -->
+  <circle class="process" cx="380" cy="990" r="72"/>
+  <text class="label" x="380" y="967" text-anchor="middle">7.1</text>
+  <text class="small" x="380" y="992" text-anchor="middle">Receive Staff</text>
+  <text class="small" x="380" y="1012" text-anchor="middle">Query</text>
+
+  <circle class="process" cx="660" cy="990" r="78"/>
+  <text class="label" x="660" y="962" text-anchor="middle">7.2</text>
+  <text class="small" x="660" y="986" text-anchor="middle">Search Applicant,</text>
+  <text class="small" x="660" y="1006" text-anchor="middle">Job and Workflow</text>
+  <text class="small" x="660" y="1026" text-anchor="middle">Context</text>
+
+  <circle class="process" cx="940" cy="990" r="78"/>
+  <text class="label" x="940" y="962" text-anchor="middle">7.3</text>
+  <text class="small" x="940" y="986" text-anchor="middle">Generate AI</text>
+  <text class="small" x="940" y="1006" text-anchor="middle">Answer or Quick</text>
+  <text class="small" x="940" y="1026" text-anchor="middle">Summary</text>
+
+  <circle class="process" cx="1220" cy="990" r="72"/>
+  <text class="label" x="1220" y="967" text-anchor="middle">7.4</text>
+  <text class="small" x="1220" y="992" text-anchor="middle">Return Chatbot</text>
+  <text class="small" x="1220" y="1012" text-anchor="middle">Response</text>
+
+  <!-- Insights subprocesses -->
+  <circle class="process" cx="380" cy="1280" r="72"/>
+  <text class="label" x="380" y="1257" text-anchor="middle">8.1</text>
+  <text class="small" x="380" y="1282" text-anchor="middle">Collect</text>
+  <text class="small" x="380" y="1302" text-anchor="middle">Recruitment Data</text>
+
+  <circle class="process" cx="660" cy="1280" r="72"/>
+  <text class="label" x="660" y="1257" text-anchor="middle">8.2</text>
+  <text class="small" x="660" y="1282" text-anchor="middle">Analyze Trends</text>
+  <text class="small" x="660" y="1302" text-anchor="middle">and Progress</text>
+
+  <circle class="process" cx="940" cy="1280" r="72"/>
+  <text class="label" x="940" y="1257" text-anchor="middle">8.3</text>
+  <text class="small" x="940" y="1282" text-anchor="middle">Generate AI</text>
+  <text class="small" x="940" y="1302" text-anchor="middle">Insights</text>
+
+  <circle class="process" cx="1220" cy="1280" r="72"/>
+  <text class="label" x="1220" y="1257" text-anchor="middle">8.4</text>
+  <text class="small" x="1220" y="1282" text-anchor="middle">Display Reports</text>
+  <text class="small" x="1220" y="1302" text-anchor="middle">and Advice</text>
+
+  <!-- Resume analysis flows -->
+  <path class="flow" d="M180 209 V348"/>
+  <text class="flowLabel" x="104" y="285" text-anchor="middle">Upload resume</text>
+
+  <path class="flow" d="M272 420 C305 390, 320 358, 330 345"/>
+  <text class="flowLabel" x="316" y="398" text-anchor="middle">Save files</text>
+
+  <path class="flow" d="M500 369 V428"/>
+  <text class="flowLabel" x="548" y="404" text-anchor="middle">Fetch resume</text>
+
+  <path class="flow" d="M572 500 H702"/>
+  <text class="flowLabel" x="637" y="478" text-anchor="middle">Parsed text</text>
+
+  <path class="flow" d="M858 500 H988"/>
+  <text class="flowLabel" x="923" y="478" text-anchor="middle">Extracted fields</text>
+
+  <path class="flow" d="M1060 428 V369"/>
+  <text class="flowLabel" x="1115" y="402" text-anchor="middle">Validated data</text>
+
+  <path class="flow" d="M1060 428 C1060 360, 1060 330, 1060 302"/>
+  <text class="flowLabel" x="1105" y="333" text-anchor="middle">AI summary</text>
+
+  <path class="flow" d="M1010 170 C910 130, 760 128, 660 132"/>
+  <text class="flowLabel" x="840" y="116" text-anchor="middle">Store summary</text>
+
+  <!-- Matching flows -->
+  <path class="flow" d="M1490 159 C1450 218, 1390 254, 1365 262"/>
+  <text class="flowLabel" x="1478" y="226" text-anchor="middle">Job criteria</text>
+
+  <path class="flow" d="M1200 352 C1275 390, 1324 425, 1338 439"/>
+  <text class="flowLabel" x="1270" y="390" text-anchor="middle">Applicant AI profile</text>
+
+  <path class="flow" d="M1350 402 V437"/>
+
+  <path class="flow" d="M1350 593 V693"/>
+  <text class="flowLabel" x="1404" y="648" text-anchor="middle">Matched skills and gaps</text>
+
+  <path class="flow" d="M1300 713 C1260 690, 1228 675, 1212 679"/>
+  <text class="flowLabel" x="1248" y="703" text-anchor="middle">Save score</text>
+
+  <path class="flow" d="M1422 765 H1528"/>
+  <text class="flowLabel" x="1475" y="742" text-anchor="middle">Scores</text>
+
+  <path class="flow" d="M1600 693 V679"/>
+  <text class="flowLabel" x="1650" y="705" text-anchor="middle">Save rank</text>
+
+  <path class="flow" d="M1665 734 C1715 700, 1770 640, 1800 615"/>
+
+  <path class="flow" d="M1850 483 C1870 382, 1900 282, 1925 225"/>
+  <text class="flowLabel" x="1962" y="390" text-anchor="middle">
+    <tspan x="1962" dy="0">Ranked candidates,</tspan>
+    <tspan x="1962" dy="18">scores, explanation</tspan>
+  </text>
+
+  <!-- Staff query and chatbot flows -->
+  <path class="flow" d="M2000 225 V890 H420 V918"/>
+  <text class="flowLabel" x="1250" y="870" text-anchor="middle">Ask recruitment question</text>
+
+  <path class="flow" d="M452 990 H582"/>
+  <text class="flowLabel" x="518" y="968" text-anchor="middle">Query</text>
+
+  <path class="flow" d="M738 990 H862"/>
+  <text class="flowLabel" x="800" y="968" text-anchor="middle">Related context</text>
+
+  <path class="flow" d="M1018 990 H1148"/>
+  <text class="flowLabel" x="1084" y="968" text-anchor="middle">AI answer</text>
+
+  <path class="flow" d="M1292 970 H2140 V175 H2120"/>
+  <text class="flowLabel" x="1605" y="948" text-anchor="middle">Chatbot response</text>
+
+  <path class="flow" d="M1220 1062 V1098"/>
+  <text class="flowLabel" x="1270" y="1086" text-anchor="middle">Store chat</text>
+
+  <path class="contextFlow" d="M800 874 C770 895, 735 905, 718 922"/>
+
+  <!-- Insights flows -->
+  <path class="flow" d="M2035 225 V1170 H420 V1208"/>
+  <text class="flowLabel" x="760" y="1150" text-anchor="middle">Request insights report</text>
+
+  <path class="flow" d="M452 1280 H588"/>
+  <text class="flowLabel" x="520" y="1258" text-anchor="middle">Recruitment dataset</text>
+
+  <path class="flow" d="M732 1280 H868"/>
+  <text class="flowLabel" x="800" y="1258" text-anchor="middle">Trends</text>
+
+  <path class="flow" d="M1012 1280 H1148"/>
+  <text class="flowLabel" x="1080" y="1258" text-anchor="middle">Insights</text>
+
+  <path class="flow" d="M1292 1260 C1380 1220, 1470 1145, 1530 1114"/>
+  <text class="flowLabel" x="1392" y="1214" text-anchor="middle">Save report</text>
+
+  <path class="flow" d="M1292 1300 H2160 V175 H2120"/>
+  <text class="flowLabel" x="1685" y="1278" text-anchor="middle">
+    <tspan x="1685" dy="0">Dashboard charts, summaries,</tspan>
+    <tspan x="1685" dy="18">recommendations</tspan>
+  </text>
+
+  <path class="contextFlow" d="M690 874 C560 1048, 450 1142, 412 1208"/>
+</svg>

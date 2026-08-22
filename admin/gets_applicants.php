@@ -41,6 +41,14 @@ try {
                 ja.contact_num,
                 ja.assigned_to_department,
                 ja.workflow_stage,
+                ja.application_type,
+                ja.academic_year,
+                ja.semester,
+                ja.certificate_of_grades,
+                ja.proof_of_enrollment,
+                ja.applicable_hourly_rate,
+                ja.salary_projection,
+                ja.salary_projection_basis,
                 ja.secretary_id,
                 a.profile_picture
             FROM job_applicants ja
@@ -69,12 +77,20 @@ try {
                 ja.contact_num,
                 ja.assigned_to_department,
                 ja.workflow_stage,
+                ja.application_type,
+                ja.academic_year,
+                ja.semester,
+                ja.certificate_of_grades,
+                ja.proof_of_enrollment,
+                ja.applicable_hourly_rate,
+                ja.salary_projection,
+                ja.salary_projection_basis,
                 a.profile_picture
             FROM job_applicants ja
             LEFT JOIN applicants a ON ja.user_id = a.id
-            WHERE ja.workflow_stage IN ('department_head_review', 'interview_scheduled', 'interview_completed',
+            WHERE ja.workflow_stage IN ('waiting_interview_schedule', 'department_head_review', 'interview_scheduled', 'interview_completed',
                                         'demo_scheduled', 'demo_completed', 'psych_scheduled', 'psych_completed',
-                                        'initially_hired', 'permanently_hired', 'hired')
+                                        'initially_hired', 'permanently_hired', 'passed', 'hired')
             AND ja.assigned_to_department IN (:department, :department_alias)
             ORDER BY ja.applied_date DESC";
         $params['department'] = $admin_department;
@@ -93,6 +109,14 @@ try {
                 ja.contact_num,
                 ja.assigned_to_department,
                 ja.workflow_stage,
+                ja.application_type,
+                ja.academic_year,
+                ja.semester,
+                ja.certificate_of_grades,
+                ja.proof_of_enrollment,
+                ja.applicable_hourly_rate,
+                ja.salary_projection,
+                ja.salary_projection_basis,
                 a.profile_picture
             FROM job_applicants ja
             LEFT JOIN applicants a ON ja.user_id = a.id
@@ -120,3 +144,4 @@ try {
     http_response_code(500);
     echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
 }
+

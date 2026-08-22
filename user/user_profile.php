@@ -19,6 +19,8 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
+require_once __DIR__ . '/../shared/helpers/recruitment.php';
+
 $success_message = '';
 $error_message = '';
 
@@ -35,17 +37,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $create_education_table = "CREATE TABLE IF NOT EXISTS user_education (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
+    education_level ENUM('bachelor','master','doctorate','other') NOT NULL DEFAULT 'other',
     degree VARCHAR(255) NOT NULL,
     field_of_study VARCHAR(255) NOT NULL,
     institution VARCHAR(255) NOT NULL,
+    education_status ENUM('completed','ongoing') NOT NULL DEFAULT 'completed',
+    completed_units INT NULL,
+    year_completed INT NULL,
+    certificate_of_grades VARCHAR(255) NULL,
+    proof_of_enrollment VARCHAR(255) NULL,
     start_year INT NOT NULL,
-    end_year INT NOT NULL,
+    end_year INT NULL,
     gpa VARCHAR(10),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )";
 if (!$conn->query($create_education_table)) {
     error_log("Error creating education table: " . $conn->error);
 }
+
+$education_column_migrations = [
+    'education_level' => "ALTER TABLE user_education ADD COLUMN education_level ENUM('bachelor','master','doctorate','other') NOT NULL DEFAULT 'other' AFTER user_id",
+    'education_status' => "ALTER TABLE user_education ADD COLUMN education_status ENUM('completed','ongoing') NOT NULL DEFAULT 'completed' AFTER institution",
+    'completed_units' => "ALTER TABLE user_education ADD COLUMN completed_units INT NULL AFTER education_status",
+    'year_completed' => "ALTER TABLE user_education ADD COLUMN year_completed INT NULL AFTER completed_units",
+    'certificate_of_grades' => "ALTER TABLE user_education ADD COLUMN certificate_of_grades VARCHAR(255) NULL AFTER year_completed",
+    'proof_of_enrollment' => "ALTER TABLE user_education ADD COLUMN proof_of_enrollment VARCHAR(255) NULL AFTER certificate_of_grades"
+];
+foreach ($education_column_migrations as $column => $alter_sql) {
+    if (!nc_column_exists($conn, 'user_education', $column) && !$conn->query($alter_sql)) {
+        error_log("Error adding user_education.$column: " . $conn->error);
+    }
+}
+$conn->query("UPDATE user_education SET year_completed = end_year WHERE year_completed IS NULL AND education_status = 'completed'");
 
 // Handle Education form submission - DISABLED (handled by save_profile_data.php via AJAX)
 if (false && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['saveEducation'])) {
@@ -394,6 +417,58 @@ if ($education_result && $education_result->num_rows > 0) {
     }
 }
 $education_stmt->close();
+
+foreach ($education_data as &$education_row) {
+    $education_row['education_level'] = nc_classify_education_level($education_row);
+    $education_row['education_status'] = strtolower(trim((string)($education_row['education_status'] ?? 'completed'))) ?: 'completed';
+}
+unset($education_row);
+
+function profileEducationLevelLabel(string $level): string
+{
+    return [
+        'bachelor' => 'Bachelor',
+        'master' => "Master's",
+        'doctorate' => 'Doctorate',
+        'other' => 'Other'
+    ][$level] ?? 'Other';
+}
+
+$qualification_summary = [
+    'title' => 'No qualifying graduate education recorded',
+    'rate' => 'No applicable part-time hourly rate yet',
+    'note' => 'Salary projection appears only after selecting a teaching load with configured teaching hours.'
+];
+foreach ($education_data as $education_row) {
+    $level = $education_row['education_level'] ?? 'other';
+    $status = $education_row['education_status'] ?? 'completed';
+    $units = isset($education_row['completed_units']) && $education_row['completed_units'] !== null ? (int)$education_row['completed_units'] : null;
+
+    if ($level === 'doctorate' && $status === 'completed') {
+        $qualification_summary = [
+            'title' => 'Doctorate - Completed',
+            'rate' => 'Applicable hourly rate: 220.00',
+            'note' => 'Part-time projection is computed from this rate and the selected load hours.'
+        ];
+        break;
+    }
+
+    if ($level === 'master' && $status === 'completed' && $qualification_summary['title'] !== 'Doctorate - Completed') {
+        $qualification_summary = [
+            'title' => "Master's - Completed",
+            'rate' => 'Applicable hourly rate: 200.00',
+            'note' => 'Part-time projection is computed from this rate and the selected load hours.'
+        ];
+    }
+
+    if ($level === 'master' && $status === 'ongoing' && $units !== null && $units >= 9 && strpos($qualification_summary['title'], 'Completed') === false) {
+        $qualification_summary = [
+            'title' => "Master's - Ongoing ({$units} completed units)",
+            'rate' => 'Applicable hourly rate: 150.00',
+            'note' => 'Requires Certificate of Grades and Proof of Enrollment for validation.'
+        ];
+    }
+}
 
 // Fetch work experience data
 $experience_sql = "SELECT * FROM user_experience WHERE user_id = ? ORDER BY start_date DESC";
@@ -934,17 +1009,46 @@ document.addEventListener('DOMContentLoaded', function() {
 <div class="space-y-3" id="educationList">
 <?php if (!empty($education_data)): ?>
 <?php foreach ($education_data as $education): ?>
+<?php
+$level = $education['education_level'] ?? nc_classify_education_level($education);
+$status = strtolower(trim((string)($education['education_status'] ?? 'completed'))) ?: 'completed';
+$level_label = profileEducationLevelLabel($level);
+$status_label = $status === 'ongoing' ? 'Ongoing' : 'Completed';
+$year_display = $status === 'ongoing'
+    ? htmlspecialchars(($education['start_year'] ?? '') . ' - Present')
+    : htmlspecialchars(($education['start_year'] ?? '') . ' - ' . (($education['year_completed'] ?? '') ?: ($education['end_year'] ?? '')));
+?>
 <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
-<div class="flex items-start justify-between">
-<div class="flex-1">
+<div class="flex items-start justify-between gap-4">
+<div class="flex-1 min-w-0">
+<div class="flex flex-wrap items-center gap-2 mb-2">
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200"><?php echo htmlspecialchars($level_label); ?></span>
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium <?php echo $status === 'ongoing' ? 'bg-blue-100 text-blue-800 border border-blue-200' : 'bg-green-100 text-green-800 border border-green-200'; ?>"><?php echo htmlspecialchars($status_label); ?></span>
+</div>
 <h4 class="font-semibold text-gray-900 text-base"><?php echo htmlspecialchars($education['degree']); ?></h4>
+<?php if (!empty($education['field_of_study'])): ?>
+<p class="text-gray-600 mt-1 text-sm"><?php echo htmlspecialchars($education['field_of_study']); ?></p>
+<?php endif; ?>
 <p class="text-gray-600 mt-1 text-sm"><?php echo htmlspecialchars($education['institution']); ?></p>
 <p class="text-gray-500 text-sm mt-1">
-<?php echo htmlspecialchars($education['start_year'] . ' - ' . $education['end_year']); ?>
+<?php echo $year_display; ?>
 <?php if (!empty($education['gpa'])): ?>
  | GPA: <?php echo htmlspecialchars($education['gpa']); ?>
 <?php endif; ?>
+<?php if (!empty($education['completed_units'])): ?>
+ | Completed Units: <?php echo htmlspecialchars((string)$education['completed_units']); ?>
+<?php endif; ?>
 </p>
+<?php if (!empty($education['certificate_of_grades']) || !empty($education['proof_of_enrollment'])): ?>
+<div class="flex flex-wrap gap-2 mt-3 text-xs">
+<?php if (!empty($education['certificate_of_grades'])): ?>
+<a href="<?php echo htmlspecialchars($education['certificate_of_grades']); ?>" target="_blank" class="inline-flex items-center gap-1 text-primary hover:underline"><i class="ri-file-list-3-line"></i>Certificate of Grades</a>
+<?php endif; ?>
+<?php if (!empty($education['proof_of_enrollment'])): ?>
+<a href="<?php echo htmlspecialchars($education['proof_of_enrollment']); ?>" target="_blank" class="inline-flex items-center gap-1 text-primary hover:underline"><i class="ri-file-user-line"></i>Proof of Enrollment</a>
+<?php endif; ?>
+</div>
+<?php endif; ?>
 </div>
 <div class="flex space-x-1 ml-4">
 <button onclick="editEducation(<?php echo $education['id']; ?>)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
@@ -964,6 +1068,19 @@ document.addEventListener('DOMContentLoaded', function() {
 <p class="text-sm text-gray-500 mt-1">Click "Add Education" to get started.</p>
 </div>
 <?php endif; ?>
+</div>
+<div class="mt-6 border border-blue-100 bg-blue-50 rounded-lg p-4">
+<div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+<div>
+<h4 class="font-semibold text-gray-900 text-base">Qualification and Salary Projection</h4>
+<p class="text-sm text-gray-700 mt-1"><?php echo htmlspecialchars($qualification_summary['title']); ?></p>
+<p class="text-xs text-gray-500 mt-1"><?php echo htmlspecialchars($qualification_summary['note']); ?></p>
+</div>
+<div class="md:text-right">
+<p class="text-sm font-semibold text-blue-900"><?php echo htmlspecialchars($qualification_summary['rate']); ?></p>
+<p class="text-xs text-gray-500 mt-1">Projected salary: available after selecting a teaching load.</p>
+</div>
+</div>
 </div>
 </div>
 
@@ -1394,6 +1511,55 @@ if (document.getElementById('profileMainContent')) {
     return div.innerHTML;
   }
 
+  function educationLevelLabel(level) {
+    return {
+      bachelor: 'Bachelor',
+      master: "Master's",
+      doctorate: 'Doctorate',
+      other: 'Other'
+    }[String(level || 'other').toLowerCase()] || 'Other';
+  }
+
+  function renderEducationCard(edu, animate = false) {
+    const level = String(edu.education_level || 'other').toLowerCase();
+    const status = String(edu.education_status || 'completed').toLowerCase();
+    const statusLabel = status === 'ongoing' ? 'Ongoing' : 'Completed';
+    const yearDisplay = status === 'ongoing'
+      ? `${edu.start_year || ''} - Present`
+      : `${edu.start_year || ''} - ${edu.year_completed || edu.end_year || ''}`;
+    const units = edu.completed_units ? ` | Completed Units: ${escapeHtml(String(edu.completed_units))}` : '';
+    const gpa = edu.gpa ? ` | GPA: ${escapeHtml(edu.gpa)}` : '';
+    const docs = [
+      edu.certificate_of_grades ? `<a href="${escapeHtml(edu.certificate_of_grades)}" target="_blank" class="inline-flex items-center gap-1 text-primary hover:underline"><i class="ri-file-list-3-line"></i>Certificate of Grades</a>` : '',
+      edu.proof_of_enrollment ? `<a href="${escapeHtml(edu.proof_of_enrollment)}" target="_blank" class="inline-flex items-center gap-1 text-primary hover:underline"><i class="ri-file-user-line"></i>Proof of Enrollment</a>` : ''
+    ].filter(Boolean).join('');
+
+    return `
+      <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow ${animate ? 'animate-fade-in' : ''}">
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex-1 min-w-0">
+            <div class="flex flex-wrap items-center gap-2 mb-2">
+              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">${escapeHtml(educationLevelLabel(level))}</span>
+              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${status === 'ongoing' ? 'bg-blue-100 text-blue-800 border border-blue-200' : 'bg-green-100 text-green-800 border border-green-200'}">${statusLabel}</span>
+            </div>
+            <h4 class="font-semibold text-gray-900 text-base">${escapeHtml(edu.degree || 'Degree')}</h4>
+            ${edu.field_of_study ? `<p class="text-gray-600 mt-1 text-sm">${escapeHtml(edu.field_of_study)}</p>` : ''}
+            <p class="text-gray-600 mt-1 text-sm">${escapeHtml(edu.institution || '')}</p>
+            <p class="text-gray-500 text-sm mt-1">${escapeHtml(yearDisplay)}${gpa}${units}</p>
+            ${docs ? `<div class="flex flex-wrap gap-2 mt-3 text-xs">${docs}</div>` : ''}
+          </div>
+          <div class="flex space-x-1 ml-4">
+            <button onclick="editEducation(${edu.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
+              <i class="ri-edit-line text-sm"></i>
+            </button>
+            <button onclick="deleteEducation(${edu.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors" title="Delete">
+              <i class="ri-delete-bin-line text-sm"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
   // Function to reload education list
   window.reloadEducationList = async function() {
     console.log('reloadEducationList function called');
@@ -1412,28 +1578,7 @@ if (document.getElementById('profileMainContent')) {
       }
       if (result.data && result.data.length > 0) {
         console.log('Updating education list with', result.data.length, 'items');
-        const html = result.data.map(edu => `
-          <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
-            <div class="flex items-start justify-between">
-              <div class="flex-1">
-                <h4 class="font-semibold text-gray-900 text-base">${escapeHtml(edu.degree)}</h4>
-                <p class="text-gray-600 mt-1 text-sm">${escapeHtml(edu.institution)}</p>
-                <p class="text-gray-500 text-sm mt-1">
-                  ${escapeHtml(edu.start_year + ' - ' + edu.end_year)}
-                  ${edu.gpa ? ' | GPA: ' + escapeHtml(edu.gpa) : ''}
-                </p>
-              </div>
-              <div class="flex space-x-1 ml-4">
-                <button onclick="editEducation(${edu.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
-                  <i class="ri-edit-line text-sm"></i>
-                </button>
-                <button onclick="deleteEducation(${edu.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors" title="Delete">
-                  <i class="ri-delete-bin-line text-sm"></i>
-                </button>
-              </div>
-            </div>
-          </div>
-        `).join('');
+        const html = result.data.map(edu => renderEducationCard(edu)).join('');
         console.log('Generated HTML length:', html.length);
         educationList.innerHTML = html;
         console.log('Education list updated successfully!');
@@ -1613,8 +1758,14 @@ document.addEventListener('DOMContentLoaded', function() {
   if (addEducationBtn && educationModal) {
     addEducationBtn.addEventListener('click', (e) => {
       e.preventDefault();
+      if (educationForm) educationForm.reset();
+      const editEducationId = document.getElementById('edit_education_id');
+      if (editEducationId) editEducationId.value = '';
+      document.getElementById('educationModalTitle').textContent = 'Add Education';
+      document.getElementById('saveEducationBtn').textContent = 'Add Education';
       educationModal.classList.remove('hidden');
       educationModal.classList.add('flex');
+      updateEducationGraduateFields();
     });
   }
 
@@ -1639,6 +1790,40 @@ document.addEventListener('DOMContentLoaded', function() {
     modal.classList.add('hidden');
     modal.classList.remove('flex');
   }
+
+  function updateEducationGraduateFields() {
+    const level = document.getElementById('education_level')?.value || 'bachelor';
+    const status = document.getElementById('education_status')?.value || 'completed';
+    const isGraduateOngoing = ['master', 'doctorate'].includes(level) && status === 'ongoing';
+    const completedUnitsGroup = document.getElementById('completedUnitsGroup');
+    const graduateDocumentsGroup = document.getElementById('graduateDocumentsGroup');
+    const endYearInput = document.getElementById('ed_ey');
+    const yearCompletedInput = document.getElementById('year_completed');
+    const completedUnitsInput = document.getElementById('completed_units');
+    const certificateInput = document.getElementById('certificate_of_grades');
+    const proofInput = document.getElementById('proof_of_enrollment');
+
+    if (completedUnitsGroup) completedUnitsGroup.classList.toggle('hidden', !isGraduateOngoing);
+    if (graduateDocumentsGroup) graduateDocumentsGroup.classList.toggle('hidden', !isGraduateOngoing);
+
+    if (endYearInput) {
+      endYearInput.required = status === 'completed';
+      if (status === 'ongoing') endYearInput.value = '';
+    }
+    if (yearCompletedInput) {
+      yearCompletedInput.disabled = status === 'ongoing';
+      if (status === 'ongoing') yearCompletedInput.value = '';
+    }
+    if (completedUnitsInput) completedUnitsInput.required = isGraduateOngoing;
+    if (certificateInput) certificateInput.required = isGraduateOngoing && !document.getElementById('edit_education_id')?.value;
+    if (proofInput) proofInput.required = isGraduateOngoing && !document.getElementById('edit_education_id')?.value;
+  }
+
+  ['education_level', 'education_status'].forEach(id => {
+    const input = document.getElementById(id);
+    if (input) input.addEventListener('change', updateEducationGraduateFields);
+  });
+  window.updateEducationGraduateFields = updateEducationGraduateFields;
 
   // Close modal event listeners with null checks
   if (closeEducationModalBtn) {
@@ -1844,129 +2029,42 @@ document.addEventListener('DOMContentLoaded', function() {
     educationForm.addEventListener('submit', function(e) {
       e.preventDefault();
       const formData = new FormData(this);
-      
-      console.log('Submitting education form...');
-      for (let [key, value] of formData.entries()) {
-        console.log(key + ': ' + value);
+      const submitBtn = document.getElementById('saveEducationBtn');
+      const originalText = submitBtn ? submitBtn.textContent : '';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
       }
-      
+
       fetch('save_profile_data.php', {
         method: 'POST',
         body: formData
       })
-      .then(response => {
-        console.log('Response status:', response.status);
-        if (!response.ok) {
-          throw new Error('HTTP error! status: ' + response.status);
-        }
-        return response.text();
-      })
-      .then(text => {
-        console.log('Raw response:', text);
-        alert('Backend Response: ' + text); // POPUP to force you to see the response
-        try {
-          const data = JSON.parse(text);
-          console.log('Parsed data:', data);
-          alert('Success: ' + data.success + ', ID: ' + data.id); // POPUP
-          
-          if (data.success) {
-            // Get form data for immediate display
-            const formData = new FormData(educationForm);
-            const degree = formData.get('ed_degree');
-            const institution = formData.get('ed_ins');
-            const startYear = formData.get('ed_sy');
-            const endYear = formData.get('ed_ey');
-            const gpa = formData.get('ed_gpa');
-            
-            console.log('📝 Form values - Degree:', degree, 'Institution:', institution);
-            
-            // Immediately add to list for instant feedback (optimistic update)
-            const educationList = document.getElementById('educationList');
-            console.log('Education list element:', educationList);
-            console.log('Data ID:', data.id);
-            
-            alert('About to add item. List exists: ' + (educationList ? 'YES' : 'NO') + ', ID: ' + data.id); // POPUP
-            
-            if (educationList && data.id) {
-              // Create HTML-safe versions
-              const safeDegree = degree ? String(degree).replace(/[&<>"']/g, function(m) {
-                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m];
-              }) : '';
-              const safeInstitution = institution ? String(institution).replace(/[&<>"']/g, function(m) {
-                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m];
-              }) : '';
-              const safeYears = String(startYear) + ' - ' + String(endYear);
-              const safeGpa = gpa ? String(gpa).replace(/[&<>"']/g, function(m) {
-                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m];
-              }) : '';
-              
-              const newItem = document.createElement('div');
-              newItem.className = 'bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow animate-fade-in';
-              newItem.innerHTML = `
-                <div class="flex items-start justify-between">
-                  <div class="flex-1">
-                    <h4 class="font-semibold text-gray-900 text-base">${safeDegree}</h4>
-                    <p class="text-gray-600 mt-1 text-sm">${safeInstitution}</p>
-                    <p class="text-gray-500 text-sm mt-1">
-                      ${safeYears}
-                      ${gpa ? ' | GPA: ' + safeGpa : ''}
-                    </p>
-                  </div>
-                  <div class="flex space-x-1 ml-4">
-                    <button onclick="editEducation(${data.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
-                      <i class="ri-edit-line text-sm"></i>
-                    </button>
-                    <button onclick="deleteEducation(${data.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors" title="Delete">
-                      <i class="ri-delete-bin-line text-sm"></i>
-                    </button>
-                  </div>
-                </div>
-              `;
-              
-              // Remove "no records" message if it exists
-              const noRecordsMsg = educationList.querySelector('.text-center.py-12');
-              if (noRecordsMsg) {
-                noRecordsMsg.remove();
-              }
-              
-              // Add new item at the top
-              educationList.insertBefore(newItem, educationList.firstChild);
-              console.log('✅ Education item added to DOM successfully!');
-              alert('✅ SUCCESS! Item added to DOM! Check the Education section now!'); // POPUP
-            } else {
-              console.log('❌ Could not add education: educationList=' + educationList + ', data.id=' + data.id);
-              alert('❌ FAILED! List: ' + (educationList ? 'exists' : 'null') + ', ID: ' + data.id); // POPUP
-            }
-            
-            // Close the modal
-            const educationModal = document.getElementById('educationModal');
-            if (educationModal) {
-              educationModal.classList.add('hidden');
-            }
-            
-            // Show success notification
-            if (typeof showNotification === 'function') {
-              showNotification(data.message || 'Education saved successfully', 'success');
-            }
-            
-            // Reset the form
-            educationForm.reset();
-          } else {
-            if (typeof showNotification === 'function') {
-              showNotification(data.message || 'Error saving education', 'error');
-            }
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          showToast(data.message || 'Education saved successfully.', 'success');
+          educationForm.reset();
+          document.getElementById('edit_education_id').value = '';
+          document.getElementById('educationModalTitle').textContent = 'Add Education';
+          document.getElementById('saveEducationBtn').textContent = 'Add Education';
+          updateEducationGraduateFields();
+          closeModal(educationModal);
+          if (typeof reloadEducationList === 'function') {
+            reloadEducationList();
           }
-        } catch (e) {
-          console.error('JSON parse error:', e);
-          if (typeof showNotification === 'function') {
-            showNotification('Server error: Invalid response format', 'error');
-          }
+        } else {
+          showToast(data.message || 'Error saving education.', 'error');
         }
       })
       .catch(error => {
-        console.error('Fetch error:', error);
-        if (typeof showNotification === 'function') {
-          showNotification('Network error: ' + error.message, 'error');
+        console.error('Error:', error);
+        showToast('Error saving education. Please try again.', 'error');
+      })
+      .finally(() => {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText || 'Add Education';
         }
       });
     });
@@ -2327,8 +2425,8 @@ window.showNotification = showNotification;
 
 <!-- Education Modal -->
 <div id="educationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-  <div class="bg-white rounded-xl max-w-md w-full mx-4">
-    <form method="POST" action="" class="p-6 space-y-4" id="educationForm">
+  <div class="bg-white rounded-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <form method="POST" action="" enctype="multipart/form-data" class="p-6 space-y-4" id="educationForm">
       <input type="hidden" name="saveEducation" value="1">
       <input type="hidden" name="edit_id" id="edit_education_id" value="">
       <div class="border-b border-gray-200 flex justify-between items-center pb-4">
@@ -2336,6 +2434,24 @@ window.showNotification = showNotification;
         <button type="button" id="closeEducationModal" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600">
           <i class="ri-close-line text-xl"></i>
         </button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2" for="education_level">Education Level</label>
+          <select name="education_level" id="education_level" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
+            <option value="bachelor">Bachelor</option>
+            <option value="master">Master's</option>
+            <option value="doctorate">Doctorate</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2" for="education_status">Status</label>
+          <select name="education_status" id="education_status" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
+            <option value="completed">Completed</option>
+            <option value="ongoing">Ongoing</option>
+          </select>
+        </div>
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-2" for="ed_degree">Degree</label>
@@ -2349,19 +2465,40 @@ window.showNotification = showNotification;
         <label class="block text-sm font-medium text-gray-700 mb-2" for="ed_ins">Institution</label>
         <input type="text" name="ed_ins" id="ed_ins" placeholder="University name" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
       </div>
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2" for="ed_sy">Start Year</label>
           <input type="number" name="ed_sy" id="ed_sy" placeholder="2020" required min="1900" max="2100" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
         </div>
-        <div>
+        <div id="endYearGroup">
           <label class="block text-sm font-medium text-gray-700 mb-2" for="ed_ey">End Year</label>
-          <input type="number" name="ed_ey" id="ed_ey" placeholder="2024" required min="1900" max="2100" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
+          <input type="number" name="ed_ey" id="ed_ey" placeholder="2024" min="1900" max="2100" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
         </div>
+        <div id="yearCompletedGroup">
+          <label class="block text-sm font-medium text-gray-700 mb-2" for="year_completed">Year Completed</label>
+          <input type="number" name="year_completed" id="year_completed" placeholder="2024" min="1900" max="2100" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
+        </div>
+      </div>
+      <div id="completedUnitsGroup" class="hidden">
+        <label class="block text-sm font-medium text-gray-700 mb-2" for="completed_units">Completed Units</label>
+        <input type="number" name="completed_units" id="completed_units" placeholder="e.g., 9" min="0" max="99" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-2" for="ed_gpa">GPA (Optional)</label>
         <input type="text" name="ed_gpa" id="ed_gpa" placeholder="3.8/4.0" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
+      </div>
+      <div id="graduateDocumentsGroup" class="hidden border border-blue-100 bg-blue-50 rounded-lg p-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2" for="certificate_of_grades">Certificate of Grades</label>
+            <input type="file" name="certificate_of_grades" id="certificate_of_grades" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" class="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2" for="proof_of_enrollment">Proof of Enrollment</label>
+            <input type="file" name="proof_of_enrollment" id="proof_of_enrollment" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" class="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
+          </div>
+        </div>
+        <p class="text-xs text-gray-500 mt-3">Required for ongoing graduate education. Accepted formats: PDF, DOC, DOCX, JPG, PNG. Maximum size: 5MB per file.</p>
       </div>
       <div class="flex justify-end space-x-4 pt-4">
         <button type="button" id="cancelEducationBtn" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors !rounded-button">Cancel</button>
@@ -2470,8 +2607,17 @@ function editEducation(id) {
   document.getElementById('ed_fs').value = education.field_of_study;
   document.getElementById('ed_ins').value = education.institution;
   document.getElementById('ed_sy').value = education.start_year;
-  document.getElementById('ed_ey').value = education.end_year;
+  document.getElementById('ed_ey').value = education.end_year || '';
   document.getElementById('ed_gpa').value = education.gpa || '';
+  document.getElementById('education_level').value = education.education_level || 'other';
+  document.getElementById('education_status').value = education.education_status || 'completed';
+  document.getElementById('completed_units').value = education.completed_units || '';
+  document.getElementById('year_completed').value = education.year_completed || education.end_year || '';
+  const certificateInput = document.getElementById('certificate_of_grades');
+  const proofInput = document.getElementById('proof_of_enrollment');
+  if (certificateInput) certificateInput.value = '';
+  if (proofInput) proofInput.value = '';
+  if (typeof updateEducationGraduateFields === 'function') updateEducationGraduateFields();
   
   // Update modal title and button
   document.getElementById('educationModalTitle').textContent = 'Edit Education';
@@ -2481,6 +2627,7 @@ function editEducation(id) {
   const modal = document.getElementById('educationModal');
   modal.classList.remove('hidden');
   modal.classList.add('flex');
+  if (typeof updateEducationGraduateFields === 'function') updateEducationGraduateFields();
 }
 
 function deleteEducation(id) {
@@ -2551,6 +2698,7 @@ function editExperience(id) {
   const modal = document.getElementById('experienceModal');
   modal.classList.remove('hidden');
   modal.classList.add('flex');
+  if (typeof updateEducationGraduateFields === 'function') updateEducationGraduateFields();
 }
 
 function deleteExperience(id) {
@@ -2621,6 +2769,7 @@ function editSkill(id) {
   const modal = document.getElementById('skillModal');
   modal.classList.remove('hidden');
   modal.classList.add('flex');
+  if (typeof updateEducationGraduateFields === 'function') updateEducationGraduateFields();
 }
 
 function deleteSkill(id) {

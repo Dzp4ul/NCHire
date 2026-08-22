@@ -43,11 +43,11 @@ if (!$user_id && !$user_email) {
 try {
     if ($user_id) {
         error_log("Querying by user_id: " . $user_id);
-        $stmt = $conn->prepare("SELECT id, position, applied_date, status, job_id, interview_date, interview_location, interview_room, interview_notes, demo_date, demo_location, demo_room, resubmission_documents, resubmission_notes, rejection_reason, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, letter_of_intent FROM job_applicants WHERE user_id = ? ORDER BY applied_date DESC, id DESC");
+        $stmt = $conn->prepare("SELECT id, position, applied_date, status, job_id, interview_date, interview_location, interview_room, interview_notes, demo_date, demo_location, demo_room, resubmission_documents, resubmission_notes, rejection_reason, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, certificate_of_grades, proof_of_enrollment, application_type, academic_year, semester, applicable_hourly_rate, salary_projection, salary_projection_basis, letter_of_intent FROM job_applicants WHERE user_id = ? ORDER BY applied_date DESC, id DESC");
         $stmt->bind_param("i", $user_id);
     } else {
         error_log("Querying by email: " . $user_email);
-        $stmt = $conn->prepare("SELECT id, position, applied_date, status, job_id, interview_date, interview_location, interview_room, interview_notes, demo_date, demo_location, demo_room, resubmission_documents, resubmission_notes, rejection_reason, applicant_email, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, letter_of_intent FROM job_applicants WHERE applicant_email = ? ORDER BY applied_date DESC, id DESC");
+        $stmt = $conn->prepare("SELECT id, position, applied_date, status, job_id, interview_date, interview_location, interview_room, interview_notes, demo_date, demo_location, demo_room, resubmission_documents, resubmission_notes, rejection_reason, applicant_email, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, certificate_of_grades, proof_of_enrollment, application_type, academic_year, semester, applicable_hourly_rate, salary_projection, salary_projection_basis, letter_of_intent FROM job_applicants WHERE applicant_email = ? ORDER BY applied_date DESC, id DESC");
         $stmt->bind_param("s", $user_email);
     }
 
