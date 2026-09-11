@@ -152,7 +152,7 @@ if (!function_exists('nc_classify_education_level')) {
     function nc_classify_education_level(array $education): string
     {
         $explicit = strtolower(trim((string)($education['education_level'] ?? '')));
-        if (in_array($explicit, ['bachelor', 'master', 'doctorate', 'other'], true)) {
+        if (in_array($explicit, ['high_school', 'associate', 'bachelor', 'master', 'doctorate', 'other'], true)) {
             return $explicit;
         }
 
@@ -165,6 +165,12 @@ if (!function_exists('nc_classify_education_level')) {
         }
         if (strpos($degree, 'bachelor') !== false || strpos($degree, 'baccalaureate') !== false) {
             return 'bachelor';
+        }
+        if (strpos($degree, 'associate') !== false) {
+            return 'associate';
+        }
+        if (strpos($degree, 'high school') !== false || strpos($degree, 'secondary') !== false) {
+            return 'high_school';
         }
         return 'other';
     }

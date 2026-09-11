@@ -55,6 +55,63 @@ function preventDuplicateSubmission(callback) {
 // Sample data
 let jobs = [];
 
+const rankingRequirementFields = [
+    'minimum_education_level', 'required_degree_fields', 'graduate_requirement',
+    'minimum_graduate_units', 'minimum_experience_years',
+    'teaching_experience_requirement', 'required_skills',
+    'required_certifications', 'required_licenses', 'required_training',
+    'preferred_qualifications'
+];
+
+function getRankingRequirementPayload(formData) {
+    return Object.fromEntries(rankingRequirementFields.map(field => [field, formData.get(field) || '']));
+}
+
+function setRankingRequirementFormValues(form, job) {
+    if (!form) return;
+    rankingRequirementFields.forEach(field => {
+        const input = form.querySelector(`[name="${field}"]`);
+        if (input) input.value = job[field] ?? '';
+    });
+}
+
+function initializeRankingRequirementEditors() {
+    const formSelectors = [
+        '#createJobModal form', '#createutilityJobModal form', '#createsecJobModal form',
+        '#newEditJobForm', '#editSecretaryJobForm'
+    ];
+    const markup = `
+      <details class="border border-blue-200 bg-blue-50 rounded-lg p-4 ranking-requirements-editor" open>
+        <summary class="font-semibold text-blue-900 cursor-pointer">Structured Candidate Ranking Criteria</summary>
+        <p class="text-xs text-blue-700 mt-2 mb-4">These fields drive the explainable score. Leave a criterion blank only when it is not applicable.</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div><label class="block text-sm font-medium text-gray-700 mb-1">Minimum Education</label><select name="minimum_education_level" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"><option value="">Not specified</option><option value="high_school">High School</option><option value="associate">Associate</option><option value="bachelor">Bachelor</option><option value="master">Master's</option><option value="doctorate">Doctorate</option></select></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1">Required Degree/Course Fields</label><input name="required_degree_fields" type="text" placeholder="Computer Science, Information Technology" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"><p class="text-xs text-gray-500 mt-1">Separate alternatives with commas.</p></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1">Graduate Qualification</label><select name="graduate_requirement" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"><option value="none">Not required</option><option value="preferred">Master's/Doctorate preferred</option><option value="master_required">Master's required</option><option value="doctorate_required">Doctorate required</option></select></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1">Minimum Graduate Units</label><input name="minimum_graduate_units" type="number" min="0" max="200" placeholder="e.g., 9" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1">Minimum Experience (Years)</label><input name="minimum_experience_years" type="number" min="0" max="60" step="0.5" placeholder="e.g., 2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1">Teaching Experience</label><select name="teaching_experience_requirement" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"><option value="not_required">Not required</option><option value="preferred">Preferred</option><option value="required">Required</option></select></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1">Required Skills</label><textarea name="required_skills" rows="2" placeholder="One per line or comma-separated" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1">Required Certifications</label><textarea name="required_certifications" rows="2" placeholder="One per line or comma-separated" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1">Required Licenses</label><textarea name="required_licenses" rows="2" placeholder="e.g., Licensed Professional Teacher" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1">Required Training</label><textarea name="required_training" rows="2" placeholder="One per line or comma-separated" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea></div>
+          <div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Preferred Qualifications</label><textarea name="preferred_qualifications" rows="2" placeholder="Other position-specific qualifications" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea></div>
+        </div>
+      </details>`;
+    formSelectors.forEach(selector => {
+        const form = document.querySelector(selector);
+        if (!form || form.querySelector('.ranking-requirements-editor')) return;
+        const submitButton = form.querySelector('button[type="submit"]');
+        let actionRow = submitButton?.parentElement || null;
+        while (actionRow && actionRow.parentElement !== form) actionRow = actionRow.parentElement;
+        if (actionRow && actionRow.parentElement === form) actionRow.insertAdjacentHTML('beforebegin', markup);
+        else form.insertAdjacentHTML('beforeend', markup);
+    });
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initializeRankingRequirementEditors);
+else initializeRankingRequirementEditors();
+
 async function loadJobs() {
     const tbody = document.getElementById('jobsTableBody');
     tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4">Loading...</td></tr>';
@@ -69,6 +126,7 @@ async function loadJobs() {
         
         // Display jobs using the filter display function
         displayFilteredJobs();
+        populateRankingJobOptions(allApplicantsData || []);
         
     } catch (error) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-red-500">Failed to load jobs.</td></tr>';
@@ -484,6 +542,7 @@ async function loadApplicants() {
         
         // Store applicants data globally for filtering
         allApplicantsData = applicants;
+        await ensureRankingJobOptions(applicants);
         
         // Update status counts
         updateStatusCounts();
@@ -902,7 +961,9 @@ async function createJob(event) {
         training: formData.get('training') || '',
         eligibility: formData.get('eligibility') || '',
         competency: formData.get('competency') || '',
-        duties: formData.get('duties') || ''
+        duties: formData.get('duties') || '',
+        job_requirements: formData.get('job_requirements') || '',
+        ...getRankingRequirementPayload(formData)
     };
 
     try {
@@ -1364,6 +1425,7 @@ function populateGeneralJobModal(job) {
     document.getElementById('editRequirements').value = job.job_requirements || "";
     document.getElementById('editDuties').value = job.duties || "";
     document.getElementById('editCompetency').value = job.competency || "";
+    setRankingRequirementFormValues(document.getElementById('newEditJobForm'), job);
 
     // Show the general job modal
     document.getElementById('newEditJobModal').classList.remove('hidden');
@@ -1399,6 +1461,7 @@ function populateSecretaryModal(job) {
     document.getElementById('editSecretaryRequirements').value = job.job_requirements || "";
     document.getElementById('editSecretaryDuties').value = job.duties || "";
     document.getElementById('editSecretaryCompetency').value = job.competency || "";
+    setRankingRequirementFormValues(document.getElementById('editSecretaryJobForm'), job);
 
     // Show the secretary modal
     document.getElementById('editSecretaryJobModal').classList.remove('hidden');
@@ -2253,6 +2316,7 @@ async function viewApplicantDetails(applicantId) {
                             </div>
                             <p class="text-gray-700 mb-1">${edu.field_of_study}</p>
                             <p class="text-gray-600 text-sm mb-1">${edu.institution}</p>
+                            <p class="text-gray-600 text-sm">${rankingEscapeHtml((edu.education_level || 'other').replaceAll('_', ' '))} — ${rankingEscapeHtml(edu.education_status || 'completed')}${edu.completed_units ? `, ${Number(edu.completed_units)} completed units` : ''}</p>
                             ${edu.gpa ? `<p class="text-gray-600 text-sm">GPA: ${edu.gpa}</p>` : ''}
                         </div>
                     `;
@@ -2277,6 +2341,7 @@ async function viewApplicantDetails(applicantId) {
                                 <span class="text-sm text-gray-500">${startDate} - ${endDate}</span>
                             </div>
                             <p class="text-gray-700 mb-1">${exp.company}</p>
+                            <span class="inline-block bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded-full mb-1">${rankingEscapeHtml(exp.experience_type || 'other')} experience</span>
                             ${exp.location ? `<p class="text-gray-600 text-sm mb-2">${exp.location}</p>` : ''}
                             ${exp.description ? `<p class="text-gray-600 text-sm">${exp.description}</p>` : ''}
                             ${exp.is_current ? '<span class="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full mt-2">Current Position</span>' : ''}
@@ -2319,6 +2384,25 @@ async function viewApplicantDetails(applicantId) {
                 skillsInfo.innerHTML = skillsHTML;
             } else {
                 skillsInfo.innerHTML = '<p class="text-gray-500 italic">No skills information provided</p>';
+            }
+
+            const qualificationsInfo = document.getElementById('qualificationsInfo');
+            if (qualificationsInfo) {
+                if (Array.isArray(data.qualifications) && data.qualifications.length > 0) {
+                    qualificationsInfo.innerHTML = data.qualifications.map(item => `
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h3 class="font-semibold text-gray-900">${rankingEscapeHtml(item.title || 'Untitled qualification')}</h3>
+                                <span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs">${rankingEscapeHtml(item.qualification_type || 'qualification')}</span>
+                                <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs">${rankingEscapeHtml(item.verification_status || 'unverified')}</span>
+                            </div>
+                            ${item.issuing_organization ? `<p class="text-gray-600 text-sm mt-1">${rankingEscapeHtml(item.issuing_organization)}</p>` : ''}
+                            <p class="text-gray-500 text-xs mt-2">${item.issued_date ? 'Issued: ' + rankingEscapeHtml(item.issued_date) : 'Issue date not provided'}${item.expiry_date ? ' | Expires: ' + rankingEscapeHtml(item.expiry_date) : ''}</p>
+                            <p class="text-xs mt-2 ${item.proof_document ? 'text-green-700' : 'text-amber-700'}">${item.proof_document ? 'Proof document on file (not automatically verified)' : 'Proof document not provided'}</p>
+                        </div>`).join('');
+                } else {
+                    qualificationsInfo.innerHTML = '<p class="text-gray-500 italic">No structured certifications, licenses, or training provided</p>';
+                }
             }
             
             // Update documents grid
@@ -4397,6 +4481,225 @@ function displayFilteredApplicants() {
     }).join('');
 }
 
+function rankingEscapeHtml(value) {
+    const div = document.createElement('div');
+    div.textContent = value == null ? '' : String(value);
+    return div.innerHTML;
+}
+
+async function ensureRankingJobOptions(applicants) {
+    if (!jobs.length) {
+        try {
+            const response = await fetch('gets_job.php', {credentials: 'same-origin'});
+            const loadedJobs = await response.json();
+            if (response.ok && Array.isArray(loadedJobs)) jobs = loadedJobs;
+        } catch (error) {
+            console.warn('Unable to load empty-job ranking options:', error);
+        }
+    }
+    populateRankingJobOptions(applicants);
+}
+
+function populateRankingJobOptions(applicants) {
+    const select = document.getElementById('rankingJobFilter');
+    if (!select) return;
+    const previous = select.value;
+    const options = new Map();
+    const normalizeDepartment = value => value === 'Computer Science' ? 'Computing Studies' : String(value || '').trim();
+    const currentDepartment = typeof CURRENT_ADMIN_DEPARTMENT === 'undefined' ? '' : normalizeDepartment(CURRENT_ADMIN_DEPARTMENT);
+    (jobs || []).forEach(job => {
+        const visible = typeof CURRENT_ADMIN_ROLE !== 'undefined' && CURRENT_ADMIN_ROLE === 'Secretary'
+            ? true
+            : currentDepartment !== '' && normalizeDepartment(job.department_role) === currentDepartment;
+        if (visible && job.id) options.set(String(job.id), job.teaching_load_title || job.job_title || `Job #${job.id}`);
+    });
+    (applicants || []).forEach(applicant => {
+        if (applicant.job_id) options.set(String(applicant.job_id), applicant.position || `Job #${applicant.job_id}`);
+    });
+    select.innerHTML = '<option value="">Select a posting</option>' + [...options.entries()]
+        .sort((a, b) => a[1].localeCompare(b[1]))
+        .map(([id, label]) => `<option value="${Number(id)}">${rankingEscapeHtml(label)}</option>`).join('');
+    if (previous && options.has(previous)) select.value = previous;
+    else if (options.size === 1) {
+        select.value = [...options.keys()][0];
+        loadCandidateRanking();
+    }
+}
+
+async function candidateRankingRequest(action, payload = {}) {
+    const response = await fetch('api/candidate_rankings.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-NCHire-CSRF': NCHIRE_RANKING_CSRF
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({action, ...payload})
+    });
+    const result = await response.json().catch(() => ({success: false, error: 'Invalid server response.'}));
+    if (!response.ok || !result.success) throw new Error(result.error || 'Candidate ranking request failed.');
+    return result.data;
+}
+
+function rankingScoreCell(category) {
+    if (!category || category.score === null || category.applicable === false) {
+        return '<span class="text-gray-500 text-xs">Not applicable</span>';
+    }
+    const status = category.data_status !== 'Complete'
+        ? `<div class="text-amber-700 text-xs mt-1">${rankingEscapeHtml(category.data_status)}</div>`
+        : '';
+    return `<span class="font-medium text-gray-900">${Number(category.score).toFixed(1)}/${Number(category.maximum).toFixed(0)}</span>${status}`;
+}
+
+function rankingLabelClass(label) {
+    if (label === 'Highly Qualified') return 'bg-green-100 text-green-800';
+    if (label === 'Very Qualified') return 'bg-emerald-100 text-emerald-800';
+    if (label === 'Qualified') return 'bg-blue-100 text-blue-800';
+    if (label === 'Partially Qualified') return 'bg-amber-100 text-amber-800';
+    return 'bg-gray-100 text-gray-700';
+}
+
+async function loadCandidateRanking() {
+    const select = document.getElementById('rankingJobFilter');
+    const tbody = document.getElementById('candidateRankingTableBody');
+    const notice = document.getElementById('rankingNotice');
+    const recalculate = document.getElementById('recalculateRankingBtn');
+    if (!select || !tbody) return;
+    const jobId = Number(select.value);
+    recalculate.disabled = !jobId;
+    if (!jobId) {
+        tbody.innerHTML = '<tr><td colspan="10" class="px-5 py-8 text-center text-gray-500">No job selected.</td></tr>';
+        notice.textContent = 'Select a job posting to compare its requirements with applicants assigned to it.';
+        return;
+    }
+    tbody.innerHTML = '<tr><td colspan="10" class="px-5 py-8 text-center text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Calculating deterministic rankings...</td></tr>';
+    try {
+        const data = await candidateRankingRequest('list', {job_id: jobId});
+        const warnings = data.rankings[0]?.job_requirement_warnings || [];
+        notice.innerHTML = warnings.length
+            ? `<span class="text-amber-700"><i class="fas fa-triangle-exclamation mr-1"></i>${rankingEscapeHtml(warnings.join(' '))}</span>`
+            : `${data.count} candidate${data.count === 1 ? '' : 's'} ranked for ${rankingEscapeHtml(data.job.job_title || 'this posting')}.`;
+        if (!data.rankings.length) {
+            tbody.innerHTML = '<tr><td colspan="10" class="px-5 py-8 text-center text-gray-500">No authorized applications were found for this job posting.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.rankings.map(item => {
+            const categories = item.categories || {};
+            const overall = item.overall_score === null ? 'N/A' : `${Number(item.overall_score).toFixed(1)}%`;
+            return `<tr class="hover:bg-gray-50">
+                <td class="px-4 py-4 font-semibold text-gray-700">${Number(item.rank)}</td>
+                <td class="px-4 py-4 font-medium text-gray-900">${rankingEscapeHtml(item.applicant_name)}</td>
+                <td class="px-4 py-4 text-lg font-bold text-blue-800">${overall}</td>
+                <td class="px-4 py-4"><span class="px-2 py-1 rounded-full text-xs font-semibold ${rankingLabelClass(item.qualification_label)}">${rankingEscapeHtml(item.qualification_label)}</span></td>
+                <td class="px-4 py-4">${rankingScoreCell(categories.education)}</td>
+                <td class="px-4 py-4">${rankingScoreCell(categories.experience)}</td>
+                <td class="px-4 py-4">${rankingScoreCell(categories.skills)}</td>
+                <td class="px-4 py-4">${rankingScoreCell(categories.certifications)}</td>
+                <td class="px-4 py-4">${rankingScoreCell(categories.requirements)}</td>
+                <td class="px-4 py-4"><button type="button" onclick="viewCandidateRankingDetails(${Number(item.application_id)})" class="text-blue-700 hover:text-blue-900 font-medium text-sm">View Ranking Details</button></td>
+            </tr>`;
+        }).join('');
+    } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="10" class="px-5 py-8 text-center text-red-600">${rankingEscapeHtml(error.message)}</td></tr>`;
+        notice.textContent = 'Candidate rankings could not be loaded.';
+    }
+}
+
+async function recalculateCandidateRanking() {
+    const jobId = Number(document.getElementById('rankingJobFilter')?.value || 0);
+    if (!jobId) return;
+    const button = document.getElementById('recalculateRankingBtn');
+    button.disabled = true;
+    const original = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Recalculating';
+    try {
+        await candidateRankingRequest('recalculate', {job_id: jobId});
+        showToast('Deterministic candidate rankings recalculated.', 'success');
+        await loadCandidateRanking();
+    } catch (error) {
+        showToast(error.message, 'error');
+    } finally {
+        button.innerHTML = original;
+        button.disabled = false;
+    }
+}
+
+function rankingList(items, emptyMessage) {
+    if (!Array.isArray(items) || !items.length) return `<p class="text-gray-500 italic">${rankingEscapeHtml(emptyMessage)}</p>`;
+    return `<ul class="space-y-2">${items.map(item => `<li class="flex items-start gap-2"><i class="fas fa-circle text-[6px] mt-2 text-blue-500"></i><span>${rankingEscapeHtml(item)}</span></li>`).join('')}</ul>`;
+}
+
+function formatRequirementValue(value) {
+    if (Array.isArray(value)) return value.length ? value.join(', ') : 'Not applicable';
+    if (value === null || value === '' || value === 'none' || value === 'not_required') return 'Not applicable';
+    return String(value).replaceAll('_', ' ');
+}
+
+function renderCandidateRankingDetails(data) {
+    const content = document.getElementById('candidateRankingDetailsContent');
+    const subtitle = document.getElementById('rankingDetailsSubtitle');
+    const ranking = data.ranking;
+    subtitle.textContent = `${data.applicant.name} — ${data.job.job_title || 'Job posting'}`;
+    const categoryCards = Object.entries(ranking.categories || {}).map(([key, category]) => {
+        const score = category.applicable === false || category.score === null ? 'Not applicable' : `${Number(category.score).toFixed(1)}/${Number(category.maximum).toFixed(0)}`;
+        const criteria = (category.criteria || []).map(item => `<div class="border-t border-gray-100 pt-2 mt-2"><div class="flex justify-between gap-3"><span class="font-medium">${rankingEscapeHtml(item.name)}</span><span>${Number(item.score).toFixed(1)}/${Number(item.maximum).toFixed(1)}</span></div><p class="text-xs text-gray-600 mt-1">${rankingEscapeHtml(item.explanation)}</p></div>`).join('');
+        return `<div class="border border-gray-200 rounded-lg p-4"><div class="flex justify-between items-center"><h4 class="font-semibold text-gray-900 capitalize">${rankingEscapeHtml(key)}</h4><span class="font-bold text-blue-800">${score}</span></div><p class="text-xs text-gray-500 mt-1">Data: ${rankingEscapeHtml(category.data_status)}</p>${criteria}</div>`;
+    }).join('');
+    const requirements = Object.entries(ranking.requirements || {}).filter(([key]) => !['warnings','source','completeness'].includes(key)).map(([key, value]) => `<div><dt class="text-xs uppercase text-gray-500">${rankingEscapeHtml(key.replaceAll('_', ' '))}</dt><dd class="text-sm text-gray-900 mt-1">${rankingEscapeHtml(formatRequirementValue(value))}</dd></div>`).join('');
+    const education = (data.profile.education || []).map(item => `${item.degree || 'Degree not provided'} — ${item.field_of_study || 'Field not provided'} (${item.education_status || 'status not provided'}${item.completed_units ? `, ${item.completed_units} units` : ''})`);
+    const experience = (data.profile.experience || []).map(item => `${item.job_title || 'Title not provided'} — ${item.company || 'Organization not provided'} (${item.experience_type || 'type not provided'})`);
+    const skills = (data.profile.skills || []).map(item => `${item.skill_name} (level ${item.skill_level || 'not provided'})`);
+    const qualifications = (data.profile.qualifications || []).map(item => `${item.title} — ${item.qualification_type}${item.verification_status ? ` (${item.verification_status})` : ''}`);
+    const ai = ranking.ai_analysis || {available: false, status: 'loading', message: 'AI explanation is loading. Deterministic scores are already available.'};
+    const aiHtml = ai.available ? `
+        <p class="text-gray-800">${rankingEscapeHtml(ai.summary)}</p>
+        <div class="grid md:grid-cols-2 gap-4 mt-4"><div><h5 class="font-medium text-gray-900 mb-2">Strengths</h5>${rankingList(ai.strengths, 'No additional strengths returned.')}</div><div><h5 class="font-medium text-gray-900 mb-2">Missing Qualifications</h5>${rankingList(ai.missing_requirements, 'No additional missing requirements returned.')}</div></div>
+        <p class="text-sm text-gray-700 mt-4">${rankingEscapeHtml(ai.job_match_explanation)}</p>`
+        : `<p class="text-sm ${ai.status === 'loading' ? 'text-blue-700' : 'text-amber-700'}"><i class="fas ${ai.status === 'loading' ? 'fa-spinner fa-spin' : 'fa-circle-info'} mr-2"></i>${rankingEscapeHtml(ai.message || 'AI analysis has not been requested.')}</p>`;
+
+    content.innerHTML = `
+      <div class="grid lg:grid-cols-3 gap-5">
+        <div class="lg:col-span-2 space-y-5">
+          <div class="bg-blue-50 border border-blue-100 rounded-lg p-5 flex flex-wrap gap-5 items-center justify-between"><div><p class="text-sm text-blue-800">Overall job match</p><p class="text-4xl font-bold text-blue-950">${ranking.overall_score === null ? 'N/A' : Number(ranking.overall_score).toFixed(1) + '%'}</p></div><span class="px-3 py-2 rounded-full font-semibold ${rankingLabelClass(ranking.qualification_label)}">${rankingEscapeHtml(ranking.qualification_label)}</span></div>
+          <div><h3 class="font-semibold text-gray-900 mb-3">Score Breakdown</h3><div class="grid md:grid-cols-2 gap-3">${categoryCards}</div></div>
+          <div class="border border-gray-200 rounded-lg p-5"><h3 class="font-semibold text-gray-900 mb-3">Matching Qualifications</h3>${rankingList(ranking.matching_qualifications, 'No confirmed matches were found in the stored profile.')}</div>
+          <div class="border border-amber-200 bg-amber-50 rounded-lg p-5"><h3 class="font-semibold text-amber-950 mb-3">Missing or Partially Met Requirements</h3>${rankingList(ranking.missing_requirements, 'No missing requirements identified from the configured criteria.')}</div>
+          <div class="border border-purple-200 bg-purple-50 rounded-lg p-5" id="rankingAiPanel"><div class="flex items-center justify-between mb-3"><h3 class="font-semibold text-purple-950">Groq AI Explanation</h3><span class="text-xs text-purple-700">Does not affect score</span></div>${aiHtml}</div>
+        </div>
+        <div class="space-y-5">
+          <div class="border border-gray-200 rounded-lg p-5"><h3 class="font-semibold text-gray-900 mb-3">Job Requirements Compared</h3><dl class="space-y-3">${requirements}</dl></div>
+          <div class="border border-gray-200 rounded-lg p-5"><h3 class="font-semibold text-gray-900 mb-3">Applicant Qualifications</h3><div class="space-y-4 text-sm"><div><h4 class="font-medium">Education</h4>${rankingList(education, 'Not provided')}</div><div><h4 class="font-medium">Experience</h4>${rankingList(experience, 'Not provided')}</div><div><h4 class="font-medium">Skills</h4>${rankingList(skills, 'Not provided')}</div><div><h4 class="font-medium">Certifications / Licenses / Training</h4>${rankingList(qualifications, 'Not provided')}</div></div></div>
+          <div class="text-xs text-gray-500 border border-gray-200 rounded-lg p-4">Scoring version ${rankingEscapeHtml(ranking.scoring_version)}. ${rankingEscapeHtml(data.decision_support_notice)}</div>
+        </div>
+      </div>`;
+}
+
+async function viewCandidateRankingDetails(applicationId) {
+    const modal = document.getElementById('candidateRankingDetailsModal');
+    const content = document.getElementById('candidateRankingDetailsContent');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    document.body.style.overflow = 'hidden';
+    content.innerHTML = '<div class="py-16 text-center text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading deterministic ranking...</div>';
+    try {
+        const details = await candidateRankingRequest('details', {application_id: applicationId});
+        renderCandidateRankingDetails(details);
+        if (!details.ranking.ai_analysis?.available) {
+            const analyzed = await candidateRankingRequest('analyze', {application_id: applicationId});
+            renderCandidateRankingDetails(analyzed);
+        }
+    } catch (error) {
+        content.innerHTML = `<div class="py-16 text-center text-red-600">${rankingEscapeHtml(error.message)}</div>`;
+    }
+}
+
+function closeCandidateRankingDetails() {
+    const modal = document.getElementById('candidateRankingDetailsModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    document.body.style.overflow = '';
+}
+
 // Update status counts in filter display
 function updateStatusCounts() {
     if (!allApplicantsData) return;
@@ -4472,7 +4775,8 @@ async function submitSecretaryEditJob(event) {
         training: formData.get('training'),
         eligibility: formData.get('eligibility'),
         duties: formData.get('duties'),
-        competency: formData.get('competency')
+        competency: formData.get('competency'),
+        ...getRankingRequirementPayload(formData)
     };
     
     try {
@@ -4544,7 +4848,8 @@ async function submitEditJob(event) {
         training: formData.get('training'),
         eligibility: formData.get('eligibility'),
         duties: formData.get('duties'),
-        competency: formData.get('competency')
+        competency: formData.get('competency'),
+        ...getRankingRequirementPayload(formData)
     };
     
     try {

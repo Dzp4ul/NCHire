@@ -106,7 +106,7 @@ if (isset($_SESSION['user_id'])) {
     $profile_stmt->close();
     
     // Fetch ALL work experiences (remove LIMIT 1)
-    $exp_stmt = $conn->prepare("SELECT job_title, company, location, start_date, end_date, is_current, description FROM user_experience WHERE user_id = ? ORDER BY start_date DESC");
+    $exp_stmt = $conn->prepare("SELECT job_title, company, location, start_date, end_date, is_current, description, experience_type FROM user_experience WHERE user_id = ? ORDER BY start_date DESC");
     $exp_stmt->bind_param("i", $profile_user_id);
     $exp_stmt->execute();
     $exp_result = $exp_stmt->get_result();
@@ -1934,6 +1934,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                     <input type="hidden" id="wx_end">
                     <input type="hidden" id="wx_current">
                     <input type="hidden" id="wx_description">
+                    <input type="hidden" id="wx_experience_type">
                     <input type="hidden" id="wx_skills">
                     
                     <div class="flex justify-end gap-3 pt-2">
@@ -2560,6 +2561,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const wx_end = document.getElementById('wx_end');
   const wx_cur = document.getElementById('wx_current');
   const wx_desc = document.getElementById('wx_description');
+  const wx_experience_type = document.getElementById('wx_experience_type');
 
   const rf_job_id = document.getElementById('rf_job_id');
   const rf_job_title = document.getElementById('rf_job_title');
@@ -4175,6 +4177,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     wx_cur.value = firstExp.is_current ? '1' : '';
     wx_desc.value = firstExp.description || '';
+    if (wx_experience_type) wx_experience_type.value = firstExp.experience_type || 'other';
     
     // Display work experience in a box
     try {
@@ -4837,6 +4840,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!wx_cur.checked && wx_end.value) formData.append('end_date', wx_end.value);
         if (wx_cur.checked) formData.append('is_current', '1');
         formData.append('work_descript', wx_desc.value.trim());
+        formData.append('experience_type', wx_experience_type?.value || 'other');
       }
       
       const res = await fetch('save_profile_data.php', { method: 'POST', body: formData });
@@ -6402,10 +6406,10 @@ document.getElementById('detailDeadlineDate').textContent = 'Not specified';
 }
 
 // Populate qualifications
-document.getElementById('detailEducation').textContent = job.education || 'Not specified';
-document.getElementById('detailExperience').textContent = job.experience || 'Not specified';
-document.getElementById('detailTraining').textContent = job.training || 'Not specified';
-document.getElementById('detailEligibility').textContent = job.eligibility || 'Not specified';
+document.getElementById('detailEducation').textContent = formatStructuredJobCriteria(job, 'education');
+document.getElementById('detailExperience').textContent = formatStructuredJobCriteria(job, 'experience');
+document.getElementById('detailTraining').textContent = formatStructuredJobCriteria(job, 'training');
+document.getElementById('detailEligibility').textContent = formatStructuredJobCriteria(job, 'eligibility');
 
 // Populate job requirements
 const requirementsContainer = document.getElementById('detailJobRequirements');
@@ -6418,7 +6422,7 @@ document.getElementById('requirementsSection').style.display = 'none';
 }
 
 // Populate competency
-document.getElementById('detailCompetency').textContent = job.competency || 'Not specified';
+document.getElementById('detailCompetency').textContent = formatStructuredJobCriteria(job, 'skills');
 
 // Populate job description
 const descriptionContainer = document.getElementById('detailJobDescription');
@@ -8763,6 +8767,33 @@ function populateWizardWithApplicationData(app, data) {
 }
 
 // Show job details function
+function formatStructuredJobCriteria(job, section) {
+  const lines = [];
+  const humanize = value => String(value || '').replaceAll('_', ' ');
+  if (section === 'education') {
+    if (job.education) lines.push(job.education);
+    if (job.minimum_education_level) lines.push(`Minimum level: ${humanize(job.minimum_education_level)}`);
+    if (job.required_degree_fields) lines.push(`Required degree/course: ${job.required_degree_fields}`);
+    if (job.graduate_requirement && job.graduate_requirement !== 'none') lines.push(`Graduate qualification: ${humanize(job.graduate_requirement)}`);
+    if (job.minimum_graduate_units) lines.push(`Minimum graduate units: ${job.minimum_graduate_units}`);
+  } else if (section === 'experience') {
+    if (job.experience) lines.push(job.experience);
+    if (job.minimum_experience_years !== null && job.minimum_experience_years !== '' && job.minimum_experience_years !== undefined) lines.push(`Minimum experience: ${job.minimum_experience_years} year(s)`);
+    if (job.teaching_experience_requirement && job.teaching_experience_requirement !== 'not_required') lines.push(`Teaching experience: ${humanize(job.teaching_experience_requirement)}`);
+  } else if (section === 'training') {
+    if (job.training) lines.push(job.training);
+    if (job.required_training) lines.push(`Required training: ${job.required_training}`);
+  } else if (section === 'eligibility') {
+    if (job.eligibility) lines.push(job.eligibility);
+    if (job.required_certifications) lines.push(`Required certifications: ${job.required_certifications}`);
+    if (job.required_licenses) lines.push(`Required licenses: ${job.required_licenses}`);
+  } else if (section === 'skills') {
+    if (job.competency) lines.push(job.competency);
+    if (job.required_skills) lines.push(`Required skills: ${job.required_skills}`);
+  }
+  return lines.length ? lines.join('\n') : 'Not specified';
+}
+
 function showJobDetails(jobId) {
   console.log('?? Showing job details for ID:', jobId);
   
@@ -8879,10 +8910,10 @@ function populateJobDetails(job) {
   }
   
   // Update qualifications
-  document.getElementById('detailEducation').textContent = job.education || 'Not specified';
-  document.getElementById('detailExperience').textContent = job.experience || 'Not specified';
-  document.getElementById('detailTraining').textContent = job.training || 'Not specified';
-  document.getElementById('detailEligibility').textContent = job.eligibility || 'Not specified';
+  document.getElementById('detailEducation').textContent = formatStructuredJobCriteria(job, 'education');
+  document.getElementById('detailExperience').textContent = formatStructuredJobCriteria(job, 'experience');
+  document.getElementById('detailTraining').textContent = formatStructuredJobCriteria(job, 'training');
+  document.getElementById('detailEligibility').textContent = formatStructuredJobCriteria(job, 'eligibility');
   
   // Update job requirements - Show document requirements
   const requirementsContainer = document.getElementById('detailJobRequirements');
@@ -8906,12 +8937,7 @@ function populateJobDetails(job) {
   
   // Update competency
   const competencyContainer = document.getElementById('detailCompetency');
-  if (job.competency && job.competency.trim()) {
-    const competencies = job.competency.split('\n').filter(comp => comp.trim());
-    competencyContainer.innerHTML = competencies.map(comp => `<p class="flex items-start"><i class="ri-star-fill text-amber-500 mr-2 mt-1"></i><span>${comp.trim()}</span></p>`).join('');
-  } else {
-    competencyContainer.innerHTML = '<p class="text-gray-500 italic">Not specified</p>';
-  }
+  competencyContainer.textContent = formatStructuredJobCriteria(job, 'skills');
   
   // Update apply button based on application status
   const applyBtn = document.getElementById('detailApplyBtn');

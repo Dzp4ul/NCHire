@@ -1,5 +1,12 @@
 <?php
+session_start();
 header('Content-Type: application/json');
+
+if (empty($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+    exit;
+}
 
 // Database connection
 $servername = "127.0.0.1";
@@ -33,6 +40,25 @@ if ($result->num_rows === 0) {
 }
 
 $applicant = $result->fetch_assoc();
+
+$role = $_SESSION['admin_role'] ?? '';
+$department = $_SESSION['admin_department'] ?? '';
+$departmentAlias = $department === 'Computing Studies' ? 'Computer Science' : ($department === 'Computer Science' ? 'Computing Studies' : $department);
+$authorized = false;
+if ($role === 'Secretary') {
+    $secretaryId = (int)($_SESSION['admin_id'] ?? 0);
+    $authorized = $applicant['workflow_stage'] !== 'rejected' && (empty($applicant['secretary_id']) || $applicant['workflow_stage'] === 'secretary_review' || (int)$applicant['secretary_id'] === $secretaryId);
+} elseif ($role === 'Department Head') {
+    $allowedStages = ['waiting_interview_schedule','department_head_review','interview_scheduled','interview_completed','demo_scheduled','demo_completed','psych_scheduled','psych_completed','initially_hired','permanently_hired','passed','hired'];
+    $authorized = in_array($applicant['workflow_stage'], $allowedStages, true) && in_array($applicant['assigned_to_department'], [$department, $departmentAlias], true);
+} elseif (in_array($role, ['HR Manager', 'Recruiter'], true)) {
+    $authorized = $applicant['status'] !== 'Rejected' && in_array($applicant['assigned_to_department'], [$department, $departmentAlias], true);
+}
+if (!$authorized) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Application is outside your authorized scope']);
+    exit;
+}
 
 // Get the user_id from the applicant record
 $user_id = $applicant['user_id'];
@@ -108,12 +134,26 @@ foreach ($skills as $skill) {
     $skills_by_category[$category][] = $skill;
 }
 
+$qualifications = [];
+if ($user_id) {
+    $tableCheck = $conn->query("SHOW TABLES LIKE 'user_qualifications'");
+    if ($tableCheck && $tableCheck->num_rows > 0) {
+        $qualification_stmt = $conn->prepare("SELECT qualification_type, title, issuing_organization, issued_date, expiry_date, proof_document, verification_status FROM user_qualifications WHERE user_id = ? ORDER BY issued_date DESC, id DESC");
+        $qualification_stmt->bind_param("i", $user_id);
+        $qualification_stmt->execute();
+        $qualification_result = $qualification_stmt->get_result();
+        while ($row = $qualification_result->fetch_assoc()) $qualifications[] = $row;
+        $qualification_stmt->close();
+    }
+}
+
 echo json_encode([
     'success' => true,
     'applicant' => $applicant,
     'education' => $education,
     'experience' => $experience,
-    'skills' => $skills_by_category
+    'skills' => $skills_by_category,
+    'qualifications' => $qualifications
 ]);
 
 $conn->close();

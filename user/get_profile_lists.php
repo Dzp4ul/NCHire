@@ -90,6 +90,19 @@ if ($type === 'skills') {
     exit();
 }
 
+if ($type === 'qualifications') {
+    $sql = "SELECT id, qualification_type, title, issuing_organization, issued_date, expiry_date, proof_document, verification_status FROM user_qualifications WHERE user_id = ? ORDER BY issued_date DESC, id DESC";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $data = [];
+    while ($row = $result->fetch_assoc()) $data[] = $row;
+    $stmt->close();
+    echo json_encode(['success' => true, 'data' => $data]);
+    exit();
+}
+
 echo json_encode(['success' => false, 'message' => 'Invalid type']);
 $conn->close();
 ?>

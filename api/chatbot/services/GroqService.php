@@ -26,7 +26,7 @@ class GroqService
     public function __construct()
     {
         $this->apiKey = ChatbotEnvLoader::get('GROQ_API_KEY', '');
-        $this->model = ChatbotEnvLoader::get('GROQ_MODEL', 'llama-3.3-70b-versatile');
+        $this->model = ChatbotEnvLoader::get('GROQ_MODEL', 'openai/gpt-oss-120b');
     }
 
     public function isConfigured()
@@ -47,14 +47,20 @@ class GroqService
             'max_completion_tokens' => $options['max_completion_tokens'] ?? 700,
         ];
 
+        if (isset($options['response_format']) && is_array($options['response_format'])) {
+            $payload['response_format'] = $options['response_format'];
+        }
+
         $payloadJson = json_encode($payload);
         if ($payloadJson === false) {
             throw new GroqApiException('invalid_payload', 'Unable to encode Groq request payload.');
         }
 
+        $timeout = max(5, min(60, (int)($options['timeout'] ?? 30)));
+        $connectTimeout = max(3, min($timeout, (int)($options['connect_timeout'] ?? 10)));
         [$rawResponse, $httpCode] = function_exists('curl_init')
-            ? $this->sendWithCurl($payloadJson)
-            : $this->sendWithStreams($payloadJson);
+            ? $this->sendWithCurl($payloadJson, $timeout, $connectTimeout)
+            : $this->sendWithStreams($payloadJson, $timeout);
 
         $decoded = json_decode($rawResponse, true);
         if (!is_array($decoded)) {
@@ -62,8 +68,22 @@ class GroqService
         }
 
         if ($httpCode < 200 || $httpCode >= 300) {
-            $category = $httpCode === 401 || $httpCode === 403 ? 'auth_error' : 'api_error';
-            throw new GroqApiException($category, 'Groq request failed with HTTP ' . $httpCode . '.');
+            $categories = [
+                400 => 'invalid_request',
+                401 => 'auth_error',
+                403 => 'auth_error',
+                404 => 'model_not_found',
+                408 => 'timeout',
+                429 => 'rate_limit',
+            ];
+            $category = $categories[$httpCode] ?? ($httpCode >= 500 ? 'service_error' : 'api_error');
+            $apiMessage = $decoded['error']['message'] ?? '';
+            $apiMessage = is_scalar($apiMessage) ? trim(strip_tags((string)$apiMessage)) : '';
+            $apiMessage = preg_replace('/[\x00-\x1F\x7F]/u', ' ', $apiMessage) ?? '';
+            if (strlen($apiMessage) > 500) $apiMessage = substr($apiMessage, 0, 500);
+            $message = 'Groq request failed with HTTP ' . $httpCode . '.';
+            if ($apiMessage !== '') $message .= ' ' . $apiMessage;
+            throw new GroqApiException($category, $message);
         }
 
         $reply = $decoded['choices'][0]['message']['content'] ?? null;
@@ -74,7 +94,7 @@ class GroqService
         return trim($reply);
     }
 
-    private function sendWithCurl($payloadJson)
+    private function sendWithCurl($payloadJson, $timeout, $connectTimeout)
     {
         $ch = curl_init(self::ENDPOINT);
         curl_setopt_array($ch, [
@@ -85,8 +105,8 @@ class GroqService
                 'Authorization: Bearer ' . $this->apiKey,
             ],
             CURLOPT_POSTFIELDS => $payloadJson,
-            CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => $connectTimeout,
+            CURLOPT_TIMEOUT => $timeout,
         ]);
 
         $rawResponse = curl_exec($ch);
@@ -101,7 +121,7 @@ class GroqService
         return [$rawResponse, $httpCode];
     }
 
-    private function sendWithStreams($payloadJson)
+    private function sendWithStreams($payloadJson, $timeout)
     {
         if (!ini_get('allow_url_fopen')) {
             throw new GroqApiException('http_client_unavailable', 'No supported HTTP client is available in this PHP runtime.');
@@ -116,7 +136,7 @@ class GroqService
                     'Content-Length: ' . strlen($payloadJson),
                 ]),
                 'content' => $payloadJson,
-                'timeout' => 30,
+                'timeout' => $timeout,
                 'ignore_errors' => true,
             ],
         ]);

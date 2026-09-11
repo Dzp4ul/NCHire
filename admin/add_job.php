@@ -17,6 +17,12 @@ if ($conn->connect_error) {
     exit;
 }
 
+if (empty($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true || !in_array($_SESSION['admin_role'] ?? '', ['Secretary', 'Department Head', 'HR Manager', 'Recruiter'], true)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    exit;
+}
+
 // Get admin info from session
 $admin_name = $_SESSION['admin_name'] ?? 'Unknown Admin';
 
@@ -44,6 +50,21 @@ $experience = $data["experience"] ?? '';
 $training = $data["training"] ?? '';
 $eligibility = $data["eligibility"] ?? '';
 $competency = $data["competency"] ?? '';
+$minimum_education_level = trim($data['minimum_education_level'] ?? '') ?: null;
+$required_degree_fields = trim($data['required_degree_fields'] ?? '');
+$graduate_requirement = trim($data['graduate_requirement'] ?? '') ?: null;
+$minimum_graduate_units = ($data['minimum_graduate_units'] ?? '') !== '' ? max(0, min(200, (int)$data['minimum_graduate_units'])) : null;
+$minimum_experience_years = ($data['minimum_experience_years'] ?? '') !== '' ? max(0, min(60, (float)$data['minimum_experience_years'])) : null;
+$teaching_experience_requirement = trim($data['teaching_experience_requirement'] ?? '') ?: null;
+$required_skills = trim($data['required_skills'] ?? '');
+$required_certifications = trim($data['required_certifications'] ?? '');
+$required_licenses = trim($data['required_licenses'] ?? '');
+$required_training = trim($data['required_training'] ?? '');
+$preferred_qualifications = trim($data['preferred_qualifications'] ?? '');
+
+if ($minimum_education_level !== null && !in_array($minimum_education_level, ['high_school','associate','bachelor','master','doctorate'], true)) $minimum_education_level = null;
+if ($graduate_requirement !== null && !in_array($graduate_requirement, ['none','preferred','master_required','doctorate_required'], true)) $graduate_requirement = null;
+if ($teaching_experience_requirement !== null && !in_array($teaching_experience_requirement, ['not_required','preferred','required'], true)) $teaching_experience_requirement = null;
 
 $subject_code = trim($data["subject_code"] ?? "");
 $subject_name = trim($data["subject_name"] ?? "") ?: $subject;
@@ -62,15 +83,15 @@ if ($department === 'Computer Science') {
 
 try {
     // Use prepared statements with new fields
-    $sql = "INSERT INTO job (job_title, department_role, job_type, locations, salary_range, application_deadline, subject, job_description, job_requirements, education, experience, training, eligibility, competency) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    $sql = "INSERT INTO job (job_title, department_role, job_type, locations, salary_range, application_deadline, subject, job_description, job_requirements, education, experience, training, eligibility, competency, minimum_education_level, required_degree_fields, graduate_requirement, minimum_graduate_units, minimum_experience_years, teaching_experience_requirement, required_skills, required_certifications, required_licenses, required_training, preferred_qualifications)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     $stmt = $conn->prepare($sql);
     if (!$stmt) {
         echo json_encode(["success" => false, "message" => "Prepare failed: " . $conn->error]);
         $conn->close();
         exit;
     }
-    $stmt->bind_param("ssssssssssssss", $title, $department, $type, $location, $salary, $deadline, $subject, $description, $requirements, $education, $experience, $training, $eligibility, $competency);
+    $stmt->bind_param("sssssssssssssssssidssssss", $title, $department, $type, $location, $salary, $deadline, $subject, $description, $requirements, $education, $experience, $training, $eligibility, $competency, $minimum_education_level, $required_degree_fields, $graduate_requirement, $minimum_graduate_units, $minimum_experience_years, $teaching_experience_requirement, $required_skills, $required_certifications, $required_licenses, $required_training, $preferred_qualifications);
     $ok = $stmt->execute();
     if ($ok) {
         $job_id = $conn->insert_id;

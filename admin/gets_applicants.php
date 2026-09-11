@@ -2,6 +2,12 @@
 session_start();
 header('Content-Type: application/json');
 
+if (empty($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Unauthorized']);
+    exit();
+}
+
 // Database connection parameters
 $host = 'localhost';
 $dbname = 'nchire';
@@ -39,6 +45,7 @@ try {
                 ja.status, 
                 ja.applicant_email, 
                 ja.contact_num,
+                ja.job_id,
                 ja.assigned_to_department,
                 ja.workflow_stage,
                 ja.application_type,
@@ -75,6 +82,7 @@ try {
                 ja.status, 
                 ja.applicant_email, 
                 ja.contact_num,
+                ja.job_id,
                 ja.assigned_to_department,
                 ja.workflow_stage,
                 ja.application_type,
@@ -107,6 +115,7 @@ try {
                 ja.status, 
                 ja.applicant_email, 
                 ja.contact_num,
+                ja.job_id,
                 ja.assigned_to_department,
                 ja.workflow_stage,
                 ja.application_type,

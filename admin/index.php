@@ -294,6 +294,10 @@ $vacancy_stats_result = $conn->query($vacancy_stats_query);
 if ($vacancy_stats_result) {
     $vacancy_stats = array_merge($vacancy_stats, $vacancy_stats_result->fetch_assoc() ?: []);
 }
+
+if (empty($_SESSION['ranking_csrf_token'])) {
+    $_SESSION['ranking_csrf_token'] = bin2hex(random_bytes(32));
+}
 $vacant_teaching_loads_query = "
     SELECT j.*, COALESCE(a.assigned_count, 0) AS assigned_instructors,
            {$vacancy_expr} AS remaining_vacancies
@@ -1335,6 +1339,44 @@ $recent_activity = $conn->query($recent_activity_query);
                     </div>
                 </div>
 
+                <!-- Job-specific candidate ranking decision support -->
+                <div class="bg-white rounded-lg shadow-sm border border-blue-200 mb-6 overflow-hidden">
+                    <div class="p-5 bg-blue-50 border-b border-blue-100 flex flex-col lg:flex-row lg:items-end gap-4 justify-between">
+                        <div>
+                            <h2 class="text-lg font-semibold text-blue-950"><i class="fas fa-ranking-star mr-2"></i>AI Candidate Ranking</h2>
+                            <p class="text-sm text-blue-800 mt-1">Deterministic, explainable scoring by teaching load. AI adds a cached explanation only when ranking details are opened.</p>
+                        </div>
+                        <div class="flex flex-col sm:flex-row gap-2 sm:items-end">
+                            <div>
+                                <label for="rankingJobFilter" class="block text-xs font-medium text-gray-700 mb-1">Selected Job / Teaching Load</label>
+                                <select id="rankingJobFilter" onchange="loadCandidateRanking()" class="min-w-72 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                                    <option value="">Select a posting</option>
+                                </select>
+                            </div>
+                            <button type="button" id="recalculateRankingBtn" onclick="recalculateCandidateRanking()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 text-sm disabled:opacity-50" disabled><i class="fas fa-rotate mr-2"></i>Recalculate</button>
+                        </div>
+                    </div>
+                    <div id="rankingNotice" class="px-5 pt-4 text-sm text-gray-600">Select a job posting to compare its requirements with applicants assigned to it.</div>
+                    <div class="overflow-x-auto mt-3">
+                        <table class="w-full min-w-[1050px]">
+                            <thead class="bg-gray-50"><tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Applicant</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Overall</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qualification</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Education</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Experience</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Skills</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cert./License</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Requirements</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                            </tr></thead>
+                            <tbody id="candidateRankingTableBody" class="divide-y divide-gray-200"><tr><td colspan="10" class="px-5 py-8 text-center text-gray-500">No job selected.</td></tr></tbody>
+                        </table>
+                    </div>
+                    <div class="px-5 py-4 border-t border-gray-100 text-xs text-gray-500">Decision-support only. Rankings do not automatically reject or hire applicants.</div>
+                </div>
+
                 <!-- Filter Section -->
                 <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 p-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1475,6 +1517,12 @@ $recent_activity = $conn->query($recent_activity_query);
                             <div id="skillsInfo" class="space-y-4">
                                 <!-- Skills info will be loaded here -->
                             </div>
+                        </div>
+
+                        <!-- Certifications, licenses, and training -->
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                            <h2 class="text-lg font-semibold text-gray-900 mb-4">Certifications, Licenses & Training</h2>
+                            <div id="qualificationsInfo" class="space-y-4"><p class="text-gray-500 italic">No structured qualifications provided</p></div>
                         </div>
 
                         <!-- Submitted Documents -->
@@ -1932,6 +1980,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                                    placeholder="e.g., CC 101">
                         </div>
+
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Subject Name</label>
                             <input type="text" name="subject_name" required
@@ -3142,12 +3191,25 @@ $recent_activity = $conn->query($recent_activity_query);
         </div>
     </div>
 
+    <!-- Candidate Ranking Details Modal -->
+    <div id="candidateRankingDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-[70] p-4">
+        <div class="bg-white rounded-xl shadow-xl max-w-5xl w-full max-h-[92vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
+                <div><h2 class="text-xl font-semibold text-gray-900">Candidate Ranking Details</h2><p id="rankingDetailsSubtitle" class="text-sm text-gray-500 mt-1"></p></div>
+                <button type="button" onclick="closeCandidateRankingDetails()" class="w-9 h-9 rounded-lg hover:bg-gray-100 text-gray-500"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="candidateRankingDetailsContent" class="p-6"><div class="py-16 text-center text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading ranking details...</div></div>
+        </div>
+    </div>
+
     <script src="admin.js"></script>
     
     <script>
         // Pass PHP session variables to JavaScript
         const CURRENT_ADMIN_ROLE = '<?php echo $admin_role; ?>';
         const CURRENT_ADMIN_NAME = '<?php echo htmlspecialchars($admin_name); ?>';
+        const CURRENT_ADMIN_DEPARTMENT = <?php echo json_encode($admin_department); ?>;
+        const NCHIRE_RANKING_CSRF = <?php echo json_encode($_SESSION['ranking_csrf_token']); ?>;
         
         // Real-time dashboard functionality
         let refreshInterval;

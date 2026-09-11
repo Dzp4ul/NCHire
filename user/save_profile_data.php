@@ -7,11 +7,9 @@ while (ob_get_level()) {
 session_start();
 header('Content-Type: application/json');
 
-// Log all incoming POST data
+// Log only the action name. Profile fields and credentials must not be written to logs.
 error_log("save_profile_data.php called");
-error_log("POST data: " . print_r($_POST, true));
 error_log("Session user_id: " . ($_SESSION['user_id'] ?? 'NOT SET'));
-error_log("Session user_email: " . ($_SESSION['user_email'] ?? 'NOT SET'));
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id']) && !isset($_SESSION['user_email'])) {
@@ -55,10 +53,22 @@ if (!$user_id) {
     exit();
 }
 
+function invalidateCandidateRankings(mysqli $conn, int $userId): void
+{
+    $check = $conn->query("SHOW TABLES LIKE 'candidate_rankings'");
+    if (!$check || $check->num_rows === 0) return;
+    $stmt = $conn->prepare("UPDATE candidate_rankings SET input_hash = REPEAT('0', 64), ai_status = 'stale', updated_at = NOW() WHERE applicant_id = ?");
+    if ($stmt) {
+        $stmt->bind_param('i', $userId);
+        $stmt->execute();
+        $stmt->close();
+    }
+}
+
 function ensureEducationProfileColumns(mysqli $conn): void
 {
     $columns = [
-        'education_level' => "ALTER TABLE user_education ADD COLUMN education_level ENUM('bachelor','master','doctorate','other') NOT NULL DEFAULT 'other' AFTER user_id",
+        'education_level' => "ALTER TABLE user_education ADD COLUMN education_level ENUM('high_school','associate','bachelor','master','doctorate','other') NOT NULL DEFAULT 'other' AFTER user_id",
         'education_status' => "ALTER TABLE user_education ADD COLUMN education_status ENUM('completed','ongoing') NOT NULL DEFAULT 'completed' AFTER institution",
         'completed_units' => "ALTER TABLE user_education ADD COLUMN completed_units INT NULL AFTER education_status",
         'year_completed' => "ALTER TABLE user_education ADD COLUMN year_completed INT NULL AFTER completed_units",
@@ -108,6 +118,42 @@ function saveEducationDocument(string $fieldName, int $userId): ?string
     return 'uploads/education_documents/' . $fileName;
 }
 
+function saveQualificationDocument(string $fieldName, int $userId): ?string
+{
+    if (!isset($_FILES[$fieldName]) || $_FILES[$fieldName]['error'] === UPLOAD_ERR_NO_FILE) return null;
+    if ($_FILES[$fieldName]['error'] !== UPLOAD_ERR_OK) throw new RuntimeException('Unable to upload qualification proof.');
+    if ($_FILES[$fieldName]['size'] > 5 * 1024 * 1024) throw new RuntimeException('Qualification proof must be 5MB or smaller.');
+
+    $allowedExtensions = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
+    $extension = strtolower(pathinfo((string)($_FILES[$fieldName]['name'] ?? ''), PATHINFO_EXTENSION));
+    if (!in_array($extension, $allowedExtensions, true)) throw new RuntimeException('Qualification proof must be PDF, DOC, DOCX, JPG, or PNG.');
+
+    if (function_exists('finfo_open')) {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime = $finfo ? finfo_file($finfo, $_FILES[$fieldName]['tmp_name']) : false;
+        if ($finfo) finfo_close($finfo);
+        $allowedMimes = [
+            'application/pdf', 'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/zip', 'image/jpeg', 'image/png',
+        ];
+        if ($mime && !in_array($mime, $allowedMimes, true)) throw new RuntimeException('Qualification proof file type is not allowed.');
+    }
+
+    $uploadDir = __DIR__ . '/uploads/qualification_documents/';
+    if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) throw new RuntimeException('Unable to prepare qualification upload folder.');
+    $fileName = 'qualification_' . $userId . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $extension;
+    if (!move_uploaded_file($_FILES[$fieldName]['tmp_name'], $uploadDir . $fileName)) throw new RuntimeException('Unable to save qualification proof.');
+    return 'uploads/qualification_documents/' . $fileName;
+}
+
+function isValidProfileDate(?string $value): bool
+{
+    if ($value === null) return true;
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+    return $date !== false && $date->format('Y-m-d') === $value;
+}
+
 // Handle Education Save
 if (isset($_POST['saveEducation'])) {
     error_log("=== EDUCATION SAVE START ===");
@@ -129,11 +175,15 @@ if (isset($_POST['saveEducation'])) {
         ? (int)$_POST['year_completed']
         : (isset($_POST['ed_year_completed']) && $_POST['ed_year_completed'] !== '' ? (int)$_POST['ed_year_completed'] : null);
 
-    if (!in_array($education_level, ['bachelor', 'master', 'doctorate', 'other'], true)) {
+    if (!in_array($education_level, ['high_school', 'associate', 'bachelor', 'master', 'doctorate', 'other'], true)) {
         $education_level = 'other';
     }
     if (!in_array($education_status, ['completed', 'ongoing'], true)) {
         $education_status = 'completed';
+    }
+    if ($completed_units !== null && ($completed_units < 0 || $completed_units > 200)) {
+        echo json_encode(['success' => false, 'message' => 'Completed graduate units must be between 0 and 200.']);
+        exit();
     }
     if ($education_level === 'other') {
         $degree_l = strtolower($ed_degree);
@@ -143,6 +193,10 @@ if (isset($_POST['saveEducation'])) {
             $education_level = 'master';
         } elseif (strpos($degree_l, 'bachelor') !== false || strpos($degree_l, 'baccalaureate') !== false) {
             $education_level = 'bachelor';
+        } elseif (strpos($degree_l, 'associate') !== false) {
+            $education_level = 'associate';
+        } elseif (strpos($degree_l, 'high school') !== false || strpos($degree_l, 'secondary') !== false) {
+            $education_level = 'high_school';
         }
     }
 
@@ -210,6 +264,7 @@ if (isset($_POST['saveEducation'])) {
         $stmt->bind_param("sssssiissiisii", $ed_degree, $ed_fs, $ed_ins, $education_level, $education_status, $completed_units, $year_completed, $certificate_of_grades, $proof_of_enrollment, $ed_sy, $ed_ey, $ed_gpa, $edit_id, $user_id);
 
         if ($stmt->execute()) {
+            invalidateCandidateRankings($conn, (int)$user_id);
             $response_data['id'] = $edit_id;
             echo json_encode(['success' => true, 'message' => 'Education updated successfully', 'id' => $edit_id, 'data' => $response_data]);
         } else {
@@ -222,6 +277,7 @@ if (isset($_POST['saveEducation'])) {
         $stmt->bind_param("isssssiissiis", $user_id, $ed_degree, $ed_fs, $ed_ins, $education_level, $education_status, $completed_units, $year_completed, $certificate_of_grades, $proof_of_enrollment, $ed_sy, $ed_ey, $ed_gpa);
 
         if ($stmt->execute()) {
+            invalidateCandidateRankings($conn, (int)$user_id);
             $new_id = $stmt->insert_id;
             $response_data['id'] = $new_id;
             error_log("SUCCESS: Education inserted with ID: " . $new_id);
@@ -245,7 +301,7 @@ if (isset($_POST['savePersonal'])) {
     $phone = $conn->real_escape_string($_POST['applicant_num'] ?? '');
     $address = $conn->real_escape_string($_POST['applicant_address'] ?? '');
     
-    error_log("User ID: $user_id, Name: $first_name $last_name, Email: $email");
+    error_log("Personal information update requested for user_id: $user_id");
     
     // Validate required fields
     if (empty($first_name) || empty($last_name) || empty($email)) {
@@ -288,7 +344,7 @@ if (isset($_POST['savePersonal'])) {
         $_SESSION['first_name'] = $first_name;
         if (isset($_SESSION['user_email']) && $_SESSION['user_email'] !== $email) {
             $_SESSION['user_email'] = $email;
-            error_log("Session email updated to: $email");
+            error_log("Session email updated for user_id: $user_id");
         }
         
         echo json_encode([
@@ -314,6 +370,10 @@ if (isset($_POST['saveExperience'])) {
     $end_date = isset($_POST['is_current']) ? NULL : ($_POST['end_date'] ?? '');
     $work_descript = $conn->real_escape_string($_POST['work_descript'] ?? '');
     $is_current = isset($_POST['is_current']) ? 1 : 0;
+    $experience_type = strtolower(trim($_POST['experience_type'] ?? 'other'));
+    if (!in_array($experience_type, ['teaching', 'industry', 'other'], true)) {
+        $experience_type = 'other';
+    }
     
     if (empty($job_title) || empty($work_comp) || empty($start_date)) {
         echo json_encode(['success' => false, 'message' => 'Please fill in all required fields']);
@@ -326,12 +386,13 @@ if (isset($_POST['saveExperience'])) {
     
     if ($edit_id > 0) {
         // UPDATE existing record
-        $sql = "UPDATE user_experience SET job_title = ?, company = ?, location = ?, start_date = ?, end_date = ?, description = ?, is_current = ? 
+        $sql = "UPDATE user_experience SET job_title = ?, company = ?, location = ?, start_date = ?, end_date = ?, description = ?, is_current = ?, experience_type = ?
                 WHERE id = ? AND user_id = ?";
         $stmt = $conn->prepare($sql);
-        $stmt->bind_param("sssssssii", $job_title, $work_comp, $work_loc, $start_date_formatted, $end_date_formatted, $work_descript, $is_current, $edit_id, $user_id);
+        $stmt->bind_param("ssssssisii", $job_title, $work_comp, $work_loc, $start_date_formatted, $end_date_formatted, $work_descript, $is_current, $experience_type, $edit_id, $user_id);
         
         if ($stmt->execute()) {
+            invalidateCandidateRankings($conn, (int)$user_id);
             echo json_encode(['success' => true, 'message' => 'Work experience updated successfully']);
         } else {
             error_log("Experience update error: " . $stmt->error);
@@ -339,12 +400,13 @@ if (isset($_POST['saveExperience'])) {
         }
     } else {
         // INSERT new record
-        $sql = "INSERT INTO user_experience (user_id, job_title, company, location, start_date, end_date, description, is_current) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        $sql = "INSERT INTO user_experience (user_id, experience_type, job_title, company, location, start_date, end_date, description, is_current)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
         $stmt = $conn->prepare($sql);
-        $stmt->bind_param("issssssi", $user_id, $job_title, $work_comp, $work_loc, $start_date_formatted, $end_date_formatted, $work_descript, $is_current);
+        $stmt->bind_param("isssssssi", $user_id, $experience_type, $job_title, $work_comp, $work_loc, $start_date_formatted, $end_date_formatted, $work_descript, $is_current);
         
         if ($stmt->execute()) {
+            invalidateCandidateRankings($conn, (int)$user_id);
             echo json_encode(['success' => true, 'message' => 'Work experience added successfully', 'id' => $stmt->insert_id]);
         } else {
             error_log("Experience insert error: " . $stmt->error);
@@ -380,6 +442,7 @@ if (isset($_POST['saveSkill'])) {
         $stmt->bind_param("ssiii", $skill_name, $skill_category, $skill_level, $edit_id, $user_id);
         
         if ($stmt->execute()) {
+            invalidateCandidateRankings($conn, (int)$user_id);
             echo json_encode(['success' => true, 'message' => 'Skill updated successfully']);
         } else {
             error_log("Skill update error: " . $stmt->error);
@@ -393,11 +456,80 @@ if (isset($_POST['saveSkill'])) {
         $stmt->bind_param("issi", $user_id, $skill_name, $skill_category, $skill_level);
         
         if ($stmt->execute()) {
+            invalidateCandidateRankings($conn, (int)$user_id);
             echo json_encode(['success' => true, 'message' => 'Skill added successfully', 'id' => $stmt->insert_id]);
         } else {
             error_log("Skill insert error: " . $stmt->error);
             echo json_encode(['success' => false, 'message' => 'Error adding skill: ' . $stmt->error]);
         }
+    }
+    $stmt->close();
+    exit();
+}
+
+// Handle structured certifications, licenses, and training.
+if (isset($_POST['saveQualification'])) {
+    $tableCheck = $conn->query("SHOW TABLES LIKE 'user_qualifications'");
+    if (!$tableCheck || $tableCheck->num_rows === 0) {
+        echo json_encode(['success' => false, 'message' => 'Qualification profile migration is required.']);
+        exit();
+    }
+
+    $editId = !empty($_POST['edit_id']) ? (int)$_POST['edit_id'] : 0;
+    $type = strtolower(trim((string)($_POST['qualification_type'] ?? '')));
+    $title = trim((string)($_POST['qualification_title'] ?? ''));
+    $issuer = trim((string)($_POST['issuing_organization'] ?? ''));
+    $issuedDate = trim((string)($_POST['issued_date'] ?? '')) ?: null;
+    $expiryDate = trim((string)($_POST['expiry_date'] ?? '')) ?: null;
+
+    if (!in_array($type, ['certification', 'license', 'training'], true) || $title === '') {
+        echo json_encode(['success' => false, 'message' => 'Qualification type and title are required.']);
+        exit();
+    }
+    if (strlen($title) > 255 || strlen($issuer) > 255) {
+        echo json_encode(['success' => false, 'message' => 'Qualification title and issuing organization must be 255 characters or fewer.']);
+        exit();
+    }
+    foreach ([$issuedDate, $expiryDate] as $date) {
+        if (!isValidProfileDate($date)) {
+            echo json_encode(['success' => false, 'message' => 'Qualification dates are invalid.']);
+            exit();
+        }
+    }
+    if ($issuedDate && $expiryDate && $expiryDate < $issuedDate) {
+        echo json_encode(['success' => false, 'message' => 'Expiry date cannot be before the issued date.']);
+        exit();
+    }
+
+    $existingProof = null;
+    if ($editId > 0) {
+        $existingStmt = $conn->prepare('SELECT proof_document FROM user_qualifications WHERE id = ? AND user_id = ?');
+        $existingStmt->bind_param('ii', $editId, $user_id);
+        $existingStmt->execute();
+        $existingProof = $existingStmt->get_result()->fetch_assoc()['proof_document'] ?? null;
+        $existingStmt->close();
+    }
+    try {
+        $proof = saveQualificationDocument('qualification_proof', (int)$user_id) ?: $existingProof;
+    } catch (RuntimeException $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        exit();
+    }
+
+    if ($editId > 0) {
+        $stmt = $conn->prepare("UPDATE user_qualifications SET qualification_type=?, title=?, issuing_organization=?, issued_date=?, expiry_date=?, proof_document=?, verification_status='unverified', verified_by=NULL, verified_at=NULL WHERE id=? AND user_id=?");
+        $stmt->bind_param('ssssssii', $type, $title, $issuer, $issuedDate, $expiryDate, $proof, $editId, $user_id);
+    } else {
+        $stmt = $conn->prepare('INSERT INTO user_qualifications (user_id, qualification_type, title, issuing_organization, issued_date, expiry_date, proof_document) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        $stmt->bind_param('issssss', $user_id, $type, $title, $issuer, $issuedDate, $expiryDate, $proof);
+    }
+    if ($stmt->execute()) {
+        $id = $editId ?: $stmt->insert_id;
+        invalidateCandidateRankings($conn, (int)$user_id);
+        echo json_encode(['success' => true, 'message' => $editId ? 'Qualification updated successfully' : 'Qualification added successfully', 'id' => $id]);
+    } else {
+        error_log('Qualification save error: ' . $stmt->error);
+        echo json_encode(['success' => false, 'message' => 'Unable to save qualification.']);
     }
     $stmt->close();
     exit();
@@ -422,6 +554,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         
         if ($stmt->execute()) {
             if ($stmt->affected_rows > 0) {
+                invalidateCandidateRankings($conn, (int)$user_id);
                 echo json_encode(['success' => true, 'message' => 'Education deleted successfully']);
             } else {
                 echo json_encode(['success' => false, 'message' => 'Education record not found']);
@@ -449,6 +582,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         
         if ($stmt->execute()) {
             if ($stmt->affected_rows > 0) {
+                invalidateCandidateRankings($conn, (int)$user_id);
                 echo json_encode(['success' => true, 'message' => 'Work experience deleted successfully']);
             } else {
                 echo json_encode(['success' => false, 'message' => 'Work experience not found']);
@@ -476,6 +610,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         
         if ($stmt->execute()) {
             if ($stmt->affected_rows > 0) {
+                invalidateCandidateRankings($conn, (int)$user_id);
                 echo json_encode(['success' => true, 'message' => 'Skill deleted successfully']);
             } else {
                 echo json_encode(['success' => false, 'message' => 'Skill not found']);
@@ -483,6 +618,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         } else {
             error_log("Delete skill error: " . $stmt->error);
             echo json_encode(['success' => false, 'message' => 'Error deleting skill']);
+        }
+        $stmt->close();
+        exit();
+    }
+
+    if (isset($delete_data['delete_qualification'])) {
+        $id = (int)($delete_data['id'] ?? 0);
+        if ($id <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Invalid ID']);
+            exit();
+        }
+        $stmt = $conn->prepare('DELETE FROM user_qualifications WHERE id = ? AND user_id = ?');
+        $stmt->bind_param('ii', $id, $user_id);
+        if ($stmt->execute() && $stmt->affected_rows > 0) {
+            invalidateCandidateRankings($conn, (int)$user_id);
+            echo json_encode(['success' => true, 'message' => 'Qualification deleted successfully']);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Qualification record not found']);
         }
         $stmt->close();
         exit();

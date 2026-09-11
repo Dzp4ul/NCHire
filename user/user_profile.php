@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $create_education_table = "CREATE TABLE IF NOT EXISTS user_education (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    education_level ENUM('bachelor','master','doctorate','other') NOT NULL DEFAULT 'other',
+    education_level ENUM('high_school','associate','bachelor','master','doctorate','other') NOT NULL DEFAULT 'other',
     degree VARCHAR(255) NOT NULL,
     field_of_study VARCHAR(255) NOT NULL,
     institution VARCHAR(255) NOT NULL,
@@ -56,7 +56,7 @@ if (!$conn->query($create_education_table)) {
 }
 
 $education_column_migrations = [
-    'education_level' => "ALTER TABLE user_education ADD COLUMN education_level ENUM('bachelor','master','doctorate','other') NOT NULL DEFAULT 'other' AFTER user_id",
+    'education_level' => "ALTER TABLE user_education ADD COLUMN education_level ENUM('high_school','associate','bachelor','master','doctorate','other') NOT NULL DEFAULT 'other' AFTER user_id",
     'education_status' => "ALTER TABLE user_education ADD COLUMN education_status ENUM('completed','ongoing') NOT NULL DEFAULT 'completed' AFTER institution",
     'completed_units' => "ALTER TABLE user_education ADD COLUMN completed_units INT NULL AFTER education_status",
     'year_completed' => "ALTER TABLE user_education ADD COLUMN year_completed INT NULL AFTER completed_units",
@@ -427,6 +427,8 @@ unset($education_row);
 function profileEducationLevelLabel(string $level): string
 {
     return [
+        'high_school' => 'High School',
+        'associate' => 'Associate',
         'bachelor' => 'Bachelor',
         'master' => "Master's",
         'doctorate' => 'Doctorate',
@@ -497,6 +499,43 @@ if ($skills_result && $skills_result->num_rows > 0) {
     }
 }
 $skills_stmt->close();
+
+$qualifications_data = [];
+$qualifications_table = $conn->query("SHOW TABLES LIKE 'user_qualifications'");
+if ($qualifications_table && $qualifications_table->num_rows > 0) {
+    $qualifications_sql = "SELECT id, qualification_type, title, issuing_organization, issued_date, expiry_date, proof_document, verification_status FROM user_qualifications WHERE user_id = ? ORDER BY issued_date DESC, id DESC";
+    $qualifications_stmt = $conn->prepare($qualifications_sql);
+    $qualifications_stmt->bind_param("i", $current_user_id);
+    $qualifications_stmt->execute();
+    $qualifications_result = $qualifications_stmt->get_result();
+    while ($row = $qualifications_result->fetch_assoc()) $qualifications_data[] = $row;
+    $qualifications_stmt->close();
+}
+
+$ranking_profile_missing = [];
+if (empty($education_data)) {
+    $ranking_profile_missing[] = 'education';
+} else {
+    foreach ($education_data as $education_row) {
+        $ongoingGraduate = ($education_row['education_status'] ?? '') === 'ongoing' && in_array(($education_row['education_level'] ?? ''), ['master', 'doctorate'], true);
+        if (empty($education_row['degree']) || empty($education_row['field_of_study']) || empty($education_row['institution']) || ($ongoingGraduate && !is_numeric($education_row['completed_units'] ?? null))) {
+            $ranking_profile_missing[] = 'complete education details';
+            break;
+        }
+    }
+}
+if (empty($experience_data)) {
+    $ranking_profile_missing[] = 'work experience';
+} else {
+    foreach ($experience_data as $experience_row) {
+        if (empty($experience_row['job_title']) || empty($experience_row['start_date']) || (empty($experience_row['is_current']) && empty($experience_row['end_date']))) {
+            $ranking_profile_missing[] = 'complete work-experience dates';
+            break;
+        }
+    }
+}
+if (empty($skills_data)) $ranking_profile_missing[] = 'skills';
+if (empty($qualifications_data)) $ranking_profile_missing[] = 'certifications, licenses, or training (when applicable)';
 ?>
 <html lang="en">
 <head><script src="https://static.readdy.ai/static/e.js"></script>
@@ -990,12 +1029,25 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 </div>
 
+<?php if (!empty($ranking_profile_missing)): ?>
+<div class="mb-6 border border-amber-200 bg-amber-50 rounded-xl p-4">
+<div class="flex items-start gap-3">
+<i class="ri-information-line text-amber-600 text-xl mt-0.5"></i>
+<div>
+<h3 class="font-semibold text-amber-900">Additional profile information improves job-specific matching</h3>
+<p class="text-sm text-amber-800 mt-1">Additional ranking information needed: <?php echo htmlspecialchars(implode(', ', $ranking_profile_missing)); ?>. Only information saved in your NCHire profile is considered; missing details are never assumed.</p>
+</div>
+</div>
+</div>
+<?php endif; ?>
+
 <div class="bg-white rounded-xl shadow-sm border border-gray-200">
 <div class="border-b border-gray-200">
-<nav class="flex space-x-8 px-6">
+<nav class="flex space-x-8 px-6 overflow-x-auto">
 <button class="py-4 px-1 border-b-2 border-primary text-primary font-medium text-sm whitespace-nowrap tab-btn" data-tab="education">Education</button>
 <button class="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium text-sm whitespace-nowrap tab-btn" data-tab="experience">Work Experience</button>
 <button class="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium text-sm whitespace-nowrap tab-btn" data-tab="skills">Skills</button>
+<button class="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium text-sm whitespace-nowrap tab-btn" data-tab="qualifications">Certifications & Licenses</button>
 <button class="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium text-sm whitespace-nowrap tab-btn" data-tab="settings">Account Settings</button>
 </nav>
 </div>
@@ -1096,6 +1148,7 @@ $year_display = $status === 'ongoing'
 <div class="flex items-start justify-between">
 <div class="flex-1">
 <h4 class="font-semibold text-gray-900 text-base"><?php echo htmlspecialchars($experience['job_title']); ?></h4>
+<span class="inline-block mt-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs"><?php echo htmlspecialchars(ucfirst($experience['experience_type'] ?? 'other')); ?></span>
 <p class="text-gray-600 mt-1 text-sm"><?php echo htmlspecialchars($experience['company']); ?></p>
 <p class="text-gray-500 text-sm mt-1"><?php
 // Format dates nicely
@@ -1106,6 +1159,7 @@ if (!empty($experience['location'])) {
     echo ' | ' . htmlspecialchars($experience['location']);
 }
 ?></p>
+<?php if (!empty($experience['description'])): ?><p class="text-gray-600 text-sm mt-2"><?php echo nl2br(htmlspecialchars($experience['description'])); ?></p><?php endif; ?>
 </div>
 <div class="flex space-x-1 ml-4">
 <button onclick="editExperience(<?php echo $experience['id']; ?>)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
@@ -1171,6 +1225,46 @@ echo $levels[$skill['skill_level']];
 </div>
 <?php endif; ?>
 </div>
+</div>
+</div>
+
+<div id="qualifications" class="tab-content hidden">
+<div class="flex items-center justify-between mb-6 gap-4">
+<div>
+<h3 class="text-xl font-semibold text-gray-900">Certifications, Licenses & Training</h3>
+<p class="text-sm text-gray-500 mt-1">Add structured qualification titles for accurate matching. Uploaded proof remains unverified until reviewed.</p>
+</div>
+<button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors text-sm whitespace-nowrap !rounded-button" id="addQualificationBtn">Add Qualification</button>
+</div>
+<div class="space-y-3" id="qualificationsList">
+<?php if (!empty($qualifications_data)): ?>
+<?php foreach ($qualifications_data as $qualification): ?>
+<div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow" data-qualification-id="<?php echo (int)$qualification['id']; ?>">
+<div class="flex items-start justify-between gap-4">
+<div class="flex-1">
+<div class="flex flex-wrap items-center gap-2">
+<h4 class="font-semibold text-gray-900 text-base"><?php echo htmlspecialchars($qualification['title']); ?></h4>
+<span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-medium"><?php echo htmlspecialchars(ucfirst($qualification['qualification_type'])); ?></span>
+<span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs"><?php echo htmlspecialchars(ucfirst($qualification['verification_status'])); ?></span>
+</div>
+<?php if (!empty($qualification['issuing_organization'])): ?><p class="text-gray-600 mt-1 text-sm"><?php echo htmlspecialchars($qualification['issuing_organization']); ?></p><?php endif; ?>
+<p class="text-gray-500 text-sm mt-1"><?php echo $qualification['issued_date'] ? 'Issued ' . htmlspecialchars(date('M Y', strtotime($qualification['issued_date']))) : 'Issue date not provided'; ?><?php echo $qualification['expiry_date'] ? ' | Expires ' . htmlspecialchars(date('M Y', strtotime($qualification['expiry_date']))) : ''; ?></p>
+<?php if (!empty($qualification['proof_document'])): ?><a href="<?php echo htmlspecialchars($qualification['proof_document']); ?>" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-primary hover:underline text-xs mt-2"><i class="ri-file-text-line"></i>View proof on file</a><?php endif; ?>
+</div>
+<div class="flex space-x-1">
+<button type="button" onclick="editQualification(<?php echo (int)$qualification['id']; ?>)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600" title="Edit"><i class="ri-edit-line"></i></button>
+<button type="button" onclick="deleteQualification(<?php echo (int)$qualification['id']; ?>)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500" title="Delete"><i class="ri-delete-bin-line"></i></button>
+</div>
+</div>
+</div>
+<?php endforeach; ?>
+<?php else: ?>
+<div class="text-center py-12 text-gray-500">
+<i class="ri-award-line text-4xl mb-4 text-gray-300"></i>
+<p class="text-gray-600">No structured qualifications found.</p>
+<p class="text-sm text-gray-500 mt-1">Add only certifications, licenses, or training you actually hold.</p>
+</div>
+<?php endif; ?>
 </div>
 </div>
 
@@ -2439,6 +2533,8 @@ window.showNotification = showNotification;
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2" for="education_level">Education Level</label>
           <select name="education_level" id="education_level" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
+            <option value="high_school">High School</option>
+            <option value="associate">Associate</option>
             <option value="bachelor">Bachelor</option>
             <option value="master">Master's</option>
             <option value="doctorate">Doctorate</option>
@@ -2521,6 +2617,14 @@ window.showNotification = showNotification;
         </button>
       </div>
       <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2" for="experience_type">Experience Type</label>
+        <select name="experience_type" id="experience_type" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
+          <option value="teaching">Teaching</option>
+          <option value="industry">Industry / Professional</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div>
         <label class="block text-sm font-medium text-gray-700 mb-2" for="job_title">Job Title</label>
         <input type="text" name="job_title" id="job_title" placeholder="e.g., Software Developer" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
       </div>
@@ -2541,6 +2645,11 @@ window.showNotification = showNotification;
           <label class="block text-sm font-medium text-gray-700 mb-2" for="end_date">End Date</label>
           <input type="month" name="end_date" id="end_date" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
         </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2" for="work_descript">Relevant Duties (Optional)</label>
+        <textarea name="work_descript" id="work_descript" rows="3" maxlength="2000" placeholder="Describe duties directly relevant to jobs you may apply for" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"></textarea>
       </div>
 
         <button type="button" id="cancelExperienceBtn" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors !rounded-button">Cancel</button>
@@ -2588,6 +2697,135 @@ window.showNotification = showNotification;
     </form>
   </div>
 </div>
+
+<!-- Structured Qualification Modal -->
+<div id="qualificationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+  <div class="bg-white rounded-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <form method="POST" enctype="multipart/form-data" class="p-6 space-y-4" id="qualificationForm">
+      <input type="hidden" name="saveQualification" value="1">
+      <input type="hidden" name="edit_id" id="edit_qualification_id" value="">
+      <div class="border-b border-gray-200 flex justify-between items-center pb-4">
+        <h3 class="text-lg font-semibold text-gray-900" id="qualificationModalTitle">Add Qualification</h3>
+        <button type="button" id="closeQualificationModal" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600"><i class="ri-close-line text-xl"></i></button>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2" for="qualification_type">Type</label>
+        <select name="qualification_type" id="qualification_type" required class="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm">
+          <option value="certification">Certification</option>
+          <option value="license">Professional License</option>
+          <option value="training">Relevant Training</option>
+        </select>
+      </div>
+      <div><label class="block text-sm font-medium text-gray-700 mb-2" for="qualification_title">Qualification Title</label><input type="text" name="qualification_title" id="qualification_title" maxlength="255" required placeholder="e.g., Licensed Professional Teacher" class="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm"></div>
+      <div><label class="block text-sm font-medium text-gray-700 mb-2" for="issuing_organization">Issuing Organization (Optional)</label><input type="text" name="issuing_organization" id="issuing_organization" maxlength="255" class="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm"></div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div><label class="block text-sm font-medium text-gray-700 mb-2" for="issued_date">Issued Date (Optional)</label><input type="date" name="issued_date" id="issued_date" class="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm"></div>
+        <div><label class="block text-sm font-medium text-gray-700 mb-2" for="expiry_date">Expiry Date (Optional)</label><input type="date" name="expiry_date" id="expiry_date" class="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm"></div>
+      </div>
+      <div><label class="block text-sm font-medium text-gray-700 mb-2" for="qualification_proof">Proof Document (Optional)</label><input type="file" name="qualification_proof" id="qualification_proof" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" class="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm"><p class="text-xs text-gray-500 mt-1">Maximum 5MB. Uploading proof does not mark it as verified.</p></div>
+      <div class="flex justify-end space-x-4 pt-4"><button type="button" id="cancelQualificationBtn" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">Cancel</button><button type="submit" id="saveQualificationBtn" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 text-sm">Save Qualification</button></div>
+    </form>
+  </div>
+</div>
+
+<script id="qualificationProfileManagement">
+(function initializeQualificationProfile() {
+  const qualificationData = <?php echo json_encode($qualifications_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+  const escapeValue = value => {
+    const div = document.createElement('div');
+    div.textContent = value == null ? '' : String(value);
+    return div.innerHTML;
+  };
+  const modal = document.getElementById('qualificationModal');
+  const form = document.getElementById('qualificationForm');
+
+  function closeQualificationModal() {
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+
+  window.reloadQualificationsList = async function() {
+    const response = await fetch('get_profile_data.php?type=qualifications', {cache: 'no-store'});
+    const result = await response.json();
+    const container = document.getElementById('qualificationsList');
+    if (!result.success || !container) return;
+    qualificationData.splice(0, qualificationData.length, ...result.data);
+    if (!result.data.length) {
+      container.innerHTML = '<div class="text-center py-12 text-gray-500"><i class="ri-award-line text-4xl mb-4 text-gray-300"></i><p>No structured qualifications found.</p></div>';
+      return;
+    }
+    container.innerHTML = result.data.map(item => `
+      <div class="bg-white border border-gray-200 rounded-lg p-4" data-qualification-id="${Number(item.id)}">
+        <div class="flex items-start justify-between gap-4"><div class="flex-1">
+          <div class="flex flex-wrap items-center gap-2"><h4 class="font-semibold text-gray-900">${escapeValue(item.title)}</h4><span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs">${escapeValue(item.qualification_type)}</span><span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs">${escapeValue(item.verification_status || 'unverified')}</span></div>
+          ${item.issuing_organization ? `<p class="text-gray-600 mt-1 text-sm">${escapeValue(item.issuing_organization)}</p>` : ''}
+          <p class="text-gray-500 text-sm mt-1">${item.issued_date ? 'Issued ' + escapeValue(item.issued_date) : 'Issue date not provided'}${item.expiry_date ? ' | Expires ' + escapeValue(item.expiry_date) : ''}</p>
+          ${item.proof_document ? `<a href="${escapeValue(item.proof_document)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-primary hover:underline text-xs mt-2">View proof on file</a>` : ''}
+        </div><div class="flex space-x-1"><button type="button" onclick="editQualification(${Number(item.id)})" class="w-8 h-8 text-gray-500" title="Edit"><i class="ri-edit-line"></i></button><button type="button" onclick="deleteQualification(${Number(item.id)})" class="w-8 h-8 text-red-500" title="Delete"><i class="ri-delete-bin-line"></i></button></div></div>
+      </div>`).join('');
+  };
+
+  window.editQualification = function(id) {
+    const item = qualificationData.find(row => Number(row.id) === Number(id));
+    if (!item || !modal) return;
+    document.getElementById('edit_qualification_id').value = item.id;
+    document.getElementById('qualification_type').value = item.qualification_type;
+    document.getElementById('qualification_title').value = item.title || '';
+    document.getElementById('issuing_organization').value = item.issuing_organization || '';
+    document.getElementById('issued_date').value = item.issued_date || '';
+    document.getElementById('expiry_date').value = item.expiry_date || '';
+    document.getElementById('qualification_proof').value = '';
+    document.getElementById('qualificationModalTitle').textContent = 'Edit Qualification';
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  };
+
+  window.deleteQualification = function(id) {
+    showDeleteConfirm('Delete this structured qualification?', async function() {
+      const response = await fetch('save_profile_data.php', {method: 'DELETE', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'delete_qualification=1&id=' + encodeURIComponent(id)});
+      const result = await response.json();
+      showNotification(result.message, result.success ? 'success' : 'error');
+      if (result.success) window.reloadQualificationsList();
+    });
+  };
+
+  function bindQualificationControls() {
+    const add = document.getElementById('addQualificationBtn');
+    if (!form || !modal || !add || form.dataset.bound === '1') return;
+    form.dataset.bound = '1';
+    add.addEventListener('click', () => {
+      form.reset();
+      document.getElementById('edit_qualification_id').value = '';
+      document.getElementById('qualificationModalTitle').textContent = 'Add Qualification';
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    });
+    document.getElementById('closeQualificationModal')?.addEventListener('click', closeQualificationModal);
+    document.getElementById('cancelQualificationBtn')?.addEventListener('click', closeQualificationModal);
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const button = document.getElementById('saveQualificationBtn');
+      button.disabled = true;
+      try {
+        const response = await fetch('save_profile_data.php', {method: 'POST', body: new FormData(form)});
+        const result = await response.json();
+        showNotification(result.message, result.success ? 'success' : 'error');
+        if (result.success) {
+          closeQualificationModal();
+          await window.reloadQualificationsList();
+        }
+      } catch (error) {
+        showNotification('Unable to save qualification.', 'error');
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindQualificationControls);
+  else setTimeout(bindQualificationControls, 0);
+})();
+</script>
 
 <script id="editDeleteFunctions">
 // Education Edit/Delete Functions
@@ -2678,6 +2916,8 @@ function editExperience(id) {
   document.getElementById('job_title').value = experience.job_title;
   document.getElementById('work_comp').value = experience.company;
   document.getElementById('work_loc').value = experience.location || '';
+  document.getElementById('experience_type').value = experience.experience_type || 'other';
+  document.getElementById('work_descript').value = experience.description || '';
   
   // Format dates for month input (YYYY-MM)
   const startDate = experience.start_date.substring(0, 7);
