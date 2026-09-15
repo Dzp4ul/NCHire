@@ -436,41 +436,15 @@ function profileEducationLevelLabel(string $level): string
     ][$level] ?? 'Other';
 }
 
+$qualification_projection = nc_calculate_salary_projection_from_education(
+    $education_data,
+    ['job_type' => 'Part-time']
+);
 $qualification_summary = [
-    'title' => 'No qualifying graduate education recorded',
-    'rate' => 'No applicable part-time hourly rate yet',
-    'note' => 'Salary projection appears only after selecting a teaching load with configured teaching hours.'
+    'title' => $qualification_projection['qualification'],
+    'rate' => 'Projected part-time rate: ' . $qualification_projection['rate_display'],
+    'note' => $qualification_projection['projection_basis'],
 ];
-foreach ($education_data as $education_row) {
-    $level = $education_row['education_level'] ?? 'other';
-    $status = $education_row['education_status'] ?? 'completed';
-    $units = isset($education_row['completed_units']) && $education_row['completed_units'] !== null ? (int)$education_row['completed_units'] : null;
-
-    if ($level === 'doctorate' && $status === 'completed') {
-        $qualification_summary = [
-            'title' => 'Doctorate - Completed',
-            'rate' => 'Applicable hourly rate: 220.00',
-            'note' => 'Part-time projection is computed from this rate and the selected load hours.'
-        ];
-        break;
-    }
-
-    if ($level === 'master' && $status === 'completed' && $qualification_summary['title'] !== 'Doctorate - Completed') {
-        $qualification_summary = [
-            'title' => "Master's - Completed",
-            'rate' => 'Applicable hourly rate: 200.00',
-            'note' => 'Part-time projection is computed from this rate and the selected load hours.'
-        ];
-    }
-
-    if ($level === 'master' && $status === 'ongoing' && $units !== null && $units >= 9 && strpos($qualification_summary['title'], 'Completed') === false) {
-        $qualification_summary = [
-            'title' => "Master's - Ongoing ({$units} completed units)",
-            'rate' => 'Applicable hourly rate: 150.00',
-            'note' => 'Requires Certificate of Grades and Proof of Enrollment for validation.'
-        ];
-    }
-}
 
 // Fetch work experience data
 $experience_sql = "SELECT * FROM user_experience WHERE user_id = ? ORDER BY start_date DESC";
@@ -1129,8 +1103,8 @@ $year_display = $status === 'ongoing'
 <p class="text-xs text-gray-500 mt-1"><?php echo htmlspecialchars($qualification_summary['note']); ?></p>
 </div>
 <div class="md:text-right">
-<p class="text-sm font-semibold text-blue-900"><?php echo htmlspecialchars($qualification_summary['rate']); ?></p>
-<p class="text-xs text-gray-500 mt-1">Projected salary: available after selecting a teaching load.</p>
+<p class="text-sm font-semibold text-blue-900"><?php echo htmlspecialchars($qualification_summary['rate']); ?><sup>*</sup></p>
+<p class="text-xs text-gray-500 mt-1">*<?php echo htmlspecialchars($qualification_projection['disclaimer']); ?></p>
 </div>
 </div>
 </div>

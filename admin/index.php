@@ -1495,6 +1495,14 @@ $recent_activity = $conn->query($recent_activity_query);
                             </div>
                         </div>
 
+                        <!-- Projected Compensation -->
+                        <div class="bg-white rounded-lg shadow-sm border border-blue-100 p-6">
+                            <h2 class="text-lg font-semibold text-gray-900 mb-4">Projected Compensation</h2>
+                            <div id="salaryProjectionInfo" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <p class="text-gray-500 italic">Salary projection will be loaded here.</p>
+                            </div>
+                        </div>
+
                         <!-- Education -->
                         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                             <h2 class="text-lg font-semibold text-gray-900 mb-4">Education</h2>
@@ -1952,7 +1960,7 @@ $recent_activity = $conn->query($recent_activity_query);
                     </div>
                     <div class="bg-blue-50 border border-blue-100 rounded-lg p-3">
                         <p class="text-sm font-medium text-blue-900">Compensation Rule</p>
-                        <p class="text-xs text-blue-800 mt-1">Full-time loads use SGD. Part-time loads are computed from applicant qualification and teaching hours.</p>
+                        <p class="text-xs text-blue-800 mt-1">Permanent/Full-time loads use the configured Salary Grade (SG). Part-time loads use the applicant's qualification rate and teaching hours.</p>
                     </div>
                 </div>
 
@@ -2014,7 +2022,7 @@ $recent_activity = $conn->query($recent_activity_query);
                             <label class="block text-sm font-medium text-gray-700 mb-1">Salary Grade (Full-time only)</label>
                             <input type="text" name="salary_grade"
                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                   placeholder="e.g., SG-11">
+                                   placeholder="Instructor I defaults to SG13">
                         </div>
                     </div>
                     <div>
@@ -2690,7 +2698,8 @@ $recent_activity = $conn->query($recent_activity_query);
       </div>
       <div class="mt-4 flex items-center justify-between">
         <div class="text-white text-xl font-semibold">
-          <i class="fas fa-peso-sign mr-2"></i><span class="job-salary"></span>
+          <i class="fas fa-money-check-alt mr-2"></i><span class="job-salary"></span><sup>*</sup>
+          <p class="text-xs font-normal text-blue-100 mt-1">*Guide only—not the actual salary. Final compensation varies by verified profile and credentials.</p>
         </div>
         <div class="text-right">
           <div class="text-blue-100 text-xs font-medium">APPLICATION DEADLINE</div>
@@ -4297,7 +4306,7 @@ $recent_activity = $conn->query($recent_activity_query);
                             <input type="hidden" name="salary_range" id="editSalary" value="">
                             <div class="bg-blue-50 border border-blue-100 rounded-lg p-3">
                                 <p class="text-sm font-medium text-blue-900">Compensation Rule</p>
-                                <p class="text-xs text-blue-800 mt-1">Full-time loads use SGD. Part-time loads are computed from applicant qualification and teaching hours.</p>
+                                <p class="text-xs text-blue-800 mt-1">Permanent/Full-time loads use the configured Salary Grade (SG). Part-time loads use the applicant's qualification rate and teaching hours.</p>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Application Deadline *</label>
@@ -4342,7 +4351,8 @@ $recent_activity = $conn->query($recent_activity_query);
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Salary Grade (Full-time only)</label>
                                     <input type="text" name="salary_grade" id="editSalaryGrade"
-                                           class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                                           class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                           placeholder="Instructor I defaults to SG13">
                                 </div>
                             </div>
                             <div class="mt-4">

@@ -27,6 +27,8 @@ if ($jobId) {
         $job = $result->fetch_assoc();
         $job['teaching_load_title'] = nc_format_teaching_load_title($job);
         $job['academic_period_label'] = nc_format_academic_period($job);
+        $job['salary_projection'] = nc_calculate_salary_projection_from_education([], $job);
+        $job['salary_display'] = $job['salary_projection']['salary_display'];
         echo json_encode($job);
     } else {
         echo json_encode(["error" => "Job not found"]);
@@ -42,6 +44,8 @@ if ($jobId) {
         while($row = $result->fetch_assoc()) {
             $row['teaching_load_title'] = nc_format_teaching_load_title($row);
             $row['academic_period_label'] = nc_format_academic_period($row);
+            $row['salary_projection'] = nc_calculate_salary_projection_from_education([], $row);
+            $row['salary_display'] = $row['salary_projection']['salary_display'];
             $jobs[] = $row;
         }
     }

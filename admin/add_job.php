@@ -76,6 +76,13 @@ $teaching_hours = (isset($data["teaching_hours_per_week"]) && $data["teaching_ho
 $load_units = (isset($data["load_units"]) && $data["load_units"] !== "") ? (float)$data["load_units"] : null;
 $required_instructors = max(1, (int)($data["required_instructors"] ?? 1));
 $salary_grade = trim($data["salary_grade"] ?? "");
+if (nc_normalize_employment_type($type) === 'full_time') {
+    $salary_grade = nc_resolve_job_salary_grade([
+        'job_title' => $title,
+        'job_type' => $type,
+        'salary_grade' => $salary_grade,
+    ], nc_salary_configuration()) ?: $salary_grade;
+}
 
 if ($department === 'Computer Science') {
     $department = 'Computing Studies';

@@ -2,6 +2,8 @@
 session_start();
 header('Content-Type: application/json');
 
+require_once __DIR__ . '/../shared/helpers/recruitment.php';
+
 // Database connection
 $host = "127.0.0.1";
 $user = "root";
@@ -79,6 +81,22 @@ if (!empty($application['user_id'])) {
     $edu_stmt->close();
 }
 
+$salary_projection = null;
+if (!empty($application['job_id']) && !empty($application['user_id'])) {
+    $job_stmt = $conn->prepare("SELECT * FROM job WHERE id = ? LIMIT 1");
+    if ($job_stmt) {
+        $job_id = (int)$application['job_id'];
+        $job_stmt->bind_param("i", $job_id);
+        $job_stmt->execute();
+        $job = $job_stmt->get_result()->fetch_assoc();
+        $job_stmt->close();
+        if ($job) {
+            $salary_projection = nc_calculate_salary_projection_from_education($education, $job);
+        }
+    }
+}
+$application['salary_projection_details'] = $salary_projection;
+
 // Get skills for this application's user
 $skills = [];
 if (!empty($application['user_id'])) {
@@ -97,7 +115,8 @@ echo json_encode([
     'application' => $application,
     'work_experience' => $work_experience,
     'education' => $education,
-    'skills' => $skills
+    'skills' => $skills,
+    'salary_projection' => $salary_projection
 ]);
 
 $stmt->close();

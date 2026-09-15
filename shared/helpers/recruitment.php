@@ -233,62 +233,220 @@ if (!function_exists('nc_get_master_status')) {
     }
 }
 
-if (!function_exists('nc_calculate_salary_projection')) {
-    function nc_calculate_salary_projection(mysqli $conn, int $userId, array $job): array
+if (!function_exists('nc_salary_configuration')) {
+    function nc_salary_configuration(?array $overrides = null): array
     {
-        $educationRows = nc_get_education_rows($conn, $userId);
-        $rate = null;
-        $qualification = 'No qualifying graduate education found';
-        $masterStatus = null;
-        $completedMasterUnits = null;
+        static $configuration = null;
+        if ($configuration === null) {
+            $path = __DIR__ . '/../../config/salary.php';
+            $loaded = is_file($path) ? require $path : [];
+            $configuration = is_array($loaded) ? $loaded : [];
+        }
+
+        return $overrides === null
+            ? $configuration
+            : array_replace_recursive($configuration, $overrides);
+    }
+}
+
+if (!function_exists('nc_normalize_employment_type')) {
+    function nc_normalize_employment_type(?string $employmentType): string
+    {
+        $value = strtolower(trim((string)$employmentType));
+        $value = str_replace(['_', '-'], ' ', $value);
+        $value = preg_replace('/\s+/', ' ', $value) ?: '';
+
+        if (strpos($value, 'part time') !== false || strpos($value, 'parttime') !== false) {
+            return 'part_time';
+        }
+        if (strpos($value, 'full time') !== false || strpos($value, 'fulltime') !== false
+            || strpos($value, 'permanent') !== false || strpos($value, 'regular') !== false) {
+            return 'full_time';
+        }
+        return 'unknown';
+    }
+}
+
+if (!function_exists('nc_normalize_salary_grade')) {
+    function nc_normalize_salary_grade(?string $salaryGrade): string
+    {
+        $value = strtoupper(trim((string)$salaryGrade));
+        if ($value === '') {
+            return '';
+        }
+        if (preg_match('/(?:SG\s*[- ]?\s*)?(\d+)/i', $value, $matches)) {
+            return 'SG' . (int)$matches[1];
+        }
+        return preg_replace('/\s+/', '-', $value) ?: $value;
+    }
+}
+
+if (!function_exists('nc_resolve_job_salary_grade')) {
+    function nc_resolve_job_salary_grade(array $job, array $configuration): string
+    {
+        $title = strtolower(trim(implode(' ', array_filter([
+            $job['job_title'] ?? null,
+            $job['position'] ?? null,
+            $job['teaching_load_title'] ?? null,
+        ]))));
+        $explicitGrade = nc_normalize_salary_grade($job['salary_grade'] ?? '');
+
+        // NCHire's generic Instructor position represents Instructor I unless
+        // a higher Instructor rank is explicitly present in the position name.
+        $hasHigherInstructorRank = preg_match('/\binstructor\s+(?:ii|iii|iv|v|vi|[2-6])\b/i', $title) === 1;
+        $isInstructorOne = !$hasHigherInstructorRank && preg_match('/\binstructor(?:\s+(?:i|1))?\b/i', $title) === 1;
+        if ($isInstructorOne) {
+            return nc_normalize_salary_grade($configuration['full_time_salary_grades']['instructor_i'] ?? 'SG13');
+        }
+
+        return $explicitGrade;
+    }
+}
+
+if (!function_exists('nc_format_money')) {
+    function nc_format_money(float $amount, string $currencySymbol = '₱'): string
+    {
+        $decimals = abs($amount - round($amount)) < 0.00001 ? 0 : 2;
+        return $currencySymbol . number_format($amount, $decimals);
+    }
+}
+
+if (!function_exists('nc_calculate_salary_projection_from_education')) {
+    function nc_calculate_salary_projection_from_education(array $educationRows, array $job, ?array $configuration = null): array
+    {
+        $configuration = nc_salary_configuration($configuration);
+        $currencySymbol = (string)($configuration['currency_symbol'] ?? '₱');
+        $disclaimer = trim((string)($configuration['projection_disclaimer'] ?? 'Guide only—not the actual salary. Final compensation may vary based on the applicant profile.'));
+        $employmentCategory = nc_normalize_employment_type($job['job_type'] ?? $job['employment_type'] ?? '');
+        $employmentType = trim((string)($job['job_type'] ?? $job['employment_type'] ?? ''));
+        $salaryGrade = nc_normalize_salary_grade($job['salary_grade'] ?? '');
+        $hours = isset($job['teaching_hours_per_week']) && is_numeric($job['teaching_hours_per_week'])
+            && (float)$job['teaching_hours_per_week'] > 0
+            ? (float)$job['teaching_hours_per_week']
+            : null;
+
+        $result = [
+            'employment_type' => $employmentType ?: 'Not specified',
+            'employment_category' => $employmentCategory,
+            'calculation_type' => 'undetermined',
+            'salary_grade' => $salaryGrade ?: null,
+            'qualification_key' => null,
+            'qualification' => 'No applicable graduate qualification recorded',
+            'master_status' => null,
+            'completed_master_units' => null,
+            'applicable_hourly_rate' => null,
+            'teaching_hours_per_week' => $hours,
+            'projected_salary' => null,
+            'rate_display' => 'Rate to be determined',
+            'projected_salary_display' => 'Rate to be determined',
+            'salary_display' => 'Rate to be determined',
+            'projection_basis' => 'Rate to be determined: employment type or salary information is incomplete.',
+            'disclaimer' => $disclaimer,
+        ];
+
+        if ($employmentCategory === 'full_time') {
+            $result['calculation_type'] = 'salary_grade';
+            $salaryGrade = nc_resolve_job_salary_grade($job, $configuration);
+            $result['salary_grade'] = $salaryGrade ?: null;
+            $result['salary_display'] = $salaryGrade !== '' ? $salaryGrade : 'Salary Grade to be determined';
+            $result['rate_display'] = $result['salary_display'];
+            $result['projected_salary_display'] = $result['salary_display'];
+            $result['projection_basis'] = $salaryGrade !== ''
+                ? 'Permanent/Full-Time compensation follows the ' . $salaryGrade . ' classification; the actual salary amount is not displayed.'
+                : 'Salary Grade to be determined: no classification is assigned.';
+            return $result;
+        }
+
+        if ($employmentCategory !== 'part_time') {
+            return $result;
+        }
+
+        $result['calculation_type'] = 'hourly';
+        $hasCompletedDoctorate = false;
+        $hasCompletedMaster = false;
+        $hasOngoingMaster = false;
+        $ongoingMasterUnits = null;
 
         foreach ($educationRows as $row) {
             $level = $row['education_level'] ?? nc_classify_education_level($row);
-            $status = strtolower(trim((string)($row['education_status'] ?? 'completed'))) ?: 'completed';
-            $units = isset($row['completed_units']) && $row['completed_units'] !== null ? (int)$row['completed_units'] : null;
+            $status = strtolower(trim((string)($row['education_status'] ?? '')));
+            $units = isset($row['completed_units']) && $row['completed_units'] !== null && $row['completed_units'] !== ''
+                ? (int)$row['completed_units']
+                : null;
 
             if ($level === 'doctorate' && $status === 'completed') {
-                $rate = 220.00;
-                $qualification = 'Doctorate - Completed';
-                break;
-            }
-
-            if ($level === 'master') {
-                $masterStatus = $status === 'ongoing' ? 'Ongoing' : 'Completed';
-                $completedMasterUnits = $units;
-
-                if ($status === 'completed' && $rate === null) {
-                    $rate = 200.00;
-                    $qualification = 'Master\'s - Completed';
-                } elseif ($status === 'ongoing' && $units !== null && $units >= 9 && $rate === null) {
-                    $rate = 150.00;
-                    $qualification = "Master's - Ongoing ({$units} completed units)";
+                $hasCompletedDoctorate = true;
+            } elseif ($level === 'master' && $status === 'completed') {
+                $hasCompletedMaster = true;
+            } elseif ($level === 'master' && $status === 'ongoing') {
+                $hasOngoingMaster = true;
+                if ($units !== null && ($ongoingMasterUnits === null || $units > $ongoingMasterUnits)) {
+                    $ongoingMasterUnits = $units;
                 }
             }
         }
 
-        $hours = isset($job['teaching_hours_per_week']) && $job['teaching_hours_per_week'] !== null
-            ? (float)$job['teaching_hours_per_week']
-            : null;
-        $projection = null;
-        $basis = 'Projection unavailable: teaching hours are not configured for this teaching load.';
-
-        if ($rate === null) {
-            $basis = 'Projection unavailable: applicant does not have a qualifying completed graduate degree or ongoing master\'s with at least 9 completed units.';
-        } elseif ($hours !== null && $hours > 0) {
-            $projection = round($rate * $hours, 2);
-            $basis = 'Applicable Hourly Rate x ' . rtrim(rtrim(number_format($hours, 2), '0'), '.') . ' compensable teaching hours/week';
+        $qualificationKey = $hasCompletedDoctorate
+            ? 'doctorate_completed'
+            : ($hasCompletedMaster ? 'master_completed' : ($hasOngoingMaster ? 'master_ongoing' : null));
+        if ($qualificationKey === null) {
+            $result['projection_basis'] = 'Rate to be determined: no applicable completed Doctorate, completed Master\'s, or ongoing Master\'s is recorded.';
+            return $result;
         }
 
-        return [
-            'qualification' => $qualification,
-            'master_status' => $masterStatus,
-            'completed_master_units' => $completedMasterUnits,
-            'applicable_hourly_rate' => $rate,
-            'teaching_hours_per_week' => $hours,
-            'projected_salary' => $projection,
-            'projection_basis' => $basis,
-        ];
+        $rateConfiguration = $configuration['part_time_rates'][$qualificationKey] ?? null;
+        $rate = is_array($rateConfiguration) ? ($rateConfiguration['hourly_rate'] ?? null) : $rateConfiguration;
+        if (!is_numeric($rate) || (float)$rate <= 0) {
+            $result['qualification_key'] = $qualificationKey;
+            $result['qualification'] = is_array($rateConfiguration)
+                ? (string)($rateConfiguration['label'] ?? ucwords(str_replace('_', ' ', $qualificationKey)))
+                : ucwords(str_replace('_', ' ', $qualificationKey));
+            $result['projection_basis'] = 'Rate to be determined: the applicable qualification rate is not configured.';
+            return $result;
+        }
+
+        $rate = round((float)$rate, 2);
+        $qualification = is_array($rateConfiguration)
+            ? (string)($rateConfiguration['label'] ?? ucwords(str_replace('_', ' ', $qualificationKey)))
+            : ucwords(str_replace('_', ' ', $qualificationKey));
+        if ($qualificationKey === 'master_ongoing' && $ongoingMasterUnits !== null) {
+            $qualification .= ' (' . $ongoingMasterUnits . ' completed units)';
+        }
+
+        $rateDisplay = nc_format_money($rate, $currencySymbol) . '/hour';
+        $result['qualification_key'] = $qualificationKey;
+        $result['qualification'] = $qualification;
+        $result['master_status'] = $qualificationKey === 'master_ongoing'
+            ? 'Ongoing'
+            : ($qualificationKey === 'master_completed' ? 'Completed' : null);
+        $result['completed_master_units'] = $ongoingMasterUnits;
+        $result['applicable_hourly_rate'] = $rate;
+        $result['rate_display'] = $rateDisplay;
+
+        if ($hours === null) {
+            $result['projected_salary_display'] = $rateDisplay;
+            $result['salary_display'] = $rateDisplay;
+            $result['projection_basis'] = 'Part-Time hourly rate based on ' . $qualification . '; teaching hours are not configured.';
+            return $result;
+        }
+
+        $projection = round($rate * $hours, 2);
+        $hoursDisplay = rtrim(rtrim(number_format($hours, 2), '0'), '.');
+        $projectionDisplay = nc_format_money($projection, $currencySymbol) . '/week';
+        $result['projected_salary'] = $projection;
+        $result['projected_salary_display'] = $projectionDisplay;
+        // Dashboard compensation stays as an hourly guide. The weekly total is
+        // retained separately for detail/review screens when load hours exist.
+        $result['salary_display'] = $rateDisplay;
+        $result['projection_basis'] = 'Part-Time ' . $qualification . ' rate x ' . $hoursDisplay . ' teaching hours/week.';
+        return $result;
+    }
+}
+
+if (!function_exists('nc_calculate_salary_projection')) {
+    function nc_calculate_salary_projection(mysqli $conn, int $userId, array $job): array
+    {
+        return nc_calculate_salary_projection_from_education(nc_get_education_rows($conn, $userId), $job);
     }
 }
 

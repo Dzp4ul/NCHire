@@ -56,6 +56,7 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 require_once __DIR__ . '/../shared/helpers/recruitment.php';
+require_once __DIR__ . '/../shared/helpers/application_documents.php';
 
 // Check if this is an AJAX request early to suppress debug output
 $is_ajax_request = ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_submit']));
@@ -307,7 +308,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
                         if ($_FILES[$fileKey]['size'][$index] > 5 * 1024 * 1024) {
                             continue; // Skip files larger than 5MB
                         }
-                        $fileName = time() . "_" . $index . "_" . basename($name);
+                        $fileName = time() . "_" . bin2hex(random_bytes(6)) . "_" . $index . "_" . basename($name);
                         $targetFile = $uploadDir . $fileName;
                         if (move_uploaded_file($_FILES[$fileKey]['tmp_name'][$index], $targetFile)) {
                             $savedFiles[] = $fileName; // Store only filename, not full path
@@ -322,7 +323,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
                 if ($_FILES[$fileKey]['size'] > 5 * 1024 * 1024) {
                     return null; // File too large
                 }
-                $fileName = time() . "_" . basename($_FILES[$fileKey]['name']);
+                $fileName = time() . "_" . bin2hex(random_bytes(6)) . "_" . basename($_FILES[$fileKey]['name']);
                 $targetFile = $uploadDir . $fileName;
                 if (move_uploaded_file($_FILES[$fileKey]['tmp_name'], $targetFile)) {
                     return $fileName; // Return only filename, not full path
@@ -463,10 +464,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         error_log("Letter of Intent from draft copy result: " . ($letter_of_intent ?? 'NULL'));
     }
     
-    // Check if this is a resubmission BEFORE validating
+    // Capture newly supplied files before any existing-document merge. This is
+    // also used to record only real replacements in document history.
+    $fresh_document_values = [
+        'application_letter' => $application_letter,
+        'resume' => $resume,
+        'letter_of_intent' => $letter_of_intent,
+        'tor' => $tor,
+        'diploma' => $diploma,
+        'professional_license' => $professional_license,
+        'coe' => $coe,
+        'seminars_trainings' => $seminars_trainings,
+        'masteral_cert' => $masteral_cert,
+        'certificate_of_grades' => $certificate_of_grades,
+        'proof_of_enrollment' => $proof_of_enrollment,
+    ];
+
+    // A normal new load/semester application may reuse valid files from any
+    // earlier application belonging to the same applicant. Admin-requested
+    // resubmissions continue to merge only with their own application below.
     $is_resubmission = isset($_POST['is_resubmission']) && $_POST['is_resubmission'] == '1';
-    
-    // Skip validation for resubmission - we'll validate after merging with existing files
+    $reusable_document_result = ['is_existing_applicant' => false, 'documents' => []];
+    $master_status = nc_get_master_status($conn, (int)$user_id);
+    if (!$is_resubmission) {
+        $reusable_document_result = nc_find_reusable_documents($conn, (int)$user_id);
+        $document_values = nc_merge_reusable_document_values($fresh_document_values, $reusable_document_result['documents']);
+        foreach ($document_values as $field => $value) {
+            ${$field} = $value;
+        }
+    }
+
+    // Skip validation for an admin-requested resubmission; it is validated
+    // after its current files have been merged below.
     if (!$is_resubmission) {
         // Check if required files were uploaded or available from draft (NEW APPLICATION ONLY)
         if (!$application_letter) {
@@ -491,15 +520,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
             $upload_errors[] = 'Letter of Intent is required';
         }
 
-    $master_status = nc_get_master_status($conn, (int)$user_id);
-    if ($master_status['requires_ongoing_documents']) {
-        if (!$certificate_of_grades) {
-            $upload_errors[] = 'Certificate of Grades is required for ongoing master\'s applicants';
+        if ($master_status['requires_ongoing_documents']) {
+            if (!$certificate_of_grades) {
+                $upload_errors[] = 'Certificate of Grades is required for ongoing master\'s applicants';
+            }
+            if (!$proof_of_enrollment) {
+                $upload_errors[] = 'Proof of Enrollment is required for ongoing master\'s applicants';
+            }
         }
-        if (!$proof_of_enrollment) {
-            $upload_errors[] = 'Proof of Enrollment is required for ongoing master\'s applicants';
-        }
-    }
     }
     
     if (!empty($upload_errors) && !$is_resubmission) {
@@ -537,7 +565,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
     $job_id = isset($_POST['job_id']) ? (int)$_POST['job_id'] : 0;
     $applied_date = date("Y-m-d H:i:s");
     $status = "Submitted";
-    $application_type = ($_POST['application_type'] ?? 'new') === 'renewing' ? 'renewing' : 'new';
+    // Applicant category is derived from owned application history, never from
+    // a user-selectable value. This prevents a renewal from being treated as a
+    // first-time application.
+    $application_type = !empty($reusable_document_result['is_existing_applicant']) ? 'renewing' : 'new';
     $application_academic_year = nc_current_academic_year();
     $application_semester = nc_current_semester();
     $job_data = null;
@@ -734,6 +765,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
                          ", TOR: " . ($tor ? basename($tor) : "NULL"));
                 
                 $application_id = $resubmit_app_id;
+                foreach ($fresh_document_values as $field => $freshFile) {
+                    if (empty($freshFile)) {
+                        continue;
+                    }
+                    nc_seed_legacy_document_version(
+                        $conn,
+                        (int)$user_id,
+                        $application_id,
+                        $field,
+                        $existing_data[$field] ?? null
+                    );
+                    nc_record_application_document_version(
+                        $conn,
+                        (int)$user_id,
+                        $application_id,
+                        $field,
+                        $freshFile,
+                        basename($freshFile)
+                    );
+                }
                 $_SESSION['application_success'] = "Documents resubmitted successfully! Your application is now under review.";
                 $_SESSION['applied_job_id'] = $job_id;
                 $_SESSION['new_application_id'] = $application_id;
@@ -857,6 +908,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
                 }
                 $meta_stmt->close();
             }
+        }
+
+        $active_document_values = [
+            'application_letter' => $application_letter,
+            'resume' => $resume,
+            'letter_of_intent' => $letter_of_intent,
+            'tor' => $tor,
+            'diploma' => $diploma,
+            'professional_license' => $professional_license,
+            'coe' => $coe,
+            'seminars_trainings' => $seminars_trainings,
+            'masteral_cert' => $masteral_cert,
+            'certificate_of_grades' => $certificate_of_grades,
+            'proof_of_enrollment' => $proof_of_enrollment,
+        ];
+        foreach ($active_document_values as $field => $fileName) {
+            if (empty($fileName)) {
+                continue;
+            }
+            $sourceApplicationId = null;
+            if (empty($fresh_document_values[$field]) && !empty($reusable_document_result['documents'][$field]['source_application_id'])) {
+                $sourceApplicationId = (int)$reusable_document_result['documents'][$field]['source_application_id'];
+            }
+            nc_record_application_document_version(
+                $conn,
+                (int)$user_id,
+                $application_id,
+                $field,
+                $fileName,
+                basename($fileName),
+                $sourceApplicationId
+            );
         }
 
         $_SESSION['application_success'] = "Application submitted successfully! We will review your application and contact you soon.";
@@ -1958,12 +2041,15 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                         <input type="hidden" name="cellphone" id="rf_cellphone">
 
                         <div class="bg-white rounded-lg border border-gray-200 p-4">
-                            <label for="rf_application_type" class="block text-sm font-semibold text-gray-700 mb-2">Applicant Category</label>
-                            <select name="application_type" id="rf_application_type" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                <option value="new">New Applicant</option>
-                                <option value="renewing">Old/Renewing Applicant</option>
-                            </select>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Applicant Category</label>
+                            <input type="hidden" name="application_type" id="rf_application_type" value="new">
+                            <div id="applicantCategoryDisplay" class="flex items-center gap-2 text-sm text-gray-700">
+                                <i class="ri-loader-4-line animate-spin text-blue-600"></i>
+                                <span>Checking your application history...</span>
+                            </div>
                         </div>
+
+                        <div id="existingDocumentNotice" class="hidden bg-emerald-50 border border-emerald-200 rounded-lg p-4"></div>
 
                         <!-- Load Draft Button -->
                         <div id="loadDraftSection" class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-lg p-4 mb-4">
@@ -2664,6 +2750,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // When navigating to Step 2, restore file indicators if application data exists
     // Draft loading is now manual via "Load Saved Documents" button
     if (n === 2) {
+      if (!window.currentApplicationData) {
+        loadReusableDocumentsForRenewal();
+      }
       // Check if any files are already uploaded and hide the Load Saved Documents button
       setTimeout(() => {
         const fileInputs = document.querySelectorAll('#step2 input[type="file"]');
@@ -3933,6 +4022,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const inputName = input.name;
         const inputAccept = input.accept;
         const inputRequired = input.required;
+        const inputMultiple = input.multiple;
         
         // Remove all child elements (including indicators)
         container.innerHTML = '';
@@ -3943,6 +4033,7 @@ document.addEventListener('DOMContentLoaded', function() {
         newInput.name = inputName;
         newInput.accept = inputAccept;
         newInput.required = inputRequired;
+        newInput.multiple = inputMultiple;
         newInput.className = 'w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100';
         
         container.appendChild(newInput);
@@ -4014,6 +4105,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const docInputMap = {
           'applicationLetter': 'application_letter',
           'resume_file': 'resume',
+          'letter_of_intent': 'letter_of_intent',
           'transcript': 'tor',
           'diploma': 'diploma',
           'license': 'professional_license',
@@ -4587,6 +4679,113 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('? Step 2 UI updated for resubmission mode');
   };
 
+  function escapeDocumentHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  async function loadReusableDocumentsForRenewal() {
+    const loadKey = String(context.jobId || 'new');
+    if (window._reusableDocumentsLoadKey === loadKey || window._loadingReusableDocuments) {
+      return;
+    }
+    window._loadingReusableDocuments = true;
+
+    const categoryInput = document.getElementById('rf_application_type');
+    const categoryDisplay = document.getElementById('applicantCategoryDisplay');
+    const notice = document.getElementById('existingDocumentNotice');
+    try {
+      const response = await fetch('get_reusable_documents.php', { credentials: 'same-origin' });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Unable to check existing documents');
+      }
+
+      window._reusableDocumentsLoadKey = loadKey;
+      const isExisting = Boolean(data.is_existing_applicant);
+      if (categoryInput) categoryInput.value = isExisting ? 'renewing' : 'new';
+      if (categoryDisplay) {
+        categoryDisplay.innerHTML = isExisting
+          ? '<i class="ri-user-follow-line text-emerald-600 text-lg"></i><span><strong>Existing / Renewing Applicant</strong> &mdash; determined from your NCHire application history</span>'
+          : '<i class="ri-user-add-line text-blue-600 text-lg"></i><span><strong>New Applicant</strong> &mdash; all required documents must be submitted</span>';
+      }
+
+      document.querySelectorAll('#step2 .reusable-document-display').forEach(element => element.remove());
+      document.querySelectorAll('#step2 input[type="file"]').forEach(input => {
+        delete input.dataset.reusableFile;
+        delete input.dataset.reusableSourceApplication;
+      });
+
+      (data.documents || []).forEach(documentInfo => {
+        const input = document.querySelector(`#step2 input[name="${documentInfo.input_name}"]`);
+        const container = input?.closest('.border-dashed');
+        if (!input || !container) return;
+
+        input.dataset.reusableFile = documentInfo.file_name;
+        input.dataset.reusableSourceApplication = String(documentInfo.source_application_id || '');
+        input.required = false;
+        input.style.display = 'none';
+
+        const files = (documentInfo.files || []).map(fileName => {
+          const safeName = escapeDocumentHtml(fileName);
+          const safeUrl = `uploads/${encodeURIComponent(fileName)}`;
+          return `<a href="${safeUrl}" target="_blank" rel="noopener" class="text-emerald-700 hover:underline break-all"><i class="ri-file-text-line mr-1"></i>${safeName}</a>`;
+        }).join('<br>');
+        const currentDisplay = document.createElement('div');
+        currentDisplay.className = 'reusable-document-display mb-3 p-3 bg-emerald-50 border border-emerald-300 rounded-lg';
+        currentDisplay.innerHTML = `
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="text-xs font-bold uppercase tracking-wide text-emerald-700 mb-1">Current / Active</div>
+              <div class="text-sm">${files}</div>
+              <div class="text-xs text-gray-500 mt-1">Previously submitted${documentInfo.uploaded_at ? ` on ${escapeDocumentHtml(documentInfo.uploaded_at)}` : ''}. It will remain attached if unchanged.</div>
+            </div>
+            <button type="button" class="replace-reusable-document flex-shrink-0 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-white border border-blue-300 rounded-lg hover:bg-blue-50">Update / Replace</button>
+          </div>`;
+        container.insertBefore(currentDisplay, input);
+        currentDisplay.querySelector('.replace-reusable-document')?.addEventListener('click', function() {
+          input.style.display = '';
+          input.classList.remove('hidden');
+          this.textContent = 'Choose updated file below';
+          this.disabled = true;
+          input.click();
+        });
+      });
+
+      if (notice) {
+        if (isExisting) {
+          const missing = data.missing_required_documents || [];
+          notice.classList.remove('hidden');
+          notice.innerHTML = `
+            <div class="flex items-start gap-3">
+              <i class="ri-shield-check-line text-emerald-600 text-xl mt-0.5"></i>
+              <div>
+                <h4 class="font-semibold text-emerald-900">Your existing documents are recognized</h4>
+                <p class="text-sm text-emerald-800 mt-1">Keep unchanged files, or use Update / Replace for documents that have changed. This application will reuse the active files shown below.</p>
+                ${missing.length ? `<p class="text-sm text-amber-800 mt-2"><strong>Still required:</strong> ${missing.map(item => escapeDocumentHtml(item.label)).join(', ')}</p>` : ''}
+              </div>
+            </div>`;
+          const loadDraftSection = document.getElementById('loadDraftSection');
+          if (loadDraftSection) loadDraftSection.style.display = missing.length ? '' : 'none';
+        } else {
+          notice.classList.add('hidden');
+          notice.innerHTML = '';
+        }
+      }
+    } catch (error) {
+      console.error('Unable to load reusable documents:', error);
+      if (categoryDisplay) {
+        categoryDisplay.innerHTML = '<i class="ri-user-line text-gray-500"></i><span>Applicant category will be verified when you submit.</span>';
+      }
+    } finally {
+      window._loadingReusableDocuments = false;
+    }
+  }
+
   // Public API: call after Terms & Conditions are accepted
   window.startApplicationWizard = function(jobId, jobTitle) {
     console.log('startApplicationWizard called with:', { jobId, jobTitle });
@@ -4609,6 +4808,25 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Clear resubmission docs for new application
     globalResubmissionDocs = [];
+    window.currentResubmissionDocs = [];
+    const requirementsForm = document.getElementById('requirementsForm');
+    requirementsForm?.querySelectorAll('input[name="is_resubmission"], input[name="resubmit_application_id"]').forEach(input => input.remove());
+    window._reusableDocumentsLoadKey = null;
+    window._loadingReusableDocuments = false;
+    document.querySelectorAll('#step2 .reusable-document-display').forEach(element => element.remove());
+    document.querySelectorAll('#step2 input[type="file"]').forEach(input => {
+      delete input.dataset.reusableFile;
+      delete input.dataset.reusableSourceApplication;
+    });
+    const categoryInput = document.getElementById('rf_application_type');
+    const categoryDisplay = document.getElementById('applicantCategoryDisplay');
+    const existingDocumentNotice = document.getElementById('existingDocumentNotice');
+    if (categoryInput) categoryInput.value = 'new';
+    if (categoryDisplay) categoryDisplay.innerHTML = '<i class="ri-loader-4-line animate-spin text-blue-600"></i><span>Checking your application history...</span>';
+    if (existingDocumentNotice) {
+      existingDocumentNotice.classList.add('hidden');
+      existingDocumentNotice.innerHTML = '';
+    }
     
     // Remove any interview/demo/psych schedule details from previous applications
     const interviewDetails = document.getElementById('interview_details');
@@ -5362,6 +5580,16 @@ document.addEventListener('DOMContentLoaded', function() {
         { name: 'coe', label: 'Certificate of Employment', dbField: 'coe' },
         { name: 'certificates[]', label: 'Seminars/Training Certificates', dbField: 'seminars_trainings' }
       ];
+      const requiresOngoingGraduateDocuments = initialEducation.some(education =>
+        ['master', 'doctorate'].includes(String(education.education_level || '').toLowerCase()) &&
+        String(education.education_status || '').toLowerCase() === 'ongoing'
+      );
+      if (requiresOngoingGraduateDocuments) {
+        requiredFields.push(
+          { name: 'certificate_of_grades', label: 'Certificate of Grades', dbField: 'certificate_of_grades' },
+          { name: 'proof_of_enrollment', label: 'Proof of Enrollment', dbField: 'proof_of_enrollment' }
+        );
+      }
       
       const missingFiles = [];
       
@@ -5383,10 +5611,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (fileInput) {
           const hasFile = fileInput.files && fileInput.files.length > 0;
           const hasDraft = draftInput && draftInput.value;
+          const hasReusableDocument = Boolean(fileInput.dataset.reusableFile);
           
           console.log(`Checking ${field.label}: hasFile=${hasFile}, hasDraft=${hasDraft}`);
           
-          if (!hasFile && !hasDraft) {
+          if (!hasFile && !hasDraft && !hasReusableDocument) {
             missingFiles.push(field.label);
           }
         }
@@ -6393,8 +6622,14 @@ ${ job.subject ? `<div class="flex items-center"><i class="ri-book-2-line mr-2">
 `;
 document.getElementById('detailJobMeta').innerHTML = metaHTML;
 
-// Populate salary
-document.getElementById('detailSalary').querySelector('span').textContent = job.salary_range || 'Not specified';
+// Populate projected compensation and its guide-only notice.
+const detailProjection = job.salary_projection || {};
+const detailSalaryText = detailProjection.salary_display || job.salary_range || 'Rate to be determined';
+const detailDisclaimer = detailProjection.disclaimer || '';
+document.getElementById('detailSalary').innerHTML = `
+  <div>${escapeHtml(detailSalaryText)}<sup class="ml-0.5 text-sm">*</sup></div>
+  ${detailDisclaimer ? `<p class="mt-1 max-w-2xl text-xs font-normal text-blue-100">*${escapeHtml(detailDisclaimer)}</p>` : ''}
+`;
 
 // Populate deadline
 if (job.application_deadline) {
@@ -7981,7 +8216,8 @@ function displayJobs(jobs) {
         </div>
         <div class="border border-gray-200 rounded-lg p-3">
           <p class="text-xs uppercase text-gray-500 font-medium">Compensation</p>
-          <p class="text-sm text-gray-900 mt-1">${escapeHtml(job.salary_display || job.salary_range || 'Computed after qualification review')}</p>
+          <p class="text-sm text-gray-900 mt-1">${escapeHtml(job.salary_display || job.salary_range || 'Rate to be determined')}<sup class="ml-0.5 text-blue-700">*</sup></p>
+          <p class="text-[11px] leading-4 text-gray-500 mt-1">*${escapeHtml(job.salary_projection?.disclaimer || 'Guide only; final compensation is subject to profile and credential verification.')}</p>
         </div>
       </div>
 
@@ -8867,8 +9103,13 @@ function populateJobDetails(job) {
     ${ job.subject ? `<div class="flex items-center"><i class="ri-book-2-line mr-2"></i><span>${job.subject}</span></div>` : '' }
   `;
   
-  // Update salary
-  document.getElementById('detailSalary').innerHTML = `<span>${job.salary_range || 'Salary not specified'}</span>`;
+  // Update projected compensation and its guide-only notice.
+  const projection = job.salary_projection || {};
+  const salaryText = projection.salary_display || job.salary_range || 'Rate to be determined';
+  document.getElementById('detailSalary').innerHTML = `
+    <div>${escapeHtml(salaryText)}<sup class="ml-0.5 text-sm">*</sup></div>
+    ${projection.disclaimer ? `<p class="mt-1 max-w-2xl text-xs font-normal text-blue-100">*${escapeHtml(projection.disclaimer)}</p>` : ''}
+  `;
   
   // Update deadline
   const deadlineElement = document.getElementById('detailDeadlineDate');

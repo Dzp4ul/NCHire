@@ -60,11 +60,10 @@ try {
         $app_stmt->close();
     }
 
-    $salaryProjection = $user_id ? nc_calculate_salary_projection($conn, (int)$user_id, $job) : null;
-    $isFullTime = stripos((string)$job['job_type'], 'full') !== false;
-    $salaryDisplay = $isFullTime
-        ? (($job['salary_grade'] ?? '') !== '' ? 'SGD ' . $job['salary_grade'] : 'SGD pending HR configuration')
-        : 'Salary projection computed from qualification and load hours';
+    $salaryProjection = $user_id
+        ? nc_calculate_salary_projection($conn, (int)$user_id, $job)
+        : nc_calculate_salary_projection_from_education([], $job);
+    $salaryDisplay = $salaryProjection['salary_display'];
 
     echo json_encode([
         'success' => true,

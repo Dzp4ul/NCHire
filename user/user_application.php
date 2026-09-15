@@ -71,6 +71,9 @@ session_start();
                         .'<button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-primary rounded-lg hover:bg-gray-100 !rounded-button" data-action="view">'
                         .'<i class="ri-eye-line"></i>'
                         .'</button>'
+                        .'<button class="h-8 px-3 flex items-center justify-center gap-1 text-sm font-medium text-emerald-700 rounded-lg hover:bg-emerald-50 !rounded-button whitespace-nowrap" data-action="attachments" title="Add/Update Attachments" aria-label="Add or update attachments">'
+                        .'<i class="ri-attachment-2"></i><span>Update Attachments</span>'
+                        .'</button>'
                         .($show_cancel_btn ? '<button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-orange-600 rounded-lg hover:bg-gray-100 !rounded-button" data-action="cancel"><i class="ri-close-circle-line"></i></button>' : '')
                         .'</div>'
                         .'</div>';
@@ -97,6 +100,44 @@ session_start();
               .'</div>';
       }
     ?>
+  </div>
+</div>
+
+<!-- Add/Update Attachments Modal -->
+<div id="attachmentsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 100000;">
+  <div class="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] flex flex-col">
+    <div class="bg-gradient-to-r from-blue-700 to-blue-900 px-6 py-4 rounded-t-xl flex items-center justify-between">
+      <div>
+        <h3 class="text-xl font-bold text-white">Add/Update Attachments</h3>
+        <p class="text-sm text-blue-100">Keep unchanged files and select only the documents you need to update.</p>
+      </div>
+      <button type="button" data-close-attachments class="text-white hover:text-blue-100" aria-label="Close attachments">
+        <i class="ri-close-line text-2xl"></i>
+      </button>
+    </div>
+    <form id="attachmentsForm" class="min-h-0 flex flex-col">
+      <input type="hidden" name="application_id" id="attachmentsApplicationId">
+      <div class="overflow-y-auto p-6">
+        <div class="grid grid-cols-[minmax(160px,1.1fr),minmax(200px,1.5fr),auto,auto] gap-3 px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 border-b">
+          <div>Document Name</div>
+          <div>Current / Existing File</div>
+          <div>Date Uploaded</div>
+          <div>Status / Action</div>
+        </div>
+        <div id="attachmentsList" class="divide-y divide-gray-200">
+          <div class="py-12 text-center text-gray-500"><i class="ri-loader-4-line animate-spin text-3xl"></i><p class="mt-2">Loading attachments...</p></div>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t bg-gray-50 rounded-b-xl flex items-center justify-between gap-3">
+        <p class="text-xs text-gray-500">Accepted: PDF, DOC, DOCX, JPG, PNG. Maximum 5MB per file.</p>
+        <div class="flex gap-3">
+          <button type="button" data-close-attachments class="px-5 py-2 border border-gray-300 rounded-lg hover:bg-white">Cancel</button>
+          <button type="submit" id="saveAttachmentsBtn" class="px-5 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 font-semibold">
+            <i class="ri-save-line mr-1"></i>Save Attachment Updates
+          </button>
+        </div>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -292,6 +333,8 @@ session_start();
         <div>
           <h3 class="font-semibold text-gray-900">${escapeHtml(app.position || 'Unknown Position')}</h3>
           <p class="text-sm text-gray-600">Application #${app.id}</p>
+          <p class="text-sm text-blue-800 mt-1">${escapeHtml(app.salary_projection_details?.salary_display || 'Rate to be determined')}<sup>*</sup></p>
+          <p class="text-[10px] leading-3 text-gray-500 mt-1">*${escapeHtml(app.salary_projection_details?.disclaimer || 'Guide only; final compensation is subject to profile and credential verification.')}</p>
         </div>
         <div>
           <span class="${statusToClasses(app.status)} px-3 py-1 rounded-full text-sm">${escapeHtml(app.status || 'Pending')}</span>
@@ -300,6 +343,9 @@ session_start();
         <div class="flex items-center space-x-2">
           <button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-primary rounded-lg hover:bg-gray-100 !rounded-button" data-action="view">
             <i class="ri-eye-line"></i>
+          </button>
+          <button class="h-8 px-3 flex items-center justify-center gap-1 text-sm font-medium text-emerald-700 rounded-lg hover:bg-emerald-50 !rounded-button whitespace-nowrap" data-action="attachments" title="Add/Update Attachments" aria-label="Add or update attachments">
+            <i class="ri-attachment-2"></i><span>Update Attachments</span>
           </button>
           ${showCancelBtn ? `<button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-orange-600 rounded-lg hover:bg-gray-100 !rounded-button" data-action="cancel">
             <i class="ri-close-circle-line"></i>
@@ -336,6 +382,118 @@ session_start();
     }
   }
 
+  const attachmentsModal = document.getElementById('attachmentsModal');
+  const attachmentsForm = document.getElementById('attachmentsForm');
+  const attachmentsList = document.getElementById('attachmentsList');
+  const attachmentsApplicationId = document.getElementById('attachmentsApplicationId');
+
+  function closeAttachmentsModal() {
+    if (!attachmentsModal) return;
+    attachmentsModal.classList.add('hidden');
+    attachmentsModal.classList.remove('flex');
+    document.body.style.overflow = '';
+    if (attachmentsForm) attachmentsForm.reset();
+  }
+
+  function renderAttachments(documents) {
+    if (!attachmentsList) return;
+    attachmentsList.innerHTML = (documents || []).map(documentInfo => {
+      const files = (documentInfo.files || []).length
+        ? documentInfo.files.map(file => `<a href="${escapeHtml(file.url)}" target="_blank" rel="noopener" class="block text-blue-700 hover:underline break-all"><i class="ri-file-text-line mr-1"></i>${escapeHtml(file.name)}</a>`).join('')
+        : '<span class="text-gray-400 italic">No document submitted</span>';
+      const uploadedDate = documentInfo.has_file && documentInfo.uploaded_at
+        ? new Date(documentInfo.uploaded_at).toLocaleDateString()
+        : '&mdash;';
+      const actionLabel = documentInfo.has_file ? 'Update / Replace' : 'Add Attachment';
+      const statusClass = documentInfo.has_file ? 'bg-emerald-100 text-emerald-800' : (documentInfo.required ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-700');
+      return `
+        <div class="grid grid-cols-1 md:grid-cols-[minmax(160px,1.1fr),minmax(200px,1.5fr),auto,auto] gap-3 p-3 items-center attachment-row">
+          <div>
+            <div class="font-semibold text-gray-900">${escapeHtml(documentInfo.label)}</div>
+            <div class="text-xs ${documentInfo.required ? 'text-red-600' : 'text-gray-500'}">${documentInfo.required ? 'Required' : 'Optional'}</div>
+          </div>
+          <div class="text-sm min-w-0">
+            ${files}
+            ${documentInfo.history_count > 1 ? `<span class="text-xs text-gray-500">${documentInfo.history_count} saved versions</span>` : ''}
+          </div>
+          <div class="text-sm text-gray-600">${uploadedDate}</div>
+          <div class="min-w-[150px]">
+            <span class="inline-flex px-2 py-1 rounded-full text-xs font-semibold ${statusClass}">${escapeHtml(documentInfo.status)}</span>
+            <input type="file" name="${escapeHtml(documentInfo.document_type)}${documentInfo.multiple ? '[]' : ''}" ${documentInfo.multiple ? 'multiple' : ''} accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" class="attachment-file-input hidden">
+            <button type="button" class="choose-attachment mt-2 block px-3 py-1.5 text-xs font-semibold border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50">${actionLabel}</button>
+            <div class="selected-attachment-name text-xs text-emerald-700 mt-1 break-all"></div>
+          </div>
+        </div>`;
+    }).join('');
+
+    attachmentsList.querySelectorAll('.choose-attachment').forEach(button => {
+      button.addEventListener('click', () => button.closest('.attachment-row')?.querySelector('.attachment-file-input')?.click());
+    });
+    attachmentsList.querySelectorAll('.attachment-file-input').forEach(input => {
+      input.addEventListener('change', () => {
+        const names = Array.from(input.files || []).map(file => file.name);
+        const display = input.closest('.attachment-row')?.querySelector('.selected-attachment-name');
+        if (display) display.textContent = names.length ? `Selected: ${names.join(', ')}` : '';
+      });
+    });
+  }
+
+  async function openAttachmentsModal(applicationId) {
+    if (!attachmentsModal || !attachmentsList || !attachmentsApplicationId) return;
+    attachmentsApplicationId.value = applicationId;
+    attachmentsList.innerHTML = '<div class="py-12 text-center text-gray-500"><i class="ri-loader-4-line animate-spin text-3xl"></i><p class="mt-2">Loading attachments...</p></div>';
+    attachmentsModal.classList.remove('hidden');
+    attachmentsModal.classList.add('flex');
+    document.body.style.overflow = 'hidden';
+    try {
+      const response = await fetch(`manage_application_attachments.php?application_id=${encodeURIComponent(applicationId)}`, { credentials: 'same-origin' });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'Unable to load attachments');
+      renderAttachments(data.documents);
+    } catch (error) {
+      attachmentsList.innerHTML = `<div class="py-10 text-center text-red-600"><i class="ri-error-warning-line text-3xl"></i><p class="mt-2">${escapeHtml(error.message)}</p></div>`;
+    }
+  }
+
+  document.querySelectorAll('[data-close-attachments]').forEach(button => button.addEventListener('click', closeAttachmentsModal));
+  if (attachmentsModal) {
+    attachmentsModal.addEventListener('click', event => {
+      if (event.target === attachmentsModal) closeAttachmentsModal();
+    });
+  }
+  if (attachmentsForm) {
+    attachmentsForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      const selectedFiles = attachmentsForm.querySelectorAll('input[type="file"]');
+      if (![...selectedFiles].some(input => input.files && input.files.length)) {
+        showToast('Select at least one attachment to add or update.', 'warning');
+        return;
+      }
+      const saveButton = document.getElementById('saveAttachmentsBtn');
+      const originalHtml = saveButton.innerHTML;
+      saveButton.disabled = true;
+      saveButton.innerHTML = '<i class="ri-loader-4-line animate-spin mr-1"></i>Saving...';
+      try {
+        const response = await fetch('manage_application_attachments.php', {
+          method: 'POST',
+          credentials: 'same-origin',
+          body: new FormData(attachmentsForm),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.error || 'Unable to update attachments');
+        renderAttachments(data.documents);
+        attachmentsForm.reset();
+        showToast(data.message || 'Attachments updated successfully.', 'success');
+        loadApplications();
+      } catch (error) {
+        showToast(error.message || 'Unable to update attachments.', 'error');
+      } finally {
+        saveButton.disabled = false;
+        saveButton.innerHTML = originalHtml;
+      }
+    });
+  }
+
   // Store the application ID to delete
   let pendingDeleteId = null;
   
@@ -369,6 +527,10 @@ session_start();
           }
         }, 200);
       }
+    }
+
+    if (action === 'attachments') {
+      openAttachmentsModal(id);
     }
 
     if (action === 'cancel') {
@@ -636,6 +798,10 @@ session_start();
               <p><strong>Position:</strong> ${escapeHtml(app.position)}</p>
               <p><strong>Submitted:</strong> ${escapeHtml(app.applied_date_pretty || app.applied_date)}</p>
               <p><strong>Status:</strong> <span class="${statusToClasses(app.status)} px-2 py-1 rounded">${escapeHtml(app.status)}</span></p>
+              ${app.salary_projection_details ? `
+                <p><strong>Projected Compensation:</strong> ${escapeHtml(app.salary_projection_details.salary_display || 'Rate to be determined')}<sup>*</sup></p>
+                <p class="text-xs text-gray-500">*${escapeHtml(app.salary_projection_details.disclaimer || 'Guide only; final compensation is subject to profile and credential verification.')}</p>
+              ` : ''}
             </div>
           </div>
           

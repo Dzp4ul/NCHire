@@ -1,4 +1,5 @@
 <?php
+session_start();
 header('Content-Type: application/json');
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
@@ -37,8 +38,6 @@ try {
         WHERE j.status = 'Active'
           AND j.application_deadline >= CURDATE()
           AND COALESCE(NULLIF(j.subject_name, ''), NULLIF(j.subject, ''), NULLIF(j.subject_code, '')) IS NOT NULL
-          AND j.teaching_hours_per_week IS NOT NULL
-          AND j.teaching_hours_per_week > 0
         HAVING remaining_vacancies > 0
         ORDER BY j.id DESC
         LIMIT 6
@@ -51,16 +50,15 @@ try {
     }
 
     $jobs = [];
+    $currentUserId = (int)($_SESSION['user_id'] ?? 0);
+    $educationRows = $currentUserId > 0 ? nc_get_education_rows($conn, $currentUserId) : [];
     while ($row = $result->fetch_assoc()) {
         $description = $row['job_description'] ?? 'No description available.';
         if (strlen($description) > 150) {
             $description = substr($description, 0, 150) . '...';
         }
 
-        $isFullTime = stripos((string)$row['job_type'], 'full') !== false;
-        $salaryDisplay = $isFullTime
-            ? (($row['salary_grade'] ?? '') !== '' ? 'SGD ' . $row['salary_grade'] : 'SGD pending HR configuration')
-            : 'Salary projection computed from qualification and load hours';
+        $salaryProjection = nc_calculate_salary_projection_from_education($educationRows, $row);
 
         $jobs[] = [
             'id' => (int)$row['id'],
@@ -68,7 +66,8 @@ try {
             'department' => $row['program'] ?: ($row['department_role'] ?? 'General'),
             'type' => $row['job_type'] ?? 'Full-time',
             'location' => $row['locations'] ?? 'Norzagaray College',
-            'salary' => $salaryDisplay,
+            'salary' => $salaryProjection['salary_display'],
+            'salary_projection' => $salaryProjection,
             'deadline' => !empty($row['application_deadline']) ? date('F d, Y', strtotime($row['application_deadline'])) : 'N/A',
             'description' => $description,
             'academic_year' => $row['academic_year'] ?: nc_current_academic_year(),

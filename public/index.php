@@ -1865,6 +1865,8 @@ function renderJobs() {
             </div>
             <p class="text-secondary text-xs md:text-sm mb-2 font-semibold truncate">${escapeHtml(job.department)}</p>
             <p class="text-gray-200 text-xs md:text-sm mb-3 md:mb-4 line-clamp-2">${escapeHtml(job.description)}</p>
+            <p class="text-white text-sm font-semibold">${escapeHtml(job.salary || 'Rate to be determined')}<sup>*</sup></p>
+            <p class="text-[10px] leading-3 text-blue-100 mt-1 mb-3">*${escapeHtml(job.salary_projection?.disclaimer || 'Guide only; final compensation is subject to profile and credential verification.')}</p>
             <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 text-xs md:text-sm text-gray-300 mb-12 md:mb-16">
                 <div class="flex items-center gap-1 min-w-0">
                     <i class="ri-map-pin-line flex-shrink-0"></i>

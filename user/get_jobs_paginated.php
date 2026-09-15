@@ -1,4 +1,5 @@
 <?php
+session_start();
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../shared/helpers/recruitment.php';
@@ -41,8 +42,7 @@ try {
     $whereConditions = [
         "j.application_deadline >= CURDATE()",
         "j.status = 'Active'",
-        "COALESCE(NULLIF(j.subject_name, ''), NULLIF(j.subject, ''), NULLIF(j.subject_code, '')) IS NOT NULL",
-        "j.teaching_hours_per_week IS NOT NULL AND j.teaching_hours_per_week > 0"
+        "COALESCE(NULLIF(j.subject_name, ''), NULLIF(j.subject, ''), NULLIF(j.subject_code, '')) IS NOT NULL"
     ];
     $params = [];
     $types = '';
@@ -139,12 +139,11 @@ try {
     $result = $stmt->get_result();
 
     $jobs = [];
+    $currentUserId = (int)($_SESSION['user_id'] ?? 0);
+    $educationRows = $currentUserId > 0 ? nc_get_education_rows($conn, $currentUserId) : [];
     while ($row = $result->fetch_assoc()) {
         $title = nc_format_teaching_load_title($row);
-        $isFullTime = stripos((string)$row['job_type'], 'full') !== false;
-        $salaryDisplay = $isFullTime
-            ? (($row['salary_grade'] ?? '') !== '' ? 'SGD ' . $row['salary_grade'] : 'SGD pending HR configuration')
-            : 'Salary projection computed from qualification and load hours';
+        $salaryProjection = nc_calculate_salary_projection_from_education($educationRows, $row);
 
         $jobs[] = [
             'id' => (int)$row['id'],
@@ -166,8 +165,10 @@ try {
             'required_instructors' => (int)($row['required_instructors'] ?? 1),
             'assigned_instructors' => (int)$row['assigned_instructors'],
             'remaining_vacancies' => (int)$row['remaining_vacancies'],
-            'salary_display' => $salaryDisplay,
-            'salary_range' => $salaryDisplay,
+            'salary_grade' => $row['salary_grade'] ?? null,
+            'salary_display' => $salaryProjection['salary_display'],
+            'salary_range' => $salaryProjection['salary_display'],
+            'salary_projection' => $salaryProjection,
             'job_description' => $row['job_description'],
             'application_deadline' => $row['application_deadline'],
             'status' => $row['status']

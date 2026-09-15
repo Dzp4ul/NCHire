@@ -2,6 +2,8 @@
 session_start();
 header('Content-Type: application/json');
 
+require_once __DIR__ . '/../shared/helpers/recruitment.php';
+
 // Enable error logging
 error_log("=== GET_USER_APPLICATIONS.PHP CALLED ===");
 error_log("Session ID: " . session_id());
@@ -43,11 +45,11 @@ if (!$user_id && !$user_email) {
 try {
     if ($user_id) {
         error_log("Querying by user_id: " . $user_id);
-        $stmt = $conn->prepare("SELECT id, position, applied_date, status, job_id, interview_date, interview_location, interview_room, interview_notes, demo_date, demo_location, demo_room, resubmission_documents, resubmission_notes, rejection_reason, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, certificate_of_grades, proof_of_enrollment, application_type, academic_year, semester, applicable_hourly_rate, salary_projection, salary_projection_basis, letter_of_intent FROM job_applicants WHERE user_id = ? ORDER BY applied_date DESC, id DESC");
+        $stmt = $conn->prepare("SELECT ja.*, j.job_type AS projection_job_type, j.salary_grade AS projection_salary_grade, j.salary_range AS projection_salary_range, j.teaching_hours_per_week AS projection_teaching_hours FROM job_applicants ja LEFT JOIN job j ON j.id = ja.job_id WHERE ja.user_id = ? ORDER BY ja.applied_date DESC, ja.id DESC");
         $stmt->bind_param("i", $user_id);
     } else {
         error_log("Querying by email: " . $user_email);
-        $stmt = $conn->prepare("SELECT id, position, applied_date, status, job_id, interview_date, interview_location, interview_room, interview_notes, demo_date, demo_location, demo_room, resubmission_documents, resubmission_notes, rejection_reason, applicant_email, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, certificate_of_grades, proof_of_enrollment, application_type, academic_year, semester, applicable_hourly_rate, salary_projection, salary_projection_basis, letter_of_intent FROM job_applicants WHERE applicant_email = ? ORDER BY applied_date DESC, id DESC");
+        $stmt = $conn->prepare("SELECT ja.*, j.job_type AS projection_job_type, j.salary_grade AS projection_salary_grade, j.salary_range AS projection_salary_range, j.teaching_hours_per_week AS projection_teaching_hours FROM job_applicants ja LEFT JOIN job j ON j.id = ja.job_id WHERE ja.applicant_email = ? ORDER BY ja.applied_date DESC, ja.id DESC");
         $stmt->bind_param("s", $user_email);
     }
 
@@ -61,6 +63,16 @@ try {
     error_log("Query returned " . $result->num_rows . " applications");
 
     while ($row = $result->fetch_assoc()) {
+        $projectionJob = [
+            'job_type' => $row['projection_job_type'] ?? '',
+            'salary_grade' => $row['projection_salary_grade'] ?? '',
+            'salary_range' => $row['projection_salary_range'] ?? '',
+            'teaching_hours_per_week' => $row['projection_teaching_hours'] ?? null,
+        ];
+        $projectionUserId = (int)($row['user_id'] ?? 0);
+        $projectionDetails = $projectionUserId > 0
+            ? nc_calculate_salary_projection($conn, $projectionUserId, $projectionJob)
+            : nc_calculate_salary_projection_from_education([], $projectionJob);
         $applications[] = [
             'id' => (int)$row['id'],
             'position' => $row['position'] ?? 'Unknown Position',
@@ -88,7 +100,16 @@ try {
             'coe' => $row['coe'] ?? null,
             'seminars_trainings' => $row['seminars_trainings'] ?? null,
             'masteral_cert' => $row['masteral_cert'] ?? null,
+            'certificate_of_grades' => $row['certificate_of_grades'] ?? null,
+            'proof_of_enrollment' => $row['proof_of_enrollment'] ?? null,
             'letter_of_intent' => $row['letter_of_intent'] ?? null,
+            'application_type' => $row['application_type'] ?? 'new',
+            'academic_year' => $row['academic_year'] ?? null,
+            'semester' => $row['semester'] ?? null,
+            'applicable_hourly_rate' => $row['applicable_hourly_rate'] ?? null,
+            'salary_projection' => $row['salary_projection'] ?? null,
+            'salary_projection_basis' => $row['salary_projection_basis'] ?? null,
+            'salary_projection_details' => $projectionDetails,
         ];
     }
 

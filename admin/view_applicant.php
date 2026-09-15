@@ -2,6 +2,8 @@
 session_start();
 header('Content-Type: application/json');
 
+require_once __DIR__ . '/../shared/helpers/recruitment.php';
+
 if (empty($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     http_response_code(401);
     echo json_encode(['success' => false, 'error' => 'Unauthorized']);
@@ -88,15 +90,20 @@ if (empty($applicant['address']) && $user_id) {
     $profile_stmt->close();
 }
 
-// Get education data
-$education = [];
-if ($user_id) {
-    $education_stmt = $conn->prepare("SELECT * FROM user_education WHERE user_id = ? ORDER BY end_year DESC");
-    $education_stmt->bind_param("i", $user_id);
-    $education_stmt->execute();
-    $education_result = $education_stmt->get_result();
-    while ($row = $education_result->fetch_assoc()) {
-        $education[] = $row;
+// Education belongs to the applicant profile and drives the current projection.
+$education = $user_id ? nc_get_education_rows($conn, (int)$user_id) : [];
+
+$salary_projection = null;
+if (!empty($applicant['job_id'])) {
+    $job_stmt = $conn->prepare("SELECT * FROM job WHERE id = ? LIMIT 1");
+    if ($job_stmt) {
+        $job_stmt->bind_param("i", $applicant['job_id']);
+        $job_stmt->execute();
+        $job = $job_stmt->get_result()->fetch_assoc();
+        $job_stmt->close();
+        if ($job) {
+            $salary_projection = nc_calculate_salary_projection_from_education($education, $job);
+        }
     }
 }
 
@@ -153,7 +160,8 @@ echo json_encode([
     'education' => $education,
     'experience' => $experience,
     'skills' => $skills_by_category,
-    'qualifications' => $qualifications
+    'qualifications' => $qualifications,
+    'salary_projection' => $salary_projection
 ]);
 
 $conn->close();

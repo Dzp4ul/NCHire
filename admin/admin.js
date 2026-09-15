@@ -253,7 +253,8 @@ function displayFilteredJobs() {
                 <div>
                     <div class="font-medium text-gray-900">${job.teaching_load_title || job.job_title}</div>
                     <div class="text-sm text-gray-500">${job.academic_period_label || [job.academic_year, job.semester].filter(Boolean).join(' - ') || job.locations}</div>
-                    <div class="text-sm text-green-600 font-medium">${job.salary_range}</div>
+                    <div class="text-sm text-green-600 font-medium">${job.salary_display || job.salary_range || 'Rate to be determined'}<sup>*</sup></div>
+                    <div class="text-[10px] leading-3 text-gray-400 max-w-xs">*${job.salary_projection?.disclaimer || 'Guide only; final compensation varies by verified profile.'}</div>
                 </div>
             </td>
             <td class="px-6 py-4 text-sm text-gray-900">${job.department_role}</td>
@@ -2302,6 +2303,41 @@ async function viewApplicantDetails(applicantId) {
                     <p class="text-gray-900">${formatDate(applicant.applied_date)}</p>
                 </div>
             `;
+
+            const salaryProjectionInfo = document.getElementById('salaryProjectionInfo');
+            if (salaryProjectionInfo) {
+                const projection = data.salary_projection;
+                if (projection) {
+                    const qualification = projection.calculation_type === 'salary_grade'
+                        ? (projection.salary_grade || 'Salary Grade not assigned')
+                        : (projection.qualification || 'Qualification not determined');
+                    const total = projection.projected_salary_display || projection.rate_display || 'Rate to be determined';
+                    salaryProjectionInfo.innerHTML = `
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600">Employment Type</label>
+                            <p class="text-gray-900">${rankingEscapeHtml(projection.employment_type || 'Not specified')}</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600">Qualification / Salary Grade</label>
+                            <p class="text-gray-900">${rankingEscapeHtml(qualification)}</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600">Projected Rate</label>
+                            <p class="text-blue-900 font-semibold">${rankingEscapeHtml(projection.rate_display || 'Rate to be determined')}<sup>*</sup></p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600">Projected Compensation</label>
+                            <p class="text-blue-900 font-semibold">${rankingEscapeHtml(total)}<sup>*</sup></p>
+                        </div>
+                        <div class="md:col-span-2 bg-blue-50 border border-blue-100 rounded-lg p-3">
+                            <p class="text-sm text-blue-900">${rankingEscapeHtml(projection.projection_basis || 'Rate to be determined')}</p>
+                            <p class="text-xs text-blue-700 mt-2">*${rankingEscapeHtml(projection.disclaimer || 'Guide only; final compensation is subject to profile and credential verification.')}</p>
+                        </div>
+                    `;
+                } else {
+                    salaryProjectionInfo.innerHTML = '<p class="text-gray-500 italic md:col-span-2">Rate to be determined: the application is not linked to a teaching load.</p>';
+                }
+            }
             
             // Update education information
             const educationInfo = document.getElementById('educationInfo');
