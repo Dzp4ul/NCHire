@@ -2234,16 +2234,16 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                     </form>
                 </section>
                 
-                <!-- Step 2: Waiting for Interview Schedule -->
+                <!-- Step 2: Interview -->
                 <section id="step2" class="wizard-step hidden">
-                    <h2 class="text-xl font-semibold text-gray-900 mb-2">Waiting for Interview Schedule</h2>
-                    <p class="text-gray-600 mb-6">Waiting for dean to schedule and approve your interview</p>
+                  <h2 id="interview_step_title" class="text-xl font-semibold text-gray-900 mb-2">Waiting for Interview Schedule</h2>
+                  <p id="interview_step_subtitle" class="text-gray-600 mb-6">Waiting for the dean to schedule your interview.</p>
                     
                     <div class="bg-white rounded-lg border border-gray-200 p-6">
                         <div id="interview_status_container" class="text-center py-8">
                             <i class="ri-calendar-line text-6xl text-blue-500 mb-4"></i>
-                            <h3 class="text-lg font-semibold text-gray-900 mb-2">Waiting for Interview Schedule</h3>
-                            <p class="text-gray-600" id="interview_status_text">Your application has been submitted. Please wait while the dean reviews your documents and schedules an interview.</p>
+                            <h3 id="interview_status_title" class="text-lg font-semibold text-gray-900 mb-2">Waiting for Interview Schedule</h3>
+                            <p class="text-gray-600" id="interview_status_text">Your application has been submitted. Please wait while the dean reviews your application and schedules your interview.</p>
                             <div id="interview_details" class="hidden mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                                 <!-- Interview details will be populated here -->
                             </div>
@@ -2263,16 +2263,16 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                     </div>
                 </section>
                 
-                <!-- Step 3: Demo Scheduled -->
+                <!-- Step 3: Demo Teaching -->
                 <section id="step3" class="wizard-step hidden">
-                    <h2 class="text-xl font-semibold text-gray-900 mb-2">Demo Teaching Scheduled</h2>
-                    <p class="text-gray-600 mb-6">Waiting for dean to schedule and approve your demo teaching</p>
+                  <h2 id="demo_step_title" class="text-xl font-semibold text-gray-900 mb-2">Waiting for Demo Teaching Schedule</h2>
+                  <p id="demo_step_subtitle" class="text-gray-600 mb-6">Waiting for the dean to schedule your demo teaching.</p>
                     
                     <div class="bg-white rounded-lg border border-gray-200 p-6">
                         <div id="demo_status_container" class="text-center py-8">
                             <i class="ri-presentation-line text-6xl text-indigo-500 mb-4"></i>
-                            <h3 class="text-lg font-semibold text-gray-900 mb-2">Demo Teaching Scheduling</h3>
-                            <p class="text-gray-600" id="demo_status_text">Your interview has been completed. Please wait while the dean schedules your demo teaching session.</p>
+                            <h3 id="demo_status_title" class="text-lg font-semibold text-gray-900 mb-2">Waiting for Demo Teaching Schedule</h3>
+                            <p class="text-gray-600" id="demo_status_text">Please wait while the Dean schedules your demo teaching session.</p>
                             <div id="demo_details" class="hidden mt-6 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                                 <!-- Demo details will be populated here -->
                             </div>
@@ -2612,6 +2612,137 @@ document.addEventListener('DOMContentLoaded', function() {
   
   const initialSkills = <?php echo json_encode($user_skills ?? ''); ?>;
 
+  function isPassedStatus(status, stage, process) {
+    const normalizedStatus = String(status || '').toLowerCase();
+    const normalizedStage = String(stage || '').toLowerCase();
+    const completedStages = process === 'interview'
+      ? ['interview_completed', 'demo_scheduled', 'demo_completed', 'psych_scheduled', 'passed']
+      : ['demo_completed', 'psych_scheduled', 'passed'];
+    return normalizedStatus === `${process} passed` ||
+      normalizedStatus.includes(`${process} approved`) ||
+      normalizedStatus.includes(`${process} qualified`) ||
+      completedStages.includes(normalizedStage);
+  }
+
+  function formatSchedule(dateValue) {
+    const date = new Date(dateValue);
+    return {
+      date: date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+      time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      hasPassed: date.getTime() < Date.now()
+    };
+  }
+
+  function updateInterviewStage(app) {
+    const hasSchedule = Boolean(app && app.interview_date);
+    const passed = isPassedStatus(app?.status, app?.workflow_stage, 'interview');
+    const schedule = hasSchedule ? formatSchedule(app.interview_date) : null;
+    const title = document.getElementById('interview_step_title');
+    const subtitle = document.getElementById('interview_step_subtitle');
+    const statusTitle = document.getElementById('interview_status_title');
+    const statusText = document.getElementById('interview_status_text');
+    const details = document.getElementById('interview_details');
+    const approval = document.getElementById('interview_approved_status');
+    const nextButton = document.getElementById('interview_next_btn');
+
+    if (!title || !subtitle || !statusTitle || !statusText || !details || !approval || !nextButton) return;
+
+    approval.innerHTML = '';
+    approval.classList.add('hidden');
+    details.innerHTML = '';
+    details.classList.add('hidden');
+    nextButton.disabled = !passed;
+    nextButton.className = passed
+      ? 'px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
+      : 'px-6 py-3 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed';
+    nextButton.title = passed ? 'Proceed to Demo Teaching' : 'Wait for the Dean to approve your interview';
+
+    if (!hasSchedule) {
+      title.textContent = 'Waiting for Interview Schedule';
+      subtitle.textContent = 'Waiting for the dean to schedule your interview.';
+      statusTitle.textContent = 'Waiting for Interview Schedule';
+      statusText.textContent = 'Your application has been submitted. Please wait while the dean reviews your application and schedules your interview.';
+      return;
+    }
+
+    title.textContent = passed ? 'Interview Completed' : (schedule.hasPassed ? 'Waiting for Interview Result' : 'Interview Scheduled');
+    subtitle.textContent = passed ? 'Your interview has been completed.' : (schedule.hasPassed ? 'Your interview has been conducted.' : 'Your interview has been scheduled.');
+    statusTitle.textContent = passed ? 'Interview Completed' : (schedule.hasPassed ? 'Interview Result' : 'Interview Details');
+    statusText.textContent = passed
+      ? 'Your interview was approved. You may proceed to Demo Teaching.'
+      : schedule.hasPassed
+        ? 'Your interview has been conducted. Please wait for the Dean to record the interview result.'
+        : 'Please review your interview schedule below and attend at the specified date, time, and location.';
+    details.innerHTML = `
+      <p class="text-sm text-green-600 font-medium"><i class="ri-calendar-check-line mr-1"></i>Interview Scheduled</p>
+      <p class="text-sm text-gray-700 mt-2"><i class="ri-calendar-event-line mr-1"></i>${schedule.date}</p>
+      <p class="text-sm text-gray-700 mt-1"><i class="ri-time-line mr-1"></i>${schedule.time}</p>
+      ${app.interview_location ? `<p class="text-sm text-gray-700 mt-1"><i class="ri-map-pin-line mr-1"></i>${escapeHtml(app.interview_location)}</p>` : ''}
+      ${app.interview_room ? `<p class="text-sm text-gray-700 mt-1"><i class="ri-door-open-line mr-1"></i>${escapeHtml(app.interview_room)}</p>` : ''}
+      ${app.interview_notes ? `<p class="text-sm text-gray-600 mt-2">${escapeHtml(app.interview_notes)}</p>` : ''}
+    `;
+    details.classList.remove('hidden');
+    approval.innerHTML = passed
+      ? '<div class="p-3 bg-green-50 border border-green-200 rounded-lg"><p class="text-green-700 font-medium flex items-center justify-center"><i class="ri-checkbox-circle-fill mr-2"></i>Interview Passed</p></div>'
+      : `<div class="p-3 ${schedule.hasPassed ? 'bg-yellow-50 border-yellow-200' : 'bg-blue-50 border-blue-200'} border rounded-lg"><p class="${schedule.hasPassed ? 'text-yellow-700' : 'text-blue-700'} font-medium flex items-center justify-center"><i class="ri-${schedule.hasPassed ? 'time' : 'information'}-line mr-2"></i>Interview Status</p><p class="${schedule.hasPassed ? 'text-yellow-600' : 'text-blue-600'} text-sm text-center mt-2">${schedule.hasPassed ? 'Please wait for the Dean to record the interview result.' : 'Please attend your scheduled interview. After the interview, please wait for the Dean\'s evaluation before proceeding to Demo Teaching.'}</p></div>`;
+    approval.classList.remove('hidden');
+  }
+
+  function updateDemoStage(app) {
+    const hasSchedule = Boolean(app && app.demo_date);
+    const passed = isPassedStatus(app?.status, app?.workflow_stage, 'demo');
+    const schedule = hasSchedule ? formatSchedule(app.demo_date) : null;
+    const title = document.getElementById('demo_step_title');
+    const subtitle = document.getElementById('demo_step_subtitle');
+    const statusTitle = document.getElementById('demo_status_title');
+    const statusText = document.getElementById('demo_status_text');
+    const details = document.getElementById('demo_details');
+    const approval = document.getElementById('demo_approved_status');
+    const nextButton = document.getElementById('demo_next_btn');
+
+    if (!title || !subtitle || !statusTitle || !statusText || !details || !approval || !nextButton) return;
+
+    approval.innerHTML = '';
+    approval.classList.add('hidden');
+    details.innerHTML = '';
+    details.classList.add('hidden');
+    nextButton.disabled = !passed;
+    nextButton.className = passed
+      ? 'px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
+      : 'px-6 py-3 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed';
+    nextButton.title = passed ? 'Proceed to Psychological Exam' : 'Wait for the Dean to approve your demo teaching';
+
+    if (!hasSchedule) {
+      title.textContent = 'Waiting for Demo Teaching Schedule';
+      subtitle.textContent = 'Waiting for the dean to schedule your demo teaching.';
+      statusTitle.textContent = 'Waiting for Demo Teaching Schedule';
+      statusText.textContent = 'Please wait while the Dean schedules your demo teaching session.';
+      return;
+    }
+
+    title.textContent = passed ? 'Demo Teaching Completed' : (schedule.hasPassed ? 'Waiting for Demo Teaching Result' : 'Demo Teaching Scheduled');
+    subtitle.textContent = passed ? 'Your demo teaching has been completed.' : (schedule.hasPassed ? 'Your demo teaching session has been completed.' : 'Your demo teaching session has been scheduled.');
+    statusTitle.textContent = passed ? 'Demo Teaching Completed' : (schedule.hasPassed ? 'Demo Teaching Result' : 'Demo Teaching Details');
+    statusText.textContent = passed
+      ? 'Your demo teaching was approved. You may proceed to the Psychological Examination.'
+      : schedule.hasPassed
+        ? 'Your demo teaching session has been completed. Please wait for the Dean to record the result.'
+        : 'Please review your demo teaching schedule below and attend at the specified date, time, and location.';
+    details.innerHTML = `
+      <p class="text-sm text-green-600 font-medium"><i class="ri-calendar-check-line mr-1"></i>Demo Teaching Scheduled</p>
+      <p class="text-sm text-gray-700 mt-2"><i class="ri-calendar-event-line mr-1"></i>${schedule.date}</p>
+      <p class="text-sm text-gray-700 mt-1"><i class="ri-time-line mr-1"></i>${schedule.time}</p>
+      ${app.demo_location ? `<p class="text-sm text-gray-700 mt-1"><i class="ri-map-pin-line mr-1"></i>${escapeHtml(app.demo_location)}</p>` : ''}
+      ${app.demo_room ? `<p class="text-sm text-gray-700 mt-1"><i class="ri-door-open-line mr-1"></i>${escapeHtml(app.demo_room)}</p>` : ''}
+      ${app.demo_notes ? `<p class="text-sm text-gray-600 mt-2">${escapeHtml(app.demo_notes)}</p>` : ''}
+    `;
+    details.classList.remove('hidden');
+    approval.innerHTML = passed
+      ? '<div class="p-3 bg-green-50 border border-green-200 rounded-lg"><p class="text-green-700 font-medium flex items-center justify-center"><i class="ri-checkbox-circle-fill mr-2"></i>Demo Teaching Passed</p></div>'
+      : `<div class="p-3 ${schedule.hasPassed ? 'bg-yellow-50 border-yellow-200' : 'bg-blue-50 border-blue-200'} border rounded-lg"><p class="${schedule.hasPassed ? 'text-yellow-700' : 'text-blue-700'} font-medium flex items-center justify-center"><i class="ri-${schedule.hasPassed ? 'time' : 'information'}-line mr-2"></i>Demo Teaching Status</p><p class="${schedule.hasPassed ? 'text-yellow-600' : 'text-blue-600'} text-sm text-center mt-2">${schedule.hasPassed ? 'Please wait for the Dean to record the result.' : 'Please attend your scheduled demo teaching session.'}</p></div>`;
+    approval.classList.remove('hidden');
+  }
+
   // Make setStep globally accessible
   window.setStep = function(n) {
     console.log('=== setStep called with:', n, '===');
@@ -2896,11 +3027,13 @@ document.addEventListener('DOMContentLoaded', function() {
           console.log('? No app data available, skipping button enablement');
           return;
         }
+        updateInterviewStage(app);
+        return;
         // Display interview details if available
         if (app.interview_date) {
           const interviewDate = new Date(app.interview_date);
           const detailsHtml = `
-            <p class="text-sm text-green-600 font-medium">? Interview scheduled</p>
+            <p class="text-sm text-green-600 font-medium">Interview Scheduled</p>
             <p class="text-sm text-gray-700 mt-2">
               <i class="ri-calendar-event-line mr-1"></i>
               ${interviewDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
@@ -3022,7 +3155,7 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         } else if (app.interview_date && !isInterviewApproved) {
           // Interview is scheduled but not yet approved
-          console.log('? Interview scheduled but not approved - button remains disabled');
+          console.log('Interview scheduled but not approved - button remains disabled');
           const nextBtn = document.getElementById('interview_next_btn');
           if (nextBtn) {
             nextBtn.disabled = true;
@@ -3034,7 +3167,7 @@ document.addEventListener('DOMContentLoaded', function() {
           const statusHtml = `
             <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p class="text-yellow-700 font-medium flex items-center justify-center">
-                <i class="ri-time-line mr-2"></i>Interview scheduled - Waiting for dean approval
+                <i class="ri-time-line mr-2"></i>Interview Scheduled
               </p>
               <p class="text-yellow-600 text-sm text-center mt-2">Please attend your interview. The Next button will be enabled after dean approval.</p>
             </div>
@@ -3058,6 +3191,8 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // Use setTimeout to ensure DOM is fully rendered
       setTimeout(() => {
+        updateDemoStage(app);
+        return;
         // Display demo details if available, or show waiting message
         const demoStatusText = document.getElementById('demo_status_text');
         const detailsElement = document.getElementById('demo_details');
@@ -3065,7 +3200,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (app.demo_date) {
           const demoDate = new Date(app.demo_date);
           const detailsHtml = `
-            <p class="text-sm text-green-600 font-medium">? Demo teaching scheduled</p>
+            <p class="text-sm text-green-600 font-medium">Demo Teaching Scheduled</p>
             <p class="text-sm text-gray-700 mt-2">
               <i class="ri-calendar-event-line mr-1"></i>
               ${demoDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
@@ -3389,8 +3524,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Update step label to show actual progress, not viewing step
     const labels = {
       1: 'Step 1 of 5: Submit Requirements',
-      2: 'Step 2 of 5: Waiting for Interview Schedule',
-      3: 'Step 3 of 5: Demo Teaching Scheduled',
+      2: window.currentApplicationData?.interview_date ? 'Step 2 of 5: Interview Scheduled' : 'Step 2 of 5: Waiting for Interview Schedule',
+      3: window.currentApplicationData?.demo_date ? 'Step 3 of 5: Demo Teaching Scheduled' : 'Step 3 of 5: Waiting for Demo Teaching Schedule',
       4: 'Step 4 of 5: Psychological Examination',
       5: 'Step 5 of 5: Initially Hired'
     };
@@ -3518,7 +3653,7 @@ document.addEventListener('DOMContentLoaded', function() {
       if (app.interview_date && workflowStep >= 2) {
         const interviewDate = new Date(app.interview_date);
         const detailsHtml = `
-          <p class="text-sm text-green-600 font-medium">? Interview scheduled</p>
+          <p class="text-sm text-green-600 font-medium">Interview Scheduled</p>
           <p class="text-sm text-gray-700 mt-2">
             <i class="ri-calendar-event-line mr-1"></i>
             ${interviewDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
@@ -3536,7 +3671,7 @@ document.addEventListener('DOMContentLoaded', function() {
       if (app.demo_date && workflowStep >= 3) {
         const demoDate = new Date(app.demo_date);
         const detailsHtml = `
-          <p class="text-sm text-green-600 font-medium">? Demo teaching scheduled</p>
+          <p class="text-sm text-green-600 font-medium">Demo Teaching Scheduled</p>
           <p class="text-sm text-gray-700 mt-2">
             <i class="ri-calendar-event-line mr-1"></i>
             ${demoDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
@@ -4752,7 +4887,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const demoStatusText = document.getElementById('demo_status_text');
     const psychStatusText = document.getElementById('psych_status_text');
     if (interviewStatusText) {
-      interviewStatusText.textContent = 'Your application has been submitted. Please wait while the dean reviews your documents and schedules an interview.';
+      interviewStatusText.textContent = 'Your application has been submitted. Please wait while the dean reviews your application and schedules your interview.';
     }
     if (demoStatusText) {
       demoStatusText.textContent = 'Your interview has been completed. Please wait while the dean schedules your demo teaching session.';
@@ -5314,7 +5449,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { name: 'certificates[]', label: 'Seminars/Training Certificates', dbField: 'seminars_trainings' }
       ];
       const requiresOngoingGraduateDocuments = initialEducation.some(education =>
-        ['master', 'doctorate'].includes(String(education.education_level || '').toLowerCase()) &&
+        String(education.education_level || '').toLowerCase() === 'master' &&
         String(education.education_status || '').toLowerCase() === 'ongoing'
       );
       if (requiresOngoingGraduateDocuments) {
@@ -8225,7 +8360,7 @@ function attachJobEventListeners() {
             if (app.interview_date) {
               const interviewDate = new Date(app.interview_date);
               const detailsHtml = `
-                <p class="text-sm text-green-600 font-medium">? Interview scheduled</p>
+                <p class="text-sm text-green-600 font-medium">Interview Scheduled</p>
                 <p class="text-sm text-gray-700 mt-2">
                   <i class="ri-calendar-event-line mr-1"></i>
                   ${interviewDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
@@ -8264,7 +8399,7 @@ function attachJobEventListeners() {
             if (app.demo_date) {
               const demoDate = new Date(app.demo_date);
               const detailsHtml = `
-                <p class="text-sm text-green-600 font-medium">? Demo teaching scheduled</p>
+                <p class="text-sm text-green-600 font-medium">Demo Teaching Scheduled</p>
                 <p class="text-sm text-gray-700 mt-2">
                   <i class="ri-calendar-event-line mr-1"></i>
                   ${demoDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}

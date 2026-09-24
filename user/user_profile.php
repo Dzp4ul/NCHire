@@ -1879,7 +1879,7 @@ document.addEventListener('DOMContentLoaded', function() {
   function updateEducationGraduateFields() {
     const level = document.getElementById('education_level')?.value || 'bachelor';
     const status = document.getElementById('education_status')?.value || 'completed';
-    const isGraduateOngoing = ['master', 'doctorate'].includes(level) && status === 'ongoing';
+    const isGraduateOngoing = level === 'master' && status === 'ongoing';
     const graduateDocumentsGroup = document.getElementById('graduateDocumentsGroup');
     const endYearInput = document.getElementById('ed_ey');
     const yearCompletedInput = document.getElementById('year_completed');

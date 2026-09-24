@@ -240,7 +240,7 @@ if (isset($_POST['saveEducation'])) {
         exit();
     }
 
-    $is_graduate_ongoing = $education_status === 'ongoing' && in_array($education_level, ['master', 'doctorate'], true);
+    $is_graduate_ongoing = $education_status === 'ongoing' && $education_level === 'master';
     if ($is_graduate_ongoing && (!$certificate_of_grades || !$proof_of_enrollment)) {
         echo json_encode(['success' => false, 'message' => 'Certificate of Grades and Proof of Enrollment are required for ongoing graduate education.']);
         exit();

@@ -18,8 +18,8 @@ if (!function_exists('nc_application_document_definitions')) {
             'professional_license' => ['label' => 'Professional License', 'input' => 'license', 'required' => false, 'multiple' => false],
             'coe' => ['label' => 'Certificate of Employment (COE)', 'input' => 'coe', 'required' => true, 'multiple' => false],
             'seminars_trainings' => ['label' => 'Seminars/Training Certificates', 'input' => 'certificates[]', 'required' => true, 'multiple' => true],
-            'masteral_cert' => ['label' => "Master's/Doctorate Certification", 'input' => 'masteral_cert', 'required' => false, 'multiple' => false],
-            'certificate_of_grades' => ['label' => "Master's/Doctorate Grades", 'input' => 'certificate_of_grades', 'required' => false, 'multiple' => false],
+            'masteral_cert' => ['label' => 'Masteral Certificate', 'input' => 'masteral_cert', 'required' => false, 'multiple' => false],
+            'certificate_of_grades' => ['label' => 'Certificate of Grades', 'input' => 'certificate_of_grades', 'required' => false, 'multiple' => false],
             'proof_of_enrollment' => ['label' => 'Proof of Enrollment', 'input' => 'proof_of_enrollment', 'required' => false, 'multiple' => false],
         ];
     }
