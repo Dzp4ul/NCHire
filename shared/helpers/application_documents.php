@@ -178,6 +178,41 @@ if (!function_exists('nc_find_reusable_documents')) {
     }
 }
 
+if (!function_exists('nc_find_profile_education_documents')) {
+    function nc_find_profile_education_documents(mysqli $conn, int $userId): array
+    {
+        $masterStatus = nc_get_master_status($conn, $userId);
+        if (!$masterStatus['requires_ongoing_documents'] || empty($masterStatus['row'])) {
+            return [];
+        }
+
+        $row = $masterStatus['row'];
+        $documents = [];
+        foreach (['certificate_of_grades', 'proof_of_enrollment'] as $field) {
+            $fileName = trim((string)($row[$field] ?? ''));
+            if ($fileName === '') {
+                continue;
+            }
+
+            $definition = nc_application_document_definitions()[$field];
+            $documents[$field] = [
+                'document_type' => $field,
+                'label' => $definition['label'],
+                'input_name' => $definition['input'],
+                'file_name' => $fileName,
+                'files' => nc_document_file_names($fileName, false),
+                'source' => 'profile',
+                'source_education_id' => (int)($row['id'] ?? 0),
+                'uploaded_at' => null,
+                'status' => 'Current / Active',
+                'required' => true,
+            ];
+        }
+
+        return $documents;
+    }
+}
+
 if (!function_exists('nc_merge_reusable_document_values')) {
     function nc_merge_reusable_document_values(array $values, array $reusableDocuments): array
     {

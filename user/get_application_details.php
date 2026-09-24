@@ -18,10 +18,14 @@ if ($conn->connect_error) {
 
 $application_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 $user_id = $_SESSION['user_id'] ?? null;
-$user_email = $_SESSION['user_email'] ?? ($_SESSION['email'] ?? ($_SESSION['applicant_email'] ?? null));
 
 if ($application_id === 0) {
     echo json_encode(['success' => false, 'error' => 'Invalid application ID']);
+    exit;
+}
+
+if (!$user_id) {
+    echo json_encode(['success' => false, 'error' => 'User session is required']);
     exit;
 }
 
@@ -30,9 +34,9 @@ $stmt = $conn->prepare("
     SELECT ja.*, a.first_name, a.last_name, a.address 
     FROM job_applicants ja 
     LEFT JOIN applicants a ON ja.user_id = a.id 
-    WHERE ja.id = ? AND (ja.user_id = ? OR ja.applicant_email = ?)
+    WHERE ja.id = ? AND ja.user_id = ?
 ");
-$stmt->bind_param("iis", $application_id, $user_id, $user_email);
+$stmt->bind_param("ii", $application_id, $user_id);
 $stmt->execute();
 $result = $stmt->get_result();
 

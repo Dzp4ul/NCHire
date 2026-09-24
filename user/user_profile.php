@@ -1066,12 +1066,22 @@ $year_display = $status === 'ongoing'
 <?php endif; ?>
 </p>
 <?php if (!empty($education['certificate_of_grades']) || !empty($education['proof_of_enrollment'])): ?>
-<div class="flex flex-wrap gap-2 mt-3 text-xs">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
 <?php if (!empty($education['certificate_of_grades'])): ?>
-<a href="<?php echo htmlspecialchars($education['certificate_of_grades']); ?>" target="_blank" class="inline-flex items-center gap-1 text-primary hover:underline"><i class="ri-file-list-3-line"></i>Certificate of Grades</a>
+<div class="p-3 bg-emerald-50 border border-emerald-300 rounded-lg">
+<div class="text-xs font-bold uppercase tracking-wide text-emerald-700">Current / Active</div>
+<a href="<?php echo htmlspecialchars($education['certificate_of_grades']); ?>" target="_blank" rel="noopener" class="block text-sm text-emerald-800 hover:underline break-all mt-1"><i class="ri-file-list-3-line mr-1"></i><?php echo htmlspecialchars(basename($education['certificate_of_grades'])); ?></a>
+<div class="text-xs text-gray-500 mt-1">Certificate of Grades</div>
+<button type="button" onclick="editEducation(<?php echo (int)$education['id']; ?>)" class="mt-2 text-xs font-semibold text-blue-700 hover:underline">Update / Replace</button>
+</div>
 <?php endif; ?>
 <?php if (!empty($education['proof_of_enrollment'])): ?>
-<a href="<?php echo htmlspecialchars($education['proof_of_enrollment']); ?>" target="_blank" class="inline-flex items-center gap-1 text-primary hover:underline"><i class="ri-file-user-line"></i>Proof of Enrollment</a>
+<div class="p-3 bg-emerald-50 border border-emerald-300 rounded-lg">
+<div class="text-xs font-bold uppercase tracking-wide text-emerald-700">Current / Active</div>
+<a href="<?php echo htmlspecialchars($education['proof_of_enrollment']); ?>" target="_blank" rel="noopener" class="block text-sm text-emerald-800 hover:underline break-all mt-1"><i class="ri-file-user-line mr-1"></i><?php echo htmlspecialchars(basename($education['proof_of_enrollment'])); ?></a>
+<div class="text-xs text-gray-500 mt-1">Proof of Enrollment</div>
+<button type="button" onclick="editEducation(<?php echo (int)$education['id']; ?>)" class="mt-2 text-xs font-semibold text-blue-700 hover:underline">Update / Replace</button>
+</div>
 <?php endif; ?>
 </div>
 <?php endif; ?>
@@ -1597,9 +1607,16 @@ if (document.getElementById('profileMainContent')) {
       : `${edu.start_year || ''} - ${edu.year_completed || edu.end_year || ''}`;
     const units = edu.completed_units ? ` | Completed Units: ${escapeHtml(String(edu.completed_units))}` : '';
     const gpa = edu.gpa ? ` | GPA: ${escapeHtml(edu.gpa)}` : '';
+    const documentCard = (path, label, icon) => path ? `
+      <div class="p-3 bg-emerald-50 border border-emerald-300 rounded-lg">
+        <div class="text-xs font-bold uppercase tracking-wide text-emerald-700">Current / Active</div>
+        <a href="${escapeHtml(path)}" target="_blank" rel="noopener" class="block text-sm text-emerald-800 hover:underline break-all mt-1"><i class="${icon} mr-1"></i>${escapeHtml(String(path).split('/').pop())}</a>
+        <div class="text-xs text-gray-500 mt-1">${label}</div>
+        <button type="button" onclick="editEducation(${Number(edu.id)})" class="mt-2 text-xs font-semibold text-blue-700 hover:underline">Update / Replace</button>
+      </div>` : '';
     const docs = [
-      edu.certificate_of_grades ? `<a href="${escapeHtml(edu.certificate_of_grades)}" target="_blank" class="inline-flex items-center gap-1 text-primary hover:underline"><i class="ri-file-list-3-line"></i>Certificate of Grades</a>` : '',
-      edu.proof_of_enrollment ? `<a href="${escapeHtml(edu.proof_of_enrollment)}" target="_blank" class="inline-flex items-center gap-1 text-primary hover:underline"><i class="ri-file-user-line"></i>Proof of Enrollment</a>` : ''
+      documentCard(edu.certificate_of_grades, 'Certificate of Grades', 'ri-file-list-3-line'),
+      documentCard(edu.proof_of_enrollment, 'Proof of Enrollment', 'ri-file-user-line')
     ].filter(Boolean).join('');
 
     return `
@@ -1614,7 +1631,7 @@ if (document.getElementById('profileMainContent')) {
             ${edu.field_of_study ? `<p class="text-gray-600 mt-1 text-sm">${escapeHtml(edu.field_of_study)}</p>` : ''}
             <p class="text-gray-600 mt-1 text-sm">${escapeHtml(edu.institution || '')}</p>
             <p class="text-gray-500 text-sm mt-1">${escapeHtml(yearDisplay)}${gpa}${units}</p>
-            ${docs ? `<div class="flex flex-wrap gap-2 mt-3 text-xs">${docs}</div>` : ''}
+            ${docs ? `<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">${docs}</div>` : ''}
           </div>
           <div class="flex space-x-1 ml-4">
             <button onclick="editEducation(${edu.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
@@ -1863,15 +1880,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const level = document.getElementById('education_level')?.value || 'bachelor';
     const status = document.getElementById('education_status')?.value || 'completed';
     const isGraduateOngoing = ['master', 'doctorate'].includes(level) && status === 'ongoing';
-    const completedUnitsGroup = document.getElementById('completedUnitsGroup');
     const graduateDocumentsGroup = document.getElementById('graduateDocumentsGroup');
     const endYearInput = document.getElementById('ed_ey');
     const yearCompletedInput = document.getElementById('year_completed');
-    const completedUnitsInput = document.getElementById('completed_units');
     const certificateInput = document.getElementById('certificate_of_grades');
     const proofInput = document.getElementById('proof_of_enrollment');
 
-    if (completedUnitsGroup) completedUnitsGroup.classList.toggle('hidden', !isGraduateOngoing);
     if (graduateDocumentsGroup) graduateDocumentsGroup.classList.toggle('hidden', !isGraduateOngoing);
 
     if (endYearInput) {
@@ -1882,15 +1896,25 @@ document.addEventListener('DOMContentLoaded', function() {
       yearCompletedInput.disabled = status === 'ongoing';
       if (status === 'ongoing') yearCompletedInput.value = '';
     }
-    if (completedUnitsInput) completedUnitsInput.required = isGraduateOngoing;
     if (certificateInput) certificateInput.required = isGraduateOngoing && !document.getElementById('edit_education_id')?.value;
     if (proofInput) proofInput.required = isGraduateOngoing && !document.getElementById('edit_education_id')?.value;
   }
 
-  ['education_level', 'education_status'].forEach(id => {
-    const input = document.getElementById(id);
-    if (input) input.addEventListener('change', updateEducationGraduateFields);
-  });
+  function bindEducationGraduateFields() {
+    ['education_level', 'education_status'].forEach(id => {
+      const input = document.getElementById(id);
+      if (input && input.dataset.graduateFieldsBound !== '1') {
+        input.addEventListener('change', updateEducationGraduateFields);
+        input.dataset.graduateFieldsBound = '1';
+      }
+    });
+    updateEducationGraduateFields();
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bindEducationGraduateFields);
+  } else {
+    bindEducationGraduateFields();
+  }
   window.updateEducationGraduateFields = updateEducationGraduateFields;
 
   // Close modal event listeners with null checks
@@ -2506,7 +2530,7 @@ window.showNotification = showNotification;
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2" for="education_level">Education Level</label>
-          <select name="education_level" id="education_level" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
+          <select name="education_level" id="education_level" required onchange="var showGraduateDocs=this.value==='master' && document.getElementById('education_status').value==='ongoing'; document.getElementById('graduateDocumentsGroup').classList.toggle('hidden', !showGraduateDocs);" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
             <option value="high_school">High School</option>
             <option value="associate">Associate</option>
             <option value="bachelor">Bachelor</option>
@@ -2517,7 +2541,7 @@ window.showNotification = showNotification;
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2" for="education_status">Status</label>
-          <select name="education_status" id="education_status" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
+          <select name="education_status" id="education_status" required onchange="var showGraduateDocs=document.getElementById('education_level').value==='master' && this.value==='ongoing'; document.getElementById('graduateDocumentsGroup').classList.toggle('hidden', !showGraduateDocs);" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
             <option value="completed">Completed</option>
             <option value="ongoing">Ongoing</option>
           </select>
@@ -2548,10 +2572,6 @@ window.showNotification = showNotification;
           <label class="block text-sm font-medium text-gray-700 mb-2" for="year_completed">Year Completed</label>
           <input type="number" name="year_completed" id="year_completed" placeholder="2024" min="1900" max="2100" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
         </div>
-      </div>
-      <div id="completedUnitsGroup" class="hidden">
-        <label class="block text-sm font-medium text-gray-700 mb-2" for="completed_units">Completed Units</label>
-        <input type="number" name="completed_units" id="completed_units" placeholder="e.g., 9" min="0" max="99" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-2" for="ed_gpa">GPA (Optional)</label>
@@ -2823,7 +2843,6 @@ function editEducation(id) {
   document.getElementById('ed_gpa').value = education.gpa || '';
   document.getElementById('education_level').value = education.education_level || 'other';
   document.getElementById('education_status').value = education.education_status || 'completed';
-  document.getElementById('completed_units').value = education.completed_units || '';
   document.getElementById('year_completed').value = education.year_completed || education.end_year || '';
   const certificateInput = document.getElementById('certificate_of_grades');
   const proofInput = document.getElementById('proof_of_enrollment');

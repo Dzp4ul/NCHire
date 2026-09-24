@@ -105,6 +105,16 @@ if (isset($_SESSION['user_id'])) {
         $profile_stmt2->close();
     }
     $profile_stmt->close();
+
+    $authoritative_profile_stmt = $conn->prepare("SELECT first_name, last_name, applicant_email AS email, contact_number AS phone, address FROM applicants WHERE id = ? LIMIT 1");
+    $authoritative_profile_stmt->bind_param("i", $profile_user_id);
+    $authoritative_profile_stmt->execute();
+    $authoritative_profile_result = $authoritative_profile_stmt->get_result();
+    if ($authoritative_profile_result->num_rows === 1) {
+      $user_profile_data = $authoritative_profile_result->fetch_assoc();
+      $user_address = $user_profile_data['address'] ?? '';
+    }
+    $authoritative_profile_stmt->close();
     
     // Fetch ALL work experiences (remove LIMIT 1)
     $exp_stmt = $conn->prepare("SELECT job_title, company, location, start_date, end_date, is_current, description, experience_type FROM user_experience WHERE user_id = ? ORDER BY start_date DESC");
@@ -121,7 +131,7 @@ if (isset($_SESSION['user_id'])) {
     $exp_stmt->close();
     
     // Fetch ALL education entries
-    $edu_stmt = $conn->prepare("SELECT institution, degree, field_of_study, start_year, end_year, gpa, education_level, education_status, completed_units, year_completed FROM user_education WHERE user_id = ? ORDER BY start_year DESC");
+    $edu_stmt = $conn->prepare("SELECT id, institution, degree, field_of_study, start_year, end_year, gpa, education_level, education_status, completed_units, year_completed, certificate_of_grades, proof_of_enrollment FROM user_education WHERE user_id = ? ORDER BY start_year DESC");
     $edu_stmt->bind_param("i", $profile_user_id);
     $edu_stmt->execute();
     $edu_result = $edu_stmt->get_result();
@@ -221,6 +231,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         header("Location: " . $_SERVER['PHP_SELF']);
         exit();
     }
+
+      // Profile data is authoritative for an application; never trust hidden form fields for identity.
+      $profile_stmt = $conn->prepare("SELECT first_name, last_name, applicant_email, contact_number, address FROM applicants WHERE id = ? LIMIT 1");
+      $profile_stmt->bind_param("i", $user_id);
+      $profile_stmt->execute();
+      $profile_result = $profile_stmt->get_result();
+      $application_profile = $profile_result->fetch_assoc();
+      $profile_stmt->close();
+
+      $profile_missing = [];
+      if (!$application_profile) {
+        $profile_missing[] = 'applicant profile';
+      } else {
+        foreach (['first_name' => 'first name', 'last_name' => 'last name', 'applicant_email' => 'email', 'contact_number' => 'contact number'] as $field => $label) {
+          if (empty(trim((string)($application_profile[$field] ?? '')))) {
+            $profile_missing[] = $label;
+          }
+        }
+        $experience_check = $conn->prepare("SELECT id FROM user_experience WHERE user_id = ? LIMIT 1");
+        $experience_check->bind_param("i", $user_id);
+        $experience_check->execute();
+        if ($experience_check->get_result()->num_rows === 0) {
+          $profile_missing[] = 'work experience';
+        }
+        $experience_check->close();
+      }
+      if (!empty($profile_missing)) {
+        $error_msg = 'Please complete your profile before applying for this job.';
+        if ($is_ajax_submit) {
+          while (ob_get_level()) ob_end_clean();
+          header('Content-Type: application/json');
+          echo json_encode([
+            'success' => false,
+            'error' => $error_msg,
+            'profile_incomplete' => true,
+            'missing_profile_fields' => $profile_missing,
+            'profile_url' => 'user_profile.php'
+          ]);
+          exit();
+        }
+        $_SESSION['application_error'] = $error_msg;
+        header("Location: user_profile.php");
+        exit();
+      }
+
+      $full_name = trim($application_profile['first_name'] . ' ' . $application_profile['last_name']);
+      $applicant_email = $application_profile['applicant_email'];
+      $contact_num = $application_profile['contact_number'];
     
     // Check if user is banned from applying
     $ban_check_stmt = $conn->prepare("SELECT rejection_ban_until, ban_reason, banned_by 
@@ -277,28 +335,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
     }
     $ban_check_stmt->close();
     
-    // Get user data from users table for form population
-    $user_stmt = $conn->prepare("SELECT first_name, last_name, email, phone FROM users WHERE id = ?");
-    $user_stmt->bind_param("i", $user_id);
-    $user_stmt->execute();
-    $user_result = $user_stmt->get_result();
-    
-    if ($user_result->num_rows === 1) {
-        $user_data = $user_result->fetch_assoc();
-        $full_name = trim($user_data['first_name'] . ' ' . $user_data['last_name']);
-        $applicant_email = $user_data['email'];
-        $contact_num = $user_data['phone'] ?? '';
-        $first_name = $user_data['first_name'];
-    } else {
-        // Fallback to form data if user not found in users table
-        $full_name = $_POST['full_name'] ?? '';
-        $applicant_email = $_POST['email'] ?? '';
-        $contact_num = $_POST['cellphone'] ?? '';
-        $first_name = $_SESSION['first_name'] ?? "Guest";
-    }
-    $user_stmt->close();
+    $first_name = $application_profile['first_name'];
 
     function uploadFile($fileKey, $uploadDir, $multiple = false) {
+      $allowedExtensions = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
+      $allowedMimes = [
+        'application/pdf', 'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/zip', 'image/jpeg', 'image/png', 'application/octet-stream',
+      ];
+      $finfo = function_exists('finfo_open') ? finfo_open(FILEINFO_MIME_TYPE) : false;
         if ($multiple) {
             $savedFiles = [];
             if (isset($_FILES[$fileKey]) && is_array($_FILES[$fileKey]['name'])) {
@@ -307,6 +353,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
                         // Validate file size (5MB max)
                         if ($_FILES[$fileKey]['size'][$index] > 5 * 1024 * 1024) {
                             continue; // Skip files larger than 5MB
+                        }
+                        $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                        $mime = $finfo ? finfo_file($finfo, $_FILES[$fileKey]['tmp_name'][$index]) : false;
+                        if (!in_array($extension, $allowedExtensions, true) || ($mime && !in_array($mime, $allowedMimes, true))) {
+                          continue;
                         }
                         $fileName = time() . "_" . bin2hex(random_bytes(6)) . "_" . $index . "_" . basename($name);
                         $targetFile = $uploadDir . $fileName;
@@ -323,6 +374,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
                 if ($_FILES[$fileKey]['size'] > 5 * 1024 * 1024) {
                     return null; // File too large
                 }
+                $extension = strtolower(pathinfo($_FILES[$fileKey]['name'], PATHINFO_EXTENSION));
+                $mime = $finfo ? finfo_file($finfo, $_FILES[$fileKey]['tmp_name']) : false;
+                if (!in_array($extension, $allowedExtensions, true) || ($mime && !in_array($mime, $allowedMimes, true))) {
+                  return null;
+                }
                 $fileName = time() . "_" . bin2hex(random_bytes(6)) . "_" . basename($_FILES[$fileKey]['name']);
                 $targetFile = $uploadDir . $fileName;
                 if (move_uploaded_file($_FILES[$fileKey]['tmp_name'], $targetFile)) {
@@ -331,6 +387,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
             }
             return null;
         }
+          if ($finfo) finfo_close($finfo);
     }
 
     // Upload files with error tracking
@@ -363,6 +420,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         }
         return null;
     }
+
+      function syncProfileEducationDocument(mysqli $conn, array $masterStatus, int $userId, string $field, string $applicationFile, string $uploadDir): ?string {
+        if (empty($masterStatus['requires_ongoing_documents']) || empty($masterStatus['row']['id']) || $applicationFile === '') {
+          return null;
+        }
+
+        $sourcePath = $uploadDir . basename($applicationFile);
+        if (!is_file($sourcePath)) {
+          return null;
+        }
+
+        $profileDir = __DIR__ . '/uploads/education_documents/';
+        if (!is_dir($profileDir) && !mkdir($profileDir, 0755, true)) {
+          return null;
+        }
+        $extension = strtolower(pathinfo($applicationFile, PATHINFO_EXTENSION));
+        $profileFile = $field . '_' . $userId . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $extension;
+        if (!copy($sourcePath, $profileDir . $profileFile)) {
+          return null;
+        }
+
+        $profilePath = 'uploads/education_documents/' . $profileFile;
+        $update = $conn->prepare("UPDATE user_education SET `{$field}` = ? WHERE id = ? AND user_id = ?");
+        if (!$update) {
+          @unlink($profileDir . $profileFile);
+          return null;
+        }
+        $educationId = (int)$masterStatus['row']['id'];
+        $update->bind_param('sii', $profilePath, $educationId, $userId);
+        $ok = $update->execute();
+        $update->close();
+        if (!$ok) {
+          @unlink($profileDir . $profileFile);
+          return null;
+        }
+        return $profilePath;
+      }
     
     // Upload new files OR use draft files automatically
     error_log("=== FILE UPLOAD PROCESS START ===");
@@ -486,8 +580,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
     $is_resubmission = isset($_POST['is_resubmission']) && $_POST['is_resubmission'] == '1';
     $reusable_document_result = ['is_existing_applicant' => false, 'documents' => []];
     $master_status = nc_get_master_status($conn, (int)$user_id);
+    if ($master_status['requires_ongoing_documents']) {
+      foreach (['certificate_of_grades', 'proof_of_enrollment'] as $field) {
+        if (empty($fresh_document_values[$field])) {
+          continue;
+        }
+        $profilePath = syncProfileEducationDocument(
+          $conn,
+          $master_status,
+          (int)$user_id,
+          $field,
+          $fresh_document_values[$field],
+          $uploadDir
+        );
+        if ($profilePath === null) {
+          $upload_errors[] = ucfirst(str_replace('_', ' ', $field)) . ' could not be synchronized to your profile';
+        } else {
+          $fresh_document_values[$field] = $profilePath;
+          ${$field} = $profilePath;
+        }
+      }
+    }
     if (!$is_resubmission) {
         $reusable_document_result = nc_find_reusable_documents($conn, (int)$user_id);
+      foreach (nc_find_profile_education_documents($conn, (int)$user_id) as $field => $document) {
+        $reusable_document_result['documents'][$field] = $document;
+      }
         $document_values = nc_merge_reusable_document_values($fresh_document_values, $reusable_document_result['documents']);
         foreach ($document_values as $field => $value) {
             ${$field} = $value;
@@ -655,22 +773,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
     error_log("Job ID: " . $job_id);
     error_log("Job Department Retrieved: " . ($job_department ?? "NULL"));
     error_log("===================================");
-
-    // New form values with validation
-    $full_name = $_POST['full_name'] ?? $applicant_name;
-    $applicant_email = $_POST['email'] ?? '';
-    $contact_num = $_POST['cellphone'] ?? '';
-    
-    // Ensure required fields are not empty
-    if (empty($applicant_email)) {
-        $applicant_email = 'no-email@provided.com'; // Default email if not provided
-    }
-    if (empty($contact_num)) {
-        $contact_num = 'Not provided'; // Default contact if not provided
-    }
-    if (empty($full_name)) {
-        $full_name = $applicant_name; // Use session name as fallback
-    }
 
     // Check if this is a RESUBMISSION or new application
     $is_resubmission = isset($_POST['is_resubmission']) && $_POST['is_resubmission'] == '1';
@@ -1902,132 +2004,16 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                         <div class="w-7 h-7 rounded-full flex items-center justify-center font-semibold step-dot" data-step="5" style="width: 1.75rem !important; height: 1.75rem !important; border-radius: 50% !important; display: flex !important; align-items: center !important; justify-content: center !important; font-weight: 600 !important; background: rgba(255,255,255,0.3) !important; color: white !important; font-size: 0.875rem !important;">5</div>
                         <div class="flex-1 h-0.5 mx-1 bg-white bg-opacity-30 step-line" data-after="5" style="flex: 1 !important; height: 2px !important; margin: 0 0.25rem !important; background-color: rgba(255, 255, 255, 0.3) !important;"></div>
                     </div>
-                    <!-- Step 6 -->
-                    <div class="flex items-center" style="display: flex !important; align-items: center !important;">
-                        <div class="w-7 h-7 rounded-full flex items-center justify-center font-semibold step-dot" data-step="6" style="width: 1.75rem !important; height: 1.75rem !important; border-radius: 50% !important; display: flex !important; align-items: center !important; justify-content: center !important; font-weight: 600 !important; background: rgba(255,255,255,0.3) !important; color: white !important; font-size: 0.875rem !important;">6</div>
-                    </div>
                 </div>
-                <div class="mt-2 text-center text-blue-100 text-xs" id="wizardStepLabel" style="margin-top: 0.5rem !important; text-align: center !important; color: #bfdbfe !important; font-size: 0.75rem !important;">Step 1 of 6: Personal Information, Work Experience, Education & Skills</div>
+                  <div class="mt-2 text-center text-blue-100 text-xs" id="wizardStepLabel" style="margin-top: 0.5rem !important; text-align: center !important; color: #bfdbfe !important; font-size: 0.75rem !important;">Step 1 of 5: Submit Requirements</div>
             </div>
         </div>
 
         <!-- Wizard Body -->
         <div class="p-4 pb-16" style="min-height: 400px; background: #f8fafc !important; padding: 1.5rem !important; padding-bottom: 4rem !important; padding-top: 1rem !important;">
             <div class="max-w-4xl mx-auto" style="position: relative; z-index: 1; max-width: 56rem; margin: 0 auto;">
-                <!-- Step 1: Personal Information, Work Experience, Education & Skills -->
+                <!-- Step 1: Submit Requirements -->
                 <section id="step1" class="wizard-step">
-                    <h2 class="text-xl font-semibold text-gray-900 mb-4">Personal Information, Work Experience, Education & Skills</h2>
-                    <p class="text-sm text-gray-600 mb-6">Complete all sections below to help us evaluate your qualifications.</p>
-                    
-                    <!-- Personal Information -->
-                    <div class="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                            <i class="ri-user-line mr-2 text-blue-600"></i>Personal Information
-                        </h3>
-                        <div class="space-y-4">
-                            <div class="grid md:grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-sm text-gray-700 mb-1">First Name <span class="text-red-500">*</span></label>
-                                    <input type="text" id="pf_first_name" class="w-full border border-gray-300 rounded-lg p-3" pattern="[A-Za-z\s\-']+" title="Please enter only letters, spaces, hyphens, and apostrophes" required>
-                                </div>
-                                <div>
-                                    <label class="block text-sm text-gray-700 mb-1">Last Name <span class="text-red-500">*</span></label>
-                                    <input type="text" id="pf_last_name" class="w-full border border-gray-300 rounded-lg p-3" pattern="[A-Za-z\s\-']+" title="Please enter only letters, spaces, hyphens, and apostrophes" required>
-                                </div>
-                            </div>
-                            <div class="grid md:grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-sm text-gray-700 mb-1">Email <span class="text-red-500">*</span></label>
-                                    <input type="email" id="pf_email" class="w-full border border-gray-300 rounded-lg p-3" required>
-                                </div>
-                                <div>
-                                    <label class="block text-sm text-gray-700 mb-1">Contact Number <span class="text-red-500">*</span></label>
-                                    <input type="tel" id="pf_phone" class="w-full border border-gray-300 rounded-lg p-3" 
-                                           pattern="09[0-9]{9}" 
-                                           maxlength="11" 
-                                           placeholder="09XXXXXXXXX"
-                                           title="Please enter a valid Philippine mobile number (e.g., 09123456789)"
-                                           oninput="this.value = this.value.replace(/[^0-9]/g, '')" 
-                                           required>
-                                </div>
-                            </div>
-                            <div>
-                                <label class="block text-sm text-gray-700 mb-1">Address</label>
-                                <input type="text" id="pf_address" class="w-full border border-gray-300 rounded-lg p-3" placeholder="Optional">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Work Experience -->
-                    <div class="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center justify-between">
-                            <span class="flex items-center gap-2">
-                                <i class="ri-briefcase-line mr-2 text-blue-600"></i>Work Experience
-                                <span id="workExpCount" class="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">0</span>
-                            </span>
-                            <button type="button" id="addWorkExpBtn" class="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 flex items-center gap-1">
-                                <i class="ri-add-line"></i>Add Experience
-                            </button>
-                        </h3>
-                        <div id="workExperienceDisplay" class="space-y-3">
-                            <!-- Work experience boxes will be populated here -->
-                            <div class="text-sm text-gray-500 italic">Loading work experience...</div>
-                        </div>
-                    </div>
-
-                    <!-- Skills -->
-                    <div class="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center justify-between">
-                            <span class="flex items-center gap-2">
-                                <i class="ri-lightbulb-line mr-2 text-blue-600"></i>Skills & Competencies
-                                <span id="skillsCount" class="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded-full">0</span>
-                            </span>
-                            <button type="button" id="addSkillsBtn" class="text-sm bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 flex items-center gap-1">
-                                <i class="ri-add-line"></i>Add Skills
-                            </button>
-                        </h3>
-                        <div id="skillsDisplay" class="flex flex-wrap gap-2">
-                            <!-- Skill tags will be populated here -->
-                            <div class="text-sm text-gray-500 italic">Loading skills...</div>
-                        </div>
-                    </div>
-
-                    <!-- Education -->
-                    <div class="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center justify-between">
-                            <span class="flex items-center gap-2">
-                                <i class="ri-graduation-cap-line mr-2 text-blue-600"></i>Education
-                                <span id="educationCount" class="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full">0</span>
-                            </span>
-                            <button type="button" id="addEducationBtn" class="text-sm bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 flex items-center gap-1">
-                                <i class="ri-add-line"></i>Add Education
-                            </button>
-                        </h3>
-                        <div id="educationDisplay" class="space-y-3">
-                            <!-- Education entries will be populated here -->
-                            <div class="text-sm text-gray-500 italic">Loading education...</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Hidden fields for form submission -->
-                    <input type="hidden" id="wx_job_title">
-                    <input type="hidden" id="wx_company">
-                    <input type="hidden" id="wx_location">
-                    <input type="hidden" id="wx_start">
-                    <input type="hidden" id="wx_end">
-                    <input type="hidden" id="wx_current">
-                    <input type="hidden" id="wx_description">
-                    <input type="hidden" id="wx_experience_type">
-                    <input type="hidden" id="wx_skills">
-                    
-                    <div class="flex justify-end gap-3 pt-2">
-                        <button type="button" id="saveAllStep1Btn" class="px-5 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Save Progress</button>
-                        <button type="button" id="toStep2" class="px-5 py-2 bg-primary text-white rounded-lg hover:bg-blue-700">Next</button>
-                    </div>
-                </section>
-
-                <!-- Step 2: Submit Requirements -->
-                <section id="step2" class="wizard-step hidden">
                     <h2 class="text-lg font-bold text-gray-900 mb-2">Submit Requirements</h2>
                     <p class="text-gray-600 mb-4">Upload your required documents. Accepted formats: PDF, DOC, DOCX, JPG, PNG. Maximum size: 5MB per file.</p>
                     
@@ -2233,9 +2219,6 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
 
                         <!-- Form Actions -->
                         <div class="flex justify-between items-center pt-6 border-t">
-                            <button type="button" id="backToStep1" class="flex items-center px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                                <i class="ri-arrow-left-line mr-2"></i>Back
-                            </button>
                             <div class="flex gap-3">
                                 <button type="button" id="saveDraftBtn" class="flex items-center px-6 py-3 border-2 border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors font-semibold">
                                     <i class="ri-save-line mr-2"></i>Save Draft
@@ -2244,15 +2227,15 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                                     <i class="ri-send-plane-line mr-2"></i>Submit Application
                                 </button>
                             </div>
-                            <button type="button" id="step2NextBtn" onclick="setStep(3)" class="hidden flex items-center px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg font-semibold">
+                            <button type="button" id="step1NextBtn" onclick="setStep(2)" class="hidden flex items-center px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 to-blue-800 transition-all shadow-lg font-semibold">
                                 Next <i class="ri-arrow-right-line ml-2"></i>
                             </button>
                         </div>
                     </form>
                 </section>
                 
-                <!-- Step 3: Waiting for Interview Schedule -->
-                <section id="step3" class="wizard-step hidden">
+                <!-- Step 2: Waiting for Interview Schedule -->
+                <section id="step2" class="wizard-step hidden">
                     <h2 class="text-xl font-semibold text-gray-900 mb-2">Waiting for Interview Schedule</h2>
                     <p class="text-gray-600 mb-6">Waiting for dean to schedule and approve your interview</p>
                     
@@ -2271,17 +2254,17 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                     </div>
                     
                     <div class="flex justify-between items-center pt-6">
-                        <button type="button" id="step3_back_btn" onclick="setStep(2)" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                        <button type="button" id="step2_back_btn" onclick="setStep(1)" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
                             <i class="ri-arrow-left-line mr-2"></i>Back
                         </button>
-                        <button type="button" id="interview_next_btn" onclick="setStep(4)" disabled class="px-6 py-3 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed" title="Waiting for admin approval">
+                        <button type="button" id="interview_next_btn" onclick="setStep(3)" disabled class="px-6 py-3 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed" title="Waiting for admin approval">
                             Next: Demo Teaching <i class="ri-arrow-right-line ml-2"></i>
                         </button>
                     </div>
                 </section>
                 
-                <!-- Step 4: Demo Scheduled -->
-                <section id="step4" class="wizard-step hidden">
+                <!-- Step 3: Demo Scheduled -->
+                <section id="step3" class="wizard-step hidden">
                     <h2 class="text-xl font-semibold text-gray-900 mb-2">Demo Teaching Scheduled</h2>
                     <p class="text-gray-600 mb-6">Waiting for dean to schedule and approve your demo teaching</p>
                     
@@ -2300,17 +2283,17 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                     </div>
                     
                     <div class="flex justify-between items-center pt-6">
-                        <button type="button" onclick="setStep(3)" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                        <button type="button" onclick="setStep(2)" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
                             <i class="ri-arrow-left-line mr-2"></i>Back
                         </button>
-                        <button type="button" id="demo_next_btn" onclick="setStep(5)" disabled class="px-6 py-3 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed" title="Waiting for admin approval">
+                        <button type="button" id="demo_next_btn" onclick="setStep(4)" disabled class="px-6 py-3 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed" title="Waiting for admin approval">
                             Next: Psychological Exam <i class="ri-arrow-right-line ml-2"></i>
                         </button>
                     </div>
                 </section>
                 
-                <!-- Step 5: Psychological Exam -->
-                <section id="step5" class="wizard-step hidden">
+                <!-- Step 4: Psychological Exam -->
+                <section id="step4" class="wizard-step hidden">
                     <h2 class="text-xl font-semibold text-gray-900 mb-2">Psychological Examination</h2>
                     <p class="text-gray-600 mb-6">Upload your psychological exam receipt or proof of completion. After submission, please wait for the dean to review and mark you as hired.</p>
                     
@@ -2353,17 +2336,17 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                     </div>
                     
                     <div class="flex justify-between items-center pt-6">
-                        <button type="button" onclick="setStep(4)" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                        <button type="button" onclick="setStep(3)" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
                             <i class="ri-arrow-left-line mr-2"></i>Back
                         </button>
-                        <button type="button" id="psych_next_btn" onclick="setStep(6)" disabled class="px-6 py-3 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed" title="Waiting for admin to mark you as hired">
+                        <button type="button" id="psych_next_btn" onclick="setStep(5)" disabled class="px-6 py-3 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed" title="Waiting for admin to mark you as hired">
                             Next: Initially Hired <i class="ri-arrow-right-line ml-2"></i>
                         </button>
                     </div>
                 </section>
                 
-                <!-- Step 6: Initially Hired -->
-                <section id="step6" class="wizard-step hidden">
+                <!-- Step 5: Initially Hired -->
+                <section id="step5" class="wizard-step hidden">
                     <h2 class="text-xl font-semibold text-gray-900 mb-2">Initially Hired</h2>
                     <p class="text-gray-600 mb-6">Congratulations! You have been marked as initially hired</p>
                     
@@ -2380,7 +2363,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                     </div>
                     
                     <div class="flex justify-between items-center pt-6">
-                        <button type="button" onclick="setStep(5)" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                        <button type="button" onclick="setStep(4)" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
                             <i class="ri-arrow-left-line mr-2"></i>Back
                         </button>
                         <button type="button" onclick="closeWizardAndRefresh()" class="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
@@ -2600,54 +2583,6 @@ document.addEventListener('DOMContentLoaded', function() {
   const step3 = document.getElementById('step3');
   const step4 = document.getElementById('step4');
   const step5 = document.getElementById('step5');
-  const step6 = document.getElementById('step6');
-
-  const pf_first = document.getElementById('pf_first_name');
-  const pf_last = document.getElementById('pf_last_name');
-  const pf_email = document.getElementById('pf_email');
-  const pf_phone = document.getElementById('pf_phone');
-  const pf_address = document.getElementById('pf_address');
-
-  // Prevent numbers from being entered in first name and last name fields
-  function preventNumbersInNameFields(event) {
-    const char = event.key;
-    // Allow navigation keys, backspace, delete, tab
-    if (event.ctrlKey || event.metaKey || 
-        ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(char)) {
-        return;
-    }
-    // Block if character is a number
-    if (/[0-9]/.test(char)) {
-        event.preventDefault();
-        showToast('Numbers are not allowed in name fields', 'warning', 2000);
-    }
-  }
-  
-  // Add real-time validation for name fields in personal information
-  if (pf_first) {
-    pf_first.addEventListener('keydown', preventNumbersInNameFields);
-    // Also prevent pasted numbers
-    pf_first.addEventListener('input', function(e) {
-      this.value = this.value.replace(/[0-9]/g, '');
-    });
-  }
-  
-  if (pf_last) {
-    pf_last.addEventListener('keydown', preventNumbersInNameFields);
-    // Also prevent pasted numbers
-    pf_last.addEventListener('input', function(e) {
-      this.value = this.value.replace(/[0-9]/g, '');
-    });
-  }
-
-  const wx_job = document.getElementById('wx_job_title');
-  const wx_comp = document.getElementById('wx_company');
-  const wx_loc = document.getElementById('wx_location');
-  const wx_start = document.getElementById('wx_start');
-  const wx_end = document.getElementById('wx_end');
-  const wx_cur = document.getElementById('wx_current');
-  const wx_desc = document.getElementById('wx_description');
-  const wx_experience_type = document.getElementById('wx_experience_type');
 
   const rf_job_id = document.getElementById('rf_job_id');
   const rf_job_title = document.getElementById('rf_job_title');
@@ -2686,41 +2621,6 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('- step3:', step3);
     console.log('- step4:', step4);
     console.log('- step5:', step5);
-    console.log('- step6:', step6);
-    
-    // CRITICAL: When showing step 1, immediately initialize displays
-    if (n === 1) {
-      console.log('?? Step 1 activated - initializing displays...');
-      setTimeout(() => {
-        console.log('?? Calling display functions...');
-        console.log('Initial data check:');
-        console.log('- Work Experiences:', initialWorkExperiences);
-        console.log('- Education:', initialEducation);
-        console.log('- Skills:', initialSkills);
-        
-        try {
-          displayWorkExperience();
-          console.log('? displayWorkExperience() called');
-        } catch (e) {
-          console.error('? Error in displayWorkExperience:', e);
-        }
-        
-        try {
-          displaySkills();
-          console.log('? displaySkills() called');
-        } catch (e) {
-          console.error('? Error in displaySkills:', e);
-        }
-        
-        try {
-          displayEducation();
-          console.log('? displayEducation() called');
-        } catch (e) {
-          console.error('? Error in displayEducation:', e);
-        }
-      }, 100);
-    }
-    
     currentStep = n;
     
     // FIRST: Hide ALL steps aggressively
@@ -2734,7 +2634,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // SECOND: Show only the target step
     console.log('Phase 2: Showing step', n, '...');
-    const steps = [step1, step2, step3, step4, step5, step6];
+    const steps = [step1, step2, step3, step4, step5];
     const targetStep = steps[n - 1];
     
     if (targetStep) {
@@ -2749,13 +2649,13 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // When navigating to Step 2, restore file indicators if application data exists
     // Draft loading is now manual via "Load Saved Documents" button
-    if (n === 2) {
+    if (n === 1) {
       if (!window.currentApplicationData) {
         loadReusableDocumentsForRenewal();
       }
       // Check if any files are already uploaded and hide the Load Saved Documents button
       setTimeout(() => {
-        const fileInputs = document.querySelectorAll('#step2 input[type="file"]');
+        const fileInputs = document.querySelectorAll('#step1 input[type="file"]');
         let hasUploadedFiles = false;
         fileInputs.forEach(input => {
           if (input.files && input.files.length > 0) {
@@ -2951,7 +2851,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Current application data:', window.currentApplicationData);
         
         // Check if indicators already exist
-        const existingIndicators = document.querySelectorAll('#step2 .approved-file');
+        const existingIndicators = document.querySelectorAll('#step1 .approved-file');
         console.log('Existing indicators found:', existingIndicators.length);
         
         // Always re-add indicators to ensure they're visible
@@ -2961,7 +2861,7 @@ document.addEventListener('DOMContentLoaded', function() {
             window.addFileIndicatorsForApplication(window.currentApplicationData);
             
             // Ensure containers are visible even with view mode restrictions
-            document.querySelectorAll('#step2 .border-dashed').forEach(container => {
+            document.querySelectorAll('#step1 .border-dashed').forEach(container => {
               const indicator = container.querySelector('.approved-file');
               if (indicator) {
                 // Override opacity for containers with approved files
@@ -2979,9 +2879,9 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }
     
-    // When navigating to Step 3, check if interview next button should be enabled
-    if (n === 3) {
-      console.log('Navigating to Step 3 - checking button state');
+    // When navigating to Step 2, check if interview next button should be enabled
+    if (n === 2) {
+      console.log('Navigating to Step 2 - checking button state');
       console.log('window.currentApplicationData:', window.currentApplicationData);
       
       if (!window.currentApplicationData) {
@@ -3017,8 +2917,8 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         }
         
-        // Always ensure the back button on step 3 works
-        const backBtn = document.querySelector('#step3_back_btn');
+        // Always ensure the back button on step 2 works
+        const backBtn = document.querySelector('#step2_back_btn');
         if (backBtn) {
           backBtn.disabled = false;
           backBtn.removeAttribute('disabled');
@@ -3030,7 +2930,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Enable next button if:
         // 1. Interview is APPROVED (status = "Interview Passed"), OR
         // 2. User has progressed past interview step (at demo or beyond)
-        const hasProgressedPastInterview = window.currentWorkflowStep >= 4 || 
+        const hasProgressedPastInterview = window.currentWorkflowStep >= 3 ||
                                             app.demo_date || 
                                             app.psych_exam_receipt;
         const isInterviewApproved = app.status && app.status.toLowerCase().includes('interview passed');
@@ -3056,7 +2956,7 @@ document.addEventListener('DOMContentLoaded', function() {
             nextBtn.style.opacity = '1';
             
             // Force onclick attribute
-            nextBtn.setAttribute('onclick', 'setStep(4)');
+            nextBtn.setAttribute('onclick', 'setStep(3)');
             
             // Add direct click event listener as backup (only if not already added)
             if (!nextBtn.hasAttribute('data-listener-added')) {
@@ -3065,8 +2965,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 e.preventDefault();
                 e.stopPropagation();
                 if (typeof setStep === 'function') {
-                  console.log('Calling setStep(4)...');
-                  setStep(4);
+                  console.log('Calling setStep(3)...');
+                  setStep(3);
                 } else {
                   console.error('setStep function not found!');
                 }
@@ -3151,9 +3051,9 @@ document.addEventListener('DOMContentLoaded', function() {
       }, 100); // Small delay to ensure DOM is ready
     }
     
-    // When navigating to Step 4, check if demo next button should be enabled
-    if (n === 4 && window.currentApplicationData) {
-      console.log('Navigating to Step 4 - checking button state');
+    // When navigating to Step 3, check if demo next button should be enabled
+    if (n === 3 && window.currentApplicationData) {
+      console.log('Navigating to Step 3 - checking button state');
       const app = window.currentApplicationData;
       
       // Use setTimeout to ensure DOM is fully rendered
@@ -3193,7 +3093,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Always ensure the back button on step 4 works
-        const backBtn = document.querySelector('#step4 button[onclick="setStep(3)"]');
+        const backBtn = document.querySelector('#step3 button[onclick="setStep(2)"]');
         if (backBtn) {
           backBtn.disabled = false;
           backBtn.removeAttribute('disabled');
@@ -3206,7 +3106,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // 1. Demo has passed (status = "Demo Passed"), OR
         // 2. User has progressed past demo step (at psych exam or hired)
         const status = (app.status || '').toLowerCase();
-        const hasProgressedPastDemo = window.currentWorkflowStep >= 5 || 
+        const hasProgressedPastDemo = window.currentWorkflowStep >= 4 ||
                                        app.psych_exam_receipt || 
                                        status.includes('initially hired') || 
                                        status.includes('hired') ||
@@ -3232,7 +3132,7 @@ document.addEventListener('DOMContentLoaded', function() {
             nextBtn.style.opacity = '1';
             
             // Force onclick attribute
-            nextBtn.setAttribute('onclick', 'setStep(5)');
+            nextBtn.setAttribute('onclick', 'setStep(4)');
             
             // Add direct click event listener as backup (only if not already added)
             if (!nextBtn.hasAttribute('data-listener-added')) {
@@ -3241,8 +3141,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 e.preventDefault();
                 e.stopPropagation();
                 if (typeof setStep === 'function') {
-                  console.log('Calling setStep(5)...');
-                  setStep(5);
+                  console.log('Calling setStep(4)...');
+                  setStep(4);
                 } else {
                   console.error('setStep function not found!');
                 }
@@ -3316,15 +3216,15 @@ document.addEventListener('DOMContentLoaded', function() {
       }, 100); // Small delay to ensure DOM is ready
     }
     
-    // When navigating to Step 5, check if psych next button should be enabled
-    if (n === 5 && window.currentApplicationData) {
-      console.log('Navigating to Step 5 - checking button state');
+    // When navigating to Step 4, check if psych next button should be enabled
+    if (n === 4 && window.currentApplicationData) {
+      console.log('Navigating to Step 4 - checking button state');
       const app = window.currentApplicationData;
       
       // Use setTimeout to ensure DOM is fully rendered
       setTimeout(() => {
         // Only enable next button if admin has marked as "Initially Hired"
-        // Just uploading psych exam receipt should NOT allow access to step 6
+        // Just uploading psych exam receipt should NOT allow access to the hired step
         const status = (app.status || '').toLowerCase();
         console.log('Checking psych step - Status:', app.status);
         console.log('Has psych_exam_receipt:', !!app.psych_exam_receipt);
@@ -3343,17 +3243,17 @@ document.addEventListener('DOMContentLoaded', function() {
             nextBtn.style.opacity = '1';
             
             // Force onclick attribute
-            nextBtn.setAttribute('onclick', 'setStep(6)');
+            nextBtn.setAttribute('onclick', 'setStep(5)');
             
             // Add direct click event listener as backup (only if not already added)
             if (!nextBtn.hasAttribute('data-listener-added')) {
               nextBtn.addEventListener('click', function(e) {
-                console.log('??? Hired button clicked! Going to step 6...');
+                console.log('??? Hired button clicked! Going to step 5...');
                 e.preventDefault();
                 e.stopPropagation();
                 if (typeof setStep === 'function') {
-                  console.log('Calling setStep(6)...');
-                  setStep(6);
+                  console.log('Calling setStep(5)...');
+                  setStep(5);
                 } else {
                   console.error('setStep function not found!');
                 }
@@ -3410,8 +3310,8 @@ document.addEventListener('DOMContentLoaded', function() {
       }, 100); // Small delay to ensure DOM is ready
     }
     
-    // Show upload form in Step 5 by default
-    if (n === 5) {
+    // Show upload form in Step 4 by default
+    if (n === 4) {
       const uploadForm = document.getElementById('psych_upload_form');
       const uploadSuccess = document.getElementById('psych_upload_success');
       const approvedStatus = document.getElementById('psych_approved_status');
@@ -3420,9 +3320,9 @@ document.addEventListener('DOMContentLoaded', function() {
       // Ensure application ID is set
       if (appIdField && window.currentApplicationId) {
         appIdField.value = window.currentApplicationId;
-        console.log('Step 5: Application ID set to', window.currentApplicationId);
+        console.log('Step 4: Application ID set to', window.currentApplicationId);
       } else {
-        console.warn('Step 5: No application ID available!');
+        console.warn('Step 4: No application ID available!');
       }
       
       // Check if user already uploaded receipt
@@ -3488,12 +3388,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Update step label to show actual progress, not viewing step
     const labels = {
-      1: 'Step 1 of 6: Personal Information, Work Experience, Education & Skills',
-      2: 'Step 2 of 6: Submit Requirements',
-      3: 'Step 3 of 6: Waiting for Interview Schedule',
-      4: 'Step 4 of 6: Demo Teaching Scheduled',
-      5: 'Step 5 of 6: Psychological Examination',
-      6: 'Step 6 of 6: Initially Hired'
+      1: 'Step 1 of 5: Submit Requirements',
+      2: 'Step 2 of 5: Waiting for Interview Schedule',
+      3: 'Step 3 of 5: Demo Teaching Scheduled',
+      4: 'Step 4 of 5: Psychological Examination',
+      5: 'Step 5 of 5: Initially Hired'
     };
     if (stepLabel) {
       // Show progress step label, not viewing step
@@ -3589,21 +3488,21 @@ document.addEventListener('DOMContentLoaded', function() {
       console.log('? Application loaded successfully:', app);
       
       // Determine current workflow step
-      let workflowStep = 3;
+      let workflowStep = 2;
       const status = (app.status || '').toLowerCase();
       
       if (status.includes('initially hired') || status.includes('hired')) {
-        workflowStep = 6;
+        workflowStep = 5;
       } else if (app.psych_exam_receipt) {
-        workflowStep = 5;
+        workflowStep = 4;
       } else if (status.includes('demo') && status.includes('passed')) {
-        workflowStep = 5;
+        workflowStep = 4;
       } else if (status.includes('demo') || app.demo_date) {
-        workflowStep = 4;
-      } else if (status.includes('interview') && status.includes('passed')) {
-        workflowStep = 4;
-      } else if (status.includes('interview') || app.interview_date) {
         workflowStep = 3;
+      } else if (status.includes('interview') && status.includes('passed')) {
+        workflowStep = 3;
+      } else if (status.includes('interview') || app.interview_date) {
+        workflowStep = 2;
       }
       
       console.log('Opening wizard at step:', workflowStep);
@@ -3616,7 +3515,7 @@ document.addEventListener('DOMContentLoaded', function() {
       window.currentWorkflowStep = workflowStep;
       
       // Populate wizard with data
-      if (app.interview_date && workflowStep >= 3) {
+      if (app.interview_date && workflowStep >= 2) {
         const interviewDate = new Date(app.interview_date);
         const detailsHtml = `
           <p class="text-sm text-green-600 font-medium">? Interview scheduled</p>
@@ -3634,7 +3533,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
       
-      if (app.demo_date && workflowStep >= 4) {
+      if (app.demo_date && workflowStep >= 3) {
         const demoDate = new Date(app.demo_date);
         const detailsHtml = `
           <p class="text-sm text-green-600 font-medium">? Demo teaching scheduled</p>
@@ -3653,7 +3552,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       
       // Show psych exam receipt if uploaded
-      if (app.psych_exam_receipt && workflowStep >= 5) {
+      if (app.psych_exam_receipt && workflowStep >= 4) {
         const psychUploadSuccess = document.getElementById('psych_upload_success');
         const psychUploadForm = document.getElementById('psych_upload_form');
         if (psychUploadSuccess) psychUploadSuccess.classList.remove('hidden');
@@ -3678,7 +3577,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       
       // Show hired details if at step 6
-      if (app.initially_hired_date && workflowStep >= 6) {
+      if (app.initially_hired_date && workflowStep >= 5) {
         const hiredDate = new Date(app.initially_hired_date);
         const detailsHtml = `
           <p class="text-sm text-gray-700">Date: ${hiredDate.toLocaleDateString()}</p>
@@ -3690,22 +3589,6 @@ document.addEventListener('DOMContentLoaded', function() {
           hiredDetailsElement.classList.remove('hidden');
         }
       }
-      
-      // ? POPULATE STEP 1 (Personal Information) with application data
-      console.log('?? Populating Step 1 with application data...');
-      const pf_first = document.getElementById('pf_first_name');
-      const pf_last = document.getElementById('pf_last_name');
-      const pf_email = document.getElementById('pf_email');
-      const pf_phone = document.getElementById('pf_phone');
-      const pf_address = document.getElementById('pf_address');
-      
-      if (pf_first) pf_first.value = app.first_name || '';
-      if (pf_last) pf_last.value = app.last_name || '';
-      if (pf_email) pf_email.value = app.applicant_email || '';
-      if (pf_phone) pf_phone.value = app.contact_num || '';
-      if (pf_address) pf_address.value = app.address || '';
-      
-      console.log('? Step 1 personal info populated');
       
       // Parse resubmission documents if status is "Resubmission Required"
       let resubmissionDocs = [];
@@ -3750,13 +3633,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         console.log('? Step 2 job info populated - job_id:', app.job_id);
       }, 200);
-      
-      // Display work experience, skills, and education
-      setTimeout(() => {
-        displayWorkExperienceFromData(data.work_experience || []);
-        displaySkillsFromData(data.skills || []);
-        displayEducationFromData(data.education || []);
-      }, 300);
       
       // Show resubmission notice and enable file inputs if applicable
       if (app.status === 'Resubmission Required' && resubmissionDocs.length > 0) {
@@ -4154,10 +4030,10 @@ document.addEventListener('DOMContentLoaded', function() {
       });
       
       // Show the Next button in step 2 for view mode
-      const step2NextBtn = document.getElementById('step2NextBtn');
-      if (step2NextBtn) {
-        step2NextBtn.classList.remove('hidden');
-        step2NextBtn.style.display = 'flex';
+      const step1NextBtn = document.getElementById('step1NextBtn');
+      if (step1NextBtn) {
+        step1NextBtn.classList.remove('hidden');
+        step1NextBtn.style.display = 'flex';
       }
     }
     
@@ -4230,75 +4106,16 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Hide the Next button in step 2 (restore to edit mode)
-    const step2NextBtn = document.getElementById('step2NextBtn');
-    if (step2NextBtn) {
-      step2NextBtn.classList.add('hidden');
-      step2NextBtn.style.display = 'none';
+    const step1NextBtn = document.getElementById('step1NextBtn');
+    if (step1NextBtn) {
+      step1NextBtn.classList.add('hidden');
+      step1NextBtn.style.display = 'none';
     }
     
     // Step 3 back button remains as "Back" for navigation
     // No need to change it in edit mode
     
     console.log('View mode restrictions removed');
-  }
-
-  function prefillPersonal() {
-    // Prefill personal information
-    pf_first.value = initialProfile.first_name || '';
-    pf_last.value = initialProfile.last_name || '';
-    pf_email.value = initialProfile.email || '';
-    pf_phone.value = initialProfile.phone || '';
-    pf_address.value = initialProfile.address || '';
-    
-    // Populate hidden work experience fields for form submission (use first/most recent experience)
-    const firstExp = initialWorkExperiences && initialWorkExperiences.length > 0 ? initialWorkExperiences[0] : {};
-    wx_job.value = firstExp.job_title || '';
-    wx_comp.value = firstExp.company || '';
-    wx_loc.value = firstExp.location || '';
-    
-    // Format dates for month input (YYYY-MM)
-    if (firstExp.start_date) {
-      const startDate = new Date(firstExp.start_date);
-      wx_start.value = startDate.getFullYear() + '-' + String(startDate.getMonth() + 1).padStart(2, '0');
-    }
-    
-    if (firstExp.end_date && !firstExp.is_current) {
-      const endDate = new Date(firstExp.end_date);
-      wx_end.value = endDate.getFullYear() + '-' + String(endDate.getMonth() + 1).padStart(2, '0');
-    }
-    
-    wx_cur.value = firstExp.is_current ? '1' : '';
-    wx_desc.value = firstExp.description || '';
-    if (wx_experience_type) wx_experience_type.value = firstExp.experience_type || 'other';
-    
-    // Display work experience in a box
-    try {
-      displayWorkExperience();
-    } catch (e) {
-      console.error('Error displaying work experience:', e);
-    }
-    
-    // Populate hidden skills field
-    const skillsField = document.getElementById('wx_skills');
-    if (skillsField) {
-      skillsField.value = initialSkills || '';
-    }
-    
-    // Display skills as tags
-    try {
-      displaySkills();
-    } catch (e) {
-      console.error('Error displaying skills:', e);
-    }
-    
-    // Display education
-    try {
-      displayEducation();
-    } catch (e) {
-      console.error('Error displaying education:', e);
-    }
-    
-    console.log('Pre-filled all wizard fields with user profile data');
   }
 
   // Define FromData functions BEFORE they're used (for viewing applications)
@@ -4714,14 +4531,14 @@ document.addEventListener('DOMContentLoaded', function() {
           : '<i class="ri-user-add-line text-blue-600 text-lg"></i><span><strong>New Applicant</strong> &mdash; all required documents must be submitted</span>';
       }
 
-      document.querySelectorAll('#step2 .reusable-document-display').forEach(element => element.remove());
-      document.querySelectorAll('#step2 input[type="file"]').forEach(input => {
+      document.querySelectorAll('#step1 .reusable-document-display').forEach(element => element.remove());
+      document.querySelectorAll('#step1 input[type="file"]').forEach(input => {
         delete input.dataset.reusableFile;
         delete input.dataset.reusableSourceApplication;
       });
 
       (data.documents || []).forEach(documentInfo => {
-        const input = document.querySelector(`#step2 input[name="${documentInfo.input_name}"]`);
+        const input = document.querySelector(`#step1 input[name="${documentInfo.input_name}"]`);
         const container = input?.closest('.border-dashed');
         if (!input || !container) return;
 
@@ -4732,7 +4549,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const files = (documentInfo.files || []).map(fileName => {
           const safeName = escapeDocumentHtml(fileName);
-          const safeUrl = `uploads/${encodeURIComponent(fileName)}`;
+          const relativePath = String(fileName).replace(/^uploads[\\/]/, '').split(/[\\/]/).map(encodeURIComponent).join('/');
+          const safeUrl = `uploads/${relativePath}`;
           return `<a href="${safeUrl}" target="_blank" rel="noopener" class="text-emerald-700 hover:underline break-all"><i class="ri-file-text-line mr-1"></i>${safeName}</a>`;
         }).join('<br>');
         const currentDisplay = document.createElement('div');
@@ -4742,7 +4560,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="min-w-0">
               <div class="text-xs font-bold uppercase tracking-wide text-emerald-700 mb-1">Current / Active</div>
               <div class="text-sm">${files}</div>
-              <div class="text-xs text-gray-500 mt-1">Previously submitted${documentInfo.uploaded_at ? ` on ${escapeDocumentHtml(documentInfo.uploaded_at)}` : ''}. It will remain attached if unchanged.</div>
+              <div class="text-xs text-gray-500 mt-1">${documentInfo.source === 'profile' ? 'Previously uploaded from your profile.' : `Previously submitted${documentInfo.uploaded_at ? ` on ${escapeDocumentHtml(documentInfo.uploaded_at)}` : ''}. It will remain attached if unchanged.`}</div>
             </div>
             <button type="button" class="replace-reusable-document flex-shrink-0 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-white border border-blue-300 rounded-lg hover:bg-blue-50">Update / Replace</button>
           </div>`;
@@ -4802,6 +4620,20 @@ document.addEventListener('DOMContentLoaded', function() {
       alert('Application wizard not available. Please refresh the page and try again.');
       return;
     }
+
+    const missingProfileFields = [];
+    if (!initialProfile.first_name || !initialProfile.last_name) missingProfileFields.push('name');
+    if (!initialProfile.email) missingProfileFields.push('email');
+    if (!initialProfile.phone) missingProfileFields.push('contact number');
+    if (!initialWorkExperiences.length) missingProfileFields.push('work experience');
+    if (missingProfileFields.length) {
+      const notice = document.createElement('div');
+      notice.className = 'fixed top-4 right-4 z-[10001] max-w-md p-4 bg-amber-50 border border-amber-300 rounded-lg shadow-lg text-amber-900';
+      notice.innerHTML = '<p class="font-semibold">Please complete your profile before applying for this job.</p><p class="text-sm mt-1">Missing: ' + missingProfileFields.join(', ') + '</p><a href="user_profile.php" class="inline-flex mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Complete Profile</a><button type="button" class="ml-2 text-sm text-gray-600 hover:text-gray-900">Dismiss</button>';
+      notice.querySelector('button').addEventListener('click', () => notice.remove());
+      document.body.appendChild(notice);
+      return;
+    }
     
     // IMPORTANT: Clear all previous application data for fresh start
     console.log('Clearing previous application data...');
@@ -4813,8 +4645,8 @@ document.addEventListener('DOMContentLoaded', function() {
     requirementsForm?.querySelectorAll('input[name="is_resubmission"], input[name="resubmit_application_id"]').forEach(input => input.remove());
     window._reusableDocumentsLoadKey = null;
     window._loadingReusableDocuments = false;
-    document.querySelectorAll('#step2 .reusable-document-display').forEach(element => element.remove());
-    document.querySelectorAll('#step2 input[type="file"]').forEach(input => {
+    document.querySelectorAll('#step1 .reusable-document-display').forEach(element => element.remove());
+    document.querySelectorAll('#step1 input[type="file"]').forEach(input => {
       delete input.dataset.reusableFile;
       delete input.dataset.reusableSourceApplication;
     });
@@ -4869,7 +4701,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Clear all file upload indicators and reset containers
-    document.querySelectorAll('#step2 .border-dashed').forEach(container => {
+    document.querySelectorAll('#step1 .border-dashed').forEach(container => {
       // Remove warning messages
       container.querySelectorAll('.bg-orange-100, .bg-green-50').forEach(msg => msg.remove());
       // Reset border colors
@@ -4945,29 +4777,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Safely set form values
     if (rf_job_id) rf_job_id.value = context.jobId || '';
     if (rf_job_title) rf_job_title.value = context.jobTitle || '';
+    if (rf_full_name) rf_full_name.value = [initialProfile.first_name, initialProfile.last_name].filter(Boolean).join(' ');
+    if (rf_email) rf_email.value = initialProfile.email || '';
+    if (rf_cellphone) rf_cellphone.value = initialProfile.phone || '';
     
     console.log('About to show wizard...');
     showWizard(false); // Pass false for edit mode (new application)
     console.log('Wizard should now be visible');
     
-    // IMPORTANT: Prefill AFTER wizard is shown to ensure DOM elements exist
-    setTimeout(() => {
-      try {
-        console.log('?? Calling prefillPersonal() after wizard is shown...');
-        prefillPersonal();
-        // also prefill hidden submit fields when known
-        if (rf_full_name && pf_first && pf_last) {
-          rf_full_name.value = [pf_first.value, pf_last.value].filter(Boolean).join(' ');
-        }
-        if (rf_email && pf_email) rf_email.value = pf_email.value;
-        if (rf_cellphone && pf_phone) rf_cellphone.value = pf_phone.value;
-      } catch (error) {
-        console.error('Error prefilling form:', error);
-      }
-    }, 300);
-    
-    // For new applications, start at step 1
-    // Set workflow progress to step 1 (new application)
+    // For new applications, start at the requirements step.
     window.currentWorkflowStep = 1;
     window.currentApplicationData = null; // Clear any previous data
     console.log('Set workflow progress to step 1 (new application)');
@@ -5027,92 +4845,7 @@ document.addEventListener('DOMContentLoaded', function() {
     location.reload();
   });
 
-  // Step 1 actions
-  document.getElementById('saveAllStep1Btn').addEventListener('click', async () => {
-    try {
-      // Validate phone number before saving
-      if (pf_phone.value.trim()) {
-        const phonePattern = /^09[0-9]{9}$/;
-        if (!phonePattern.test(pf_phone.value.trim())) {
-          showToast('Invalid phone number! Must be 11 digits starting with 09 (e.g., 09123456789)', 'error', 5000);
-          pf_phone.focus();
-          return;
-        }
-      }
-      
-      const formData = new FormData();
-      formData.append('savePersonal', '1');
-      formData.append('applicant_fname', pf_first.value.trim());
-      formData.append('applicant_lname', pf_last.value.trim());
-      formData.append('applicant_email', pf_email.value.trim());
-      formData.append('applicant_num', pf_phone.value.trim());
-      formData.append('applicant_address', pf_address.value.trim());
-      
-      // Save work experience
-      if (wx_job.value && wx_comp.value && wx_start.value) {
-        formData.append('saveExperience', '1');
-        formData.append('job_title', wx_job.value.trim());
-        formData.append('work_comp', wx_comp.value.trim());
-        formData.append('work_loc', wx_loc.value.trim());
-        formData.append('start_date', wx_start.value);
-        if (!wx_cur.checked && wx_end.value) formData.append('end_date', wx_end.value);
-        if (wx_cur.checked) formData.append('is_current', '1');
-        formData.append('work_descript', wx_desc.value.trim());
-        formData.append('experience_type', wx_experience_type?.value || 'other');
-      }
-      
-      const res = await fetch('save_profile_data.php', { method: 'POST', body: formData });
-      const data = await res.json();
-      showToast(data.success ? 'Information saved successfully' : (data.message || 'Save failed'), data.success ? 'success' : 'error');
-      if (data.success) {
-        rf_full_name.value = [pf_first.value, pf_last.value].filter(Boolean).join(' ');
-        rf_email.value = pf_email.value;
-        rf_cellphone.value = pf_phone.value;
-      }
-    } catch (e) {
-      showToast('Error saving personal info', 'error');
-    }
-  });
-  document.getElementById('toStep2').addEventListener('click', () => {
-    // If viewing an existing application (view mode), just navigate without validation
-    if (window.currentApplicationData && window.currentApplicationData.id) {
-      console.log('?? View mode - navigating to step 2 without validation');
-      setStep(2);
-      return;
-    }
-    
-    // For new applications, validate required personal fields
-    if (!pf_first.value || !pf_last.value || !pf_email.value || !pf_phone.value) {
-      showToast('Please complete required personal fields', 'warning');
-      return;
-    }
-    
-    // Validate Philippine phone number format (must be 11 digits starting with 09)
-    const phonePattern = /^09[0-9]{9}$/;
-    if (!phonePattern.test(pf_phone.value)) {
-      showToast('Invalid phone number! Must be 11 digits starting with 09 (e.g., 09123456789)', 'error', 5000);
-      pf_phone.focus();
-      return;
-    }
-    
-    // Check if work experience exists (from profile)
-    if (!wx_job.value || !wx_comp.value) {
-      showToast('Please add work experience in your profile before applying. Visit Profile page to add your work experience.', 'warning', 5000);
-      return;
-    }
-    rf_full_name.value = [pf_first.value, pf_last.value].filter(Boolean).join(' ');
-    rf_email.value = pf_email.value;
-    rf_cellphone.value = pf_phone.value;
-    
-    // Update workflow step for proper step indicator color
-    window.currentWorkflowStep = 2;
-    console.log('Updated currentWorkflowStep to 2 for step indicator');
-    
-    setStep(2);
-  });
-
-  // Step 2 actions - handle form submission with AJAX (no page reload)
-  document.getElementById('backToStep1').addEventListener('click', () => setStep(1));
+  // Step 1 contains the requirements form and has no previous profile-entry page.
   
   // Load Saved Documents button handler
   document.getElementById('loadDraftBtn').addEventListener('click', async function() {
@@ -5741,7 +5474,7 @@ document.addEventListener('DOMContentLoaded', function() {
             window.currentApplicationId = newApp.application_id;
             
             // Set workflow progress to step 3 (application submitted, waiting for interview)
-            window.currentWorkflowStep = 3;
+            window.currentWorkflowStep = 2;
             console.log('Set workflow progress to step 3 (application submitted)');
             
             // Add file indicators immediately to show uploaded files
@@ -5788,7 +5521,7 @@ document.addEventListener('DOMContentLoaded', function() {
               
               // Hide the submit button and show the Next button
               const submitBtn = requirementsForm.querySelector('button[type="submit"]');
-              const nextBtn = document.getElementById('step2NextBtn');
+              const nextBtn = document.getElementById('step1NextBtn');
               
               if (submitBtn) {
                 submitBtn.style.display = 'none';
@@ -5845,25 +5578,10 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
   
-  // Add Work Experience button - show custom modal
-  document.getElementById('addWorkExpBtn').addEventListener('click', () => {
-    openAddWorkExpModal();
-  });
-  
-  // Add Skills button - show custom modal
-  document.getElementById('addSkillsBtn').addEventListener('click', () => {
-    openAddSkillsModal();
-  });
-  
-  // Add Education button - show custom modal
-  document.getElementById('addEducationBtn').addEventListener('click', () => {
-    openAddEducationModal();
-  });
-  
-  // File upload visual indicators for Step 2
+  // File upload visual indicators for Step 1
   function setupFileUploadIndicators() {
     // Get all file inputs in step 2
-    const fileInputs = document.querySelectorAll('#step2 input[type="file"]');
+    const fileInputs = document.querySelectorAll('#step1 input[type="file"]');
     
     fileInputs.forEach(input => {
       // Create indicator container
@@ -5907,7 +5625,7 @@ document.addEventListener('DOMContentLoaded', function() {
           
           // Check if there are any remaining uploaded files
           setTimeout(() => {
-            const allFileInputs = document.querySelectorAll('#step2 input[type="file"]');
+            const allFileInputs = document.querySelectorAll('#step1 input[type="file"]');
             let hasAnyFiles = false;
             allFileInputs.forEach(inp => {
               if (inp.files && inp.files.length > 0) {
@@ -8467,21 +8185,21 @@ function attachJobEventListeners() {
           const app = data.application;
           
           // Determine current workflow step
-          let workflowStep = 3; // Default to step 3 (Interview)
+          let workflowStep = 2; // Default to step 2 (Interview)
           const status = (app.status || '').toLowerCase();
           
           if (status.includes('initially hired') || status.includes('hired')) {
-            workflowStep = 6; // Admin has marked as hired - show step 6
+            workflowStep = 5; // Admin has marked as hired - show step 5
           } else if (app.psych_exam_receipt) {
-            workflowStep = 5; // Psych receipt uploaded, waiting for admin to hire
+            workflowStep = 4; // Psych receipt uploaded, waiting for admin to hire
           } else if (status.includes('demo') && status.includes('passed')) {
-            workflowStep = 5; // Demo passed, ready for psychological exam
+            workflowStep = 4; // Demo passed, ready for psychological exam
           } else if (status.includes('demo') || app.demo_date) {
-            workflowStep = 4; // Demo scheduled but not yet passed
+            workflowStep = 3; // Demo scheduled but not yet passed
           } else if (status.includes('interview') && status.includes('passed')) {
-            workflowStep = 4; // Interview passed, ready for demo
+            workflowStep = 3; // Interview passed, ready for demo
           } else if (status.includes('interview') || app.interview_date) {
-            workflowStep = 3;
+            workflowStep = 2;
           }
           
           console.log('Opening wizard at step:', workflowStep);
@@ -8725,14 +8443,7 @@ function attachJobEventListeners() {
           
           // NOW populate Step 1 and Step 2 AFTER wizard is visible
           setTimeout(() => {
-            // Populate Step 1 (Personal Information) with submitted data
-            document.getElementById('pf_first_name').value = app.first_name || '';
-            document.getElementById('pf_last_name').value = app.last_name || '';
-            document.getElementById('pf_email').value = app.applicant_email || '';
-            document.getElementById('pf_phone').value = app.contact_num || '';
-            document.getElementById('pf_address').value = app.address || '';
-            
-            // Populate Step 2 form fields (for display purposes)
+            // Populate the requirements form metadata for view mode.
             document.getElementById('rf_job_id').value = app.job_id || '';
             document.getElementById('rf_job_title').value = app.position || '';
             document.getElementById('rf_full_name').value = app.full_name || '';
@@ -8742,9 +8453,6 @@ function attachJobEventListeners() {
             if (rf_application_type) rf_application_type.value = app.application_type || 'new';
             
             // Display work experience, skills, and education from API data
-            displayWorkExperienceFromData(data.work_experience || []);
-            displaySkillsFromData(data.skills || []);
-            displayEducationFromData(data.education || []);
           }, 300);
           
           // NOW add the file indicators after wizard is shown
@@ -8977,29 +8685,6 @@ function populateWizardWithApplicationData(app, data) {
     wizardJobTitle.innerHTML = `Applying for: <span>${app.job_title || '-'}</span>`;
   }
   
-  // Populate step 1 fields
-  const pf_first = document.getElementById('pf_first_name');
-  const pf_last = document.getElementById('pf_last_name');
-  const pf_email = document.getElementById('pf_email');
-  const pf_phone = document.getElementById('pf_phone');
-  const pf_address = document.getElementById('pf_address');
-  
-  if (pf_first) pf_first.value = app.first_name || '';
-  if (pf_last) pf_last.value = app.last_name || '';
-  if (pf_email) pf_email.value = app.email || '';
-  if (pf_phone) pf_phone.value = app.contact_number || '';
-  if (pf_address) pf_address.value = app.address || '';
-  
-  // Display work experience, education, and skills
-  if (data.work_experience && data.work_experience.length > 0) {
-    displayWorkExperienceFromData(data.work_experience);
-  }
-  if (data.education && data.education.length > 0) {
-    displayEducationFromData(data.education);
-  }
-  if (data.skills && data.skills.length > 0) {
-    displaySkillsFromData(data.skills);
-  }
 }
 
 // Show job details function
@@ -9228,7 +8913,7 @@ function populateJobDetails(job) {
           showWizard(true); // true = view mode
           
           // Determine current workflow step (SAME LOGIC AS DASHBOARD)
-          let workflowStep = 3; // Default to step 3 (Interview)
+          let workflowStep = 2; // Default to step 2 (Interview)
           const status = (app.status || '').toLowerCase();
           
           console.log('?? Application status:', status);
@@ -9237,17 +8922,17 @@ function populateJobDetails(job) {
           console.log('?? Has psych_exam_receipt:', !!app.psych_exam_receipt);
           
           if (status.includes('initially hired') || status.includes('hired')) {
-            workflowStep = 6; // Admin has marked as hired - show step 6
+            workflowStep = 5; // Admin has marked as hired - show step 5
           } else if (app.psych_exam_receipt) {
-            workflowStep = 5; // Psych receipt uploaded, waiting for admin to hire
+            workflowStep = 4; // Psych receipt uploaded, waiting for admin to hire
           } else if (status.includes('demo') && status.includes('passed')) {
-            workflowStep = 5; // Demo passed, ready for psychological exam
+            workflowStep = 4; // Demo passed, ready for psychological exam
           } else if (status.includes('demo') || app.demo_date) {
-            workflowStep = 4; // Demo scheduled but not yet passed
+            workflowStep = 3; // Demo scheduled but not yet passed
           } else if (status.includes('interview') && status.includes('passed')) {
-            workflowStep = 4; // Interview passed, ready for demo
+            workflowStep = 3; // Interview passed, ready for demo
           } else if (status.includes('interview') || app.interview_date) {
-            workflowStep = 3;
+            workflowStep = 2;
           }
           
           console.log('?? Opening wizard at step:', workflowStep, 'based on status:', status);

@@ -16,6 +16,10 @@ if ($userId <= 0) {
 try {
     $result = nc_find_reusable_documents($conn, $userId);
     $masterStatus = nc_get_master_status($conn, $userId);
+    $profileDocuments = nc_find_profile_education_documents($conn, $userId);
+    foreach ($profileDocuments as $field => $document) {
+        $result['documents'][$field] = $document;
+    }
     $requiredFields = nc_required_application_document_fields((bool)$masterStatus['requires_ongoing_documents']);
     $missing = [];
     $definitions = nc_application_document_definitions();

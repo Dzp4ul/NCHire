@@ -183,13 +183,9 @@ session_start();
             <div class="w-7 h-7 rounded-full flex items-center justify-center font-semibold progress-step-dot" data-step="5" style="width: 1.75rem !important; height: 1.75rem !important; border-radius: 50% !important; display: flex !important; align-items: center !important; justify-content: center !important; font-weight: 600 !important; background: rgba(255,255,255,0.3) !important; color: white !important; font-size: 0.875rem !important;">5</div>
             <div class="flex-1 h-0.5 mx-1 bg-white bg-opacity-30 progress-step-line" data-after="5" style="flex: 1 !important; height: 2px !important; margin: 0 0.25rem !important; background-color: rgba(255, 255, 255, 0.3) !important;"></div>
           </div>
-          <!-- Step 6 -->
-          <div class="flex items-center" style="display: flex !important; align-items: center !important;">
-            <div class="w-7 h-7 rounded-full flex items-center justify-center font-semibold progress-step-dot" data-step="6" style="width: 1.75rem !important; height: 1.75rem !important; border-radius: 50% !important; display: flex !important; align-items: center !important; justify-content: center !important; font-weight: 600 !important; background: rgba(255,255,255,0.3) !important; color: white !important; font-size: 0.875rem !important;">6</div>
-          </div>
         </div>
         <div class="mt-2 text-center text-blue-100 text-xs" id="progressStepLabel" style="margin-top: 0.5rem !important; text-align: center !important; color: #bfdbfe !important; font-size: 0.75rem !important;">
-          Step 1 of 6: Application Submitted
+          Step 1 of 5: Documents Under Review
         </div>
       </div>
     </div>
@@ -682,15 +678,15 @@ session_start();
       if (status.includes('reject')) {
         currentStep = -1; // Rejected
       } else if (status.includes('initially hired') || status.includes('hired')) {
-        currentStep = 6;
-      } else if (status.includes('psychological') || status.includes('psych')) {
         currentStep = 5;
-      } else if (status.includes('demo')) {
+      } else if (status.includes('psychological') || status.includes('psych')) {
         currentStep = 4;
-      } else if (status.includes('interview')) {
+      } else if (status.includes('demo')) {
         currentStep = 3;
-      } else if (status.includes('documents approved')) {
+      } else if (status.includes('interview')) {
         currentStep = 2;
+      } else if (status.includes('documents approved')) {
+        currentStep = 1;
       } else {
         currentStep = 1; // Pending or submitted
       }
@@ -728,12 +724,11 @@ session_start();
   
   function updateProgressSteps(currentStep) {
     const stepLabels = {
-      1: 'Step 1 of 6: Application Submitted',
-      2: 'Step 2 of 6: Documents Under Review',
-      3: 'Step 3 of 6: Interview Scheduled',
-      4: 'Step 4 of 6: Demo Teaching Scheduled',
-      5: 'Step 5 of 6: Psychological Examination',
-      6: 'Step 6 of 6: Initially Hired',
+      1: 'Step 1 of 5: Documents Under Review',
+      2: 'Step 2 of 5: Interview Scheduled',
+      3: 'Step 3 of 5: Demo Teaching Scheduled',
+      4: 'Step 4 of 5: Psychological Examination',
+      5: 'Step 5 of 5: Initially Hired',
       '-1': 'Application Rejected'
     };
     

@@ -103,6 +103,19 @@ function saveEducationDocument(string $fieldName, int $userId): ?string
     if (!in_array($extension, $allowedExtensions, true)) {
         throw new RuntimeException('Education documents must be PDF, DOC, DOCX, JPG, or PNG files.');
     }
+    if (function_exists('finfo_open')) {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime = $finfo ? finfo_file($finfo, $_FILES[$fieldName]['tmp_name']) : false;
+        if ($finfo) finfo_close($finfo);
+        $allowedMimes = [
+            'application/pdf', 'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/zip', 'image/jpeg', 'image/png',
+        ];
+        if ($mime && !in_array($mime, $allowedMimes, true)) {
+            throw new RuntimeException('Education document file type is not allowed.');
+        }
+    }
 
     $uploadDir = __DIR__ . '/uploads/education_documents/';
     if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
@@ -228,10 +241,6 @@ if (isset($_POST['saveEducation'])) {
     }
 
     $is_graduate_ongoing = $education_status === 'ongoing' && in_array($education_level, ['master', 'doctorate'], true);
-    if ($is_graduate_ongoing && $completed_units === null) {
-        echo json_encode(['success' => false, 'message' => 'Completed units are required for ongoing graduate education.']);
-        exit();
-    }
     if ($is_graduate_ongoing && (!$certificate_of_grades || !$proof_of_enrollment)) {
         echo json_encode(['success' => false, 'message' => 'Certificate of Grades and Proof of Enrollment are required for ongoing graduate education.']);
         exit();
