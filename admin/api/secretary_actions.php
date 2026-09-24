@@ -33,7 +33,8 @@ try {
         throw new Exception('Database connection not established');
     }
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    error_log('Secretary action database setup failed: ' . $e->getMessage());
+    echo json_encode(['success' => false, 'message' => 'Unable to process this action. Please try again.']);
     exit();
 }
 
@@ -89,7 +90,8 @@ try {
         exit();
     }
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => 'Database query error: ' . $e->getMessage()]);
+    error_log('Secretary action application lookup failed: ' . $e->getMessage());
+    echo json_encode(['success' => false, 'message' => 'Unable to load the application. Please try again.']);
     exit();
 }
 

@@ -232,6 +232,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         exit();
     }
 
+      $preflight_job_id = isset($_POST['job_id']) ? (int)$_POST['job_id'] : 0;
+      if ($preflight_job_id > 0) {
+        $preflight_stmt = $conn->prepare("SELECT job_type FROM job WHERE id = ? LIMIT 1");
+        if ($preflight_stmt) {
+          $preflight_stmt->bind_param("i", $preflight_job_id);
+          $preflight_stmt->execute();
+          $preflight_job = $preflight_stmt->get_result()->fetch_assoc();
+          $preflight_stmt->close();
+
+          if ($preflight_job && nc_normalize_employment_type($preflight_job['job_type'] ?? '') === 'full_time') {
+            $preflight_eligibility = nc_check_full_time_education_eligibility(nc_get_education_rows($conn, (int)$user_id));
+            if (!$preflight_eligibility['eligible']) {
+              $preflight_message = 'Full-time teaching loads require a completed Master\'s or Doctorate degree.';
+              if ($preflight_eligibility['has_ongoing_masters']) {
+                $preflight_message .= ' Your Master\'s degree is currently marked as ongoing.';
+              }
+
+              if ($is_ajax_submit) {
+                while (ob_get_level()) { ob_end_clean(); }
+                http_response_code(403);
+                header('Content-Type: application/json');
+                echo json_encode([
+                  'success' => false,
+                  'code' => 'FULL_TIME_EDUCATION_REQUIREMENT',
+                  'error' => $preflight_message,
+                  'message' => $preflight_message
+                ]);
+                exit();
+              }
+
+              $_SESSION['application_error'] = $preflight_message;
+              header("Location: " . $_SERVER['PHP_SELF']);
+              exit();
+            }
+          }
+        }
+      }
+
       // Profile data is authoritative for an application; never trust hidden form fields for identity.
       $profile_stmt = $conn->prepare("SELECT first_name, last_name, applicant_email, contact_number, address FROM applicants WHERE id = ? LIMIT 1");
       $profile_stmt->bind_param("i", $user_id);
@@ -717,6 +755,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
     // Fetch teaching load details for routing, vacancy checks, and salary projection.
     $job_department = null;
     $job_validation_errors = [];
+    $education_requirement_failed = false;
     $job_dept_stmt = $conn->prepare("SELECT * FROM job WHERE id = ? LIMIT 1");
     if ($job_dept_stmt) {
         $job_dept_stmt->bind_param("i", $job_id);
@@ -746,6 +785,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
             $job_validation_errors[] = 'This teaching load no longer has vacant slots';
         }
 
+        $job_type = strtolower(trim((string)($job_data['job_type'] ?? '')));
+        $job_type = str_replace(['_', ' '], '-', $job_type);
+        if ($job_type === 'full-time') {
+          $education_eligibility = nc_check_full_time_education_eligibility(nc_get_education_rows($conn, (int)$user_id));
+          if (!$education_eligibility['eligible']) {
+            $education_requirement_failed = true;
+            $job_validation_errors[] = 'Full-time teaching loads require a completed Master\'s or Doctorate degree.';
+          }
+        }
+
         $position = nc_format_teaching_load_title($job_data);
         $salary_snapshot = nc_calculate_salary_projection($conn, (int)$user_id, $job_data);
         $applicable_hourly_rate = $salary_snapshot['applicable_hourly_rate'];
@@ -759,6 +808,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         $is_ajax = $is_ajax || (isset($_POST['ajax_submit']) && $_POST['ajax_submit'] == '1');
         if ($is_ajax) {
             while (ob_get_level()) { ob_end_clean(); }
+          if ($education_requirement_failed) {
+            http_response_code(403);
+            echo json_encode([
+              'success' => false,
+              'code' => 'FULL_TIME_EDUCATION_REQUIREMENT',
+              'error' => $error_message,
+              'message' => $error_message
+            ]);
+            exit();
+          }
             header('Content-Type: application/json');
             echo json_encode(['success' => false, 'error' => $error_message, 'message' => $error_message]);
             exit();
@@ -2608,7 +2667,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const initialWorkExperiences = <?php echo json_encode($user_work_experience ?? []); ?>;
   
   // Education is now an array of all education entries
-  const initialEducation = <?php echo json_encode($user_education ?? []); ?>;
+  window.initialEducationRecords = <?php echo json_encode($user_education ?? []); ?>;
+  const initialEducation = window.initialEducationRecords;
   
   const initialSkills = <?php echo json_encode($user_skills ?? ''); ?>;
 
@@ -5677,6 +5737,15 @@ document.addEventListener('DOMContentLoaded', function() {
           
         } else {
           console.error('? Upload failed - Response data:', data);
+
+          if (data.code === 'FULL_TIME_EDUCATION_REQUIREMENT') {
+                  showFullTimeEligibilityModal(checkFullTimeEligibility(window.initialEducationRecords).hasOngoingMasters);
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnHtml;
+            if (saveDraftBtn) saveDraftBtn.style.display = '';
+            return;
+          }
+
           const errorMsg = data.error || data.message || 'Upload failed - no success response';
           
           // If there's a raw response, log it
@@ -6526,6 +6595,7 @@ descriptionContainer.innerHTML = '<p>No description available</p>';
 const detailApplyBtn = document.getElementById('detailApplyBtn');
 detailApplyBtn.setAttribute('data-job-id', jobId);
 detailApplyBtn.setAttribute('data-job-title', job.job_title);
+detailApplyBtn.setAttribute('data-job-type', job.job_type || '');
 
 } else {
 alert('Error loading job details: ' + data.error);
@@ -6570,6 +6640,7 @@ if (jobId && jobTitle) {
 // Store job info for terms modal (same as regular Apply buttons)
 window.selectedJobId = jobId;
 window.selectedJobTitle = jobTitle;
+window.selectedJobType = e.target.getAttribute('data-job-type') || '';
 
 // Show terms modal
 const termsModalElement = document.getElementById('termsModal');
@@ -6599,6 +6670,7 @@ if (window.modalJobId && window.modalJobTitle) {
 // Store job info for terms modal
 window.selectedJobId = window.modalJobId;
 window.selectedJobTitle = window.modalJobTitle;
+window.selectedJobType = window.modalJobType || '';
 
 // Close job details modal
 modal.classList.add('hidden');
@@ -8078,7 +8150,7 @@ function displayJobs(jobs) {
         <p class="text-sm text-gray-500">Application deadline: ${escapeHtml(job.application_deadline || 'Not set')}</p>
         <div class="flex space-x-3">
           <button class="px-5 py-2.5 text-primary border border-primary rounded-lg hover:bg-primary hover:text-white transition-colors text-base whitespace-nowrap view-details-btn" data-job-id="${job.id}">View Teaching Load</button>
-          <button class="px-7 py-2.5 ${applyDisabled ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-primary text-white hover:bg-blue-700'} rounded-lg transition-colors text-base apply-btn" data-job-id="${job.id}" ${applyDisabled ? 'disabled' : ''}>Apply</button>
+          <button class="px-7 py-2.5 ${applyDisabled ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-primary text-white hover:bg-blue-700'} rounded-lg transition-colors text-base apply-btn" data-job-id="${job.id}" data-job-type="${escapeHtml(job.job_type || '')}" ${applyDisabled ? 'disabled' : ''}>Apply</button>
         </div>
       </div>
     `;
@@ -8801,6 +8873,7 @@ function attachJobEventListeners() {
       // Store job info for application form
       window.selectedJobId = jobId;
       window.selectedJobTitle = jobTitle;
+      window.selectedJobType = this.getAttribute('data-job-type') || '';
       
       // Show terms modal first
       showTermsModal();
@@ -9003,6 +9076,7 @@ function populateJobDetails(job) {
   // Update apply button based on application status
   const applyBtn = document.getElementById('detailApplyBtn');
   applyBtn.setAttribute('data-job-id', job.id);
+  applyBtn.setAttribute('data-job-type', job.job_type || '');
   
   // Check if user has already applied
   if (job.application_id) {
@@ -9094,6 +9168,7 @@ function populateJobDetails(job) {
     applyBtn.onclick = function() {
       window.selectedJobId = job.id;
       window.selectedJobTitle = job.job_title;
+      window.selectedJobType = job.job_type || '';
       showTermsModal();
     };
   }
@@ -9108,9 +9183,78 @@ function showJobListings() {
   document.getElementById('searchFilters').style.display = 'block';
 }
 
+function normalizeEmploymentType(value) {
+  return String(value || '').toLowerCase().replace(/[_-]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function checkFullTimeEligibility(educationRecords) {
+  let hasCompletedMasters = false;
+  let hasCompletedDoctorate = false;
+  let hasOngoingMasters = false;
+
+  (educationRecords || []).forEach(education => {
+    const level = String(education.education_level || '').toLowerCase().trim();
+    const degree = String(education.degree || '').toLowerCase();
+    const normalizedLevel = level || (degree.includes('doctor') || degree.includes('ph.d') || degree.includes('phd')
+      ? 'doctorate'
+      : degree.includes('master') || degree.includes('masteral') ? 'master' : '');
+    const status = String(education.education_status || 'completed').toLowerCase().trim();
+
+    if (['completed', 'graduated'].includes(status)) {
+      hasCompletedMasters = hasCompletedMasters || normalizedLevel === 'master';
+      hasCompletedDoctorate = hasCompletedDoctorate || normalizedLevel === 'doctorate';
+    }
+    if (normalizedLevel === 'master' && ['ongoing', 'currently_pursuing', 'in_progress', 'not_yet_completed'].includes(status)) {
+      hasOngoingMasters = true;
+    }
+  });
+
+  return {
+    eligible: hasCompletedMasters || hasCompletedDoctorate,
+    hasOngoingMasters
+  };
+}
+
+function showFullTimeEligibilityModal(hasOngoingMasters = false) {
+  document.getElementById('termsModal')?.remove();
+  document.getElementById('fullTimeEligibilityModal')?.remove();
+
+  const ongoingMessage = hasOngoingMasters
+    ? ' Your Master\'s degree is currently marked as ongoing.'
+    : '';
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-4" id="fullTimeEligibilityModal" role="dialog" aria-modal="true" aria-labelledby="fullTimeEligibilityTitle">
+      <div class="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-200">
+        <div class="p-6 text-center">
+          <i class="ri-information-line text-4xl text-blue-600 mb-3"></i>
+          <h2 id="fullTimeEligibilityTitle" class="text-xl font-bold text-gray-900 mb-3">Full-Time Eligibility Requirement</h2>
+          <p class="text-gray-600 leading-relaxed">Full-time teaching loads require a completed Master\'s or Doctorate degree.${ongoingMessage}</p>
+        </div>
+        <div class="px-6 pb-6 flex justify-end gap-3">
+          <button type="button" id="closeFullTimeEligibility" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">Close</button>
+          <a href="user_profile.php#education" class="hidden px-6 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors" id="goToEducationProfile">Go to Profile</a>
+        </div>
+      </div>
+    </div>
+  `);
+
+  document.getElementById('closeFullTimeEligibility')?.addEventListener('click', () => {
+    document.getElementById('fullTimeEligibilityModal')?.remove();
+  });
+}
+
 // Show terms modal function
 function showTermsModal() {
   console.log('Showing terms modal for job:', window.selectedJobTitle);
+
+  const employmentType = normalizeEmploymentType(window.selectedJobType);
+  if (employmentType.includes('full time')) {
+    const eligibility = checkFullTimeEligibility(window.initialEducationRecords);
+    if (!eligibility.eligible) {
+      showFullTimeEligibilityModal(eligibility.hasOngoingMasters);
+      return;
+    }
+  }
   
   // Create and show terms modal
   const existingModal = document.getElementById('termsModal');

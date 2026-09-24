@@ -3211,6 +3211,16 @@ $recent_activity = $conn->query($recent_activity_query);
         </div>
     </div>
 
+    <div id="actionLoadingModal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100] p-4" role="dialog" aria-modal="true" aria-live="polite" aria-labelledby="actionLoadingTitle" aria-describedby="actionLoadingMessage">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-sm p-8 text-center">
+            <div class="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50" aria-hidden="true">
+                <i class="fas fa-spinner fa-spin text-2xl text-blue-600"></i>
+            </div>
+            <h2 id="actionLoadingTitle" class="text-lg font-semibold text-gray-900">Processing request</h2>
+            <p id="actionLoadingMessage" class="mt-2 text-sm leading-6 text-gray-600">Please wait while your request is being processed.</p>
+        </div>
+    </div>
+
     <script src="admin.js"></script>
     
     <script>

@@ -772,7 +772,7 @@ function closeSaveModal() {
 function confirmSave() {
   closeSaveModal();
   // Validate phone number before submitting
-  const phoneInput = document.querySelector('input[name="applicant_num"]');
+  const phoneInput = document.querySelector('#profileMainContent input[name="applicant_num"]');
   if (phoneInput && phoneInput.value && !/^09[0-9]{9}$/.test(phoneInput.value.trim())) {
     showToast('Invalid phone number! Must be 11 digits starting with 09 (e.g., 09123456789)', 'error');
     return;
@@ -800,7 +800,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const firstNameInput = document.querySelector('input[name="applicant_fname"]');
   const lastNameInput = document.querySelector('input[name="applicant_lname"]');
   const emailInput = document.querySelector('input[name="applicant_email"]');
-  const phoneInput = document.querySelector('input[name="applicant_num"]');
+  const phoneInput = document.querySelector('#profileMainContent input[name="applicant_num"]');
   const addressInput = document.querySelector('textarea[name="applicant_address"]');
   
   // Store original values for cancel functionality

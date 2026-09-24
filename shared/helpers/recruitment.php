@@ -233,6 +233,36 @@ if (!function_exists('nc_get_master_status')) {
     }
 }
 
+if (!function_exists('nc_check_full_time_education_eligibility')) {
+    function nc_check_full_time_education_eligibility(array $educationRows): array
+    {
+        $hasCompletedMasters = false;
+        $hasCompletedDoctorate = false;
+        $hasOngoingMasters = false;
+
+        foreach ($educationRows as $education) {
+            $level = nc_classify_education_level($education);
+            $status = strtolower(trim((string)($education['education_status'] ?? 'completed')));
+
+            if (in_array($status, ['completed', 'graduated'], true)) {
+                $hasCompletedMasters = $hasCompletedMasters || $level === 'master';
+                $hasCompletedDoctorate = $hasCompletedDoctorate || $level === 'doctorate';
+            }
+
+            if ($level === 'master' && in_array($status, ['ongoing', 'currently_pursuing', 'in_progress', 'not_yet_completed'], true)) {
+                $hasOngoingMasters = true;
+            }
+        }
+
+        return [
+            'eligible' => $hasCompletedMasters || $hasCompletedDoctorate,
+            'has_completed_masters' => $hasCompletedMasters,
+            'has_completed_doctorate' => $hasCompletedDoctorate,
+            'has_ongoing_masters' => $hasOngoingMasters,
+        ];
+    }
+}
+
 if (!function_exists('nc_salary_configuration')) {
     function nc_salary_configuration(?array $overrides = null): array
     {

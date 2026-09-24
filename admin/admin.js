@@ -38,18 +38,53 @@ function showToast(message, type = 'info', duration = 3000) {
 // Override window.alert globally to use custom toast
 window.alert = function(message) { showToast(message, 'info'); };
 
-// Prevent duplicate form submissions
+// Prevent duplicate form submissions and provide feedback for applicant actions.
 let isSubmitting = false;
 
-function preventDuplicateSubmission(callback) {
+function showActionLoading({ title, message }) {
+    const modal = document.getElementById('actionLoadingModal');
+    if (!modal) return;
+
+    document.getElementById('actionLoadingTitle').textContent = title;
+    document.getElementById('actionLoadingMessage').textContent = message;
+    modal.classList.remove('hidden');
+    document.body.dataset.actionLoadingOverflow = document.body.style.overflow || '';
+    document.body.style.overflow = 'hidden';
+}
+
+function hideActionLoading() {
+    const modal = document.getElementById('actionLoadingModal');
+    if (!modal) return;
+
+    modal.classList.add('hidden');
+    document.body.style.overflow = document.body.dataset.actionLoadingOverflow || '';
+    delete document.body.dataset.actionLoadingOverflow;
+}
+
+function preventDuplicateSubmission(callback, loading = null) {
     if (isSubmitting) {
         showToast('Please wait, processing your request...', 'warning');
         return Promise.resolve(false);
     }
     isSubmitting = true;
-    return callback().finally(() => {
-        isSubmitting = false;
+
+    const applicantDetails = document.getElementById('applicantDetailsSection');
+    const actionControls = applicantDetails ? applicantDetails.querySelectorAll('button, input, select, textarea') : [];
+    actionControls.forEach(control => {
+        control.disabled = true;
     });
+
+    if (loading) showActionLoading(loading);
+
+    return Promise.resolve()
+        .then(callback)
+        .finally(() => {
+            hideActionLoading();
+            actionControls.forEach(control => {
+                control.disabled = false;
+            });
+            isSubmitting = false;
+        });
 }
 
 // Sample data
@@ -3442,6 +3477,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Prevent duplicate submissions
         preventDuplicateSubmission(async () => {
+            showActionLoading({
+                title: this.dataset.action === 'schedule_demo' ? 'Scheduling Demo Teaching' : 'Scheduling Interview',
+                message: this.dataset.action === 'schedule_demo'
+                    ? 'Please wait while the demo teaching schedule is being saved.'
+                    : 'Please wait while the interview schedule is being saved.'
+            });
             // Get the action from dataset (defaults to interview)
             const action = this.dataset.action || 'schedule_interview';
             
@@ -3488,11 +3529,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     this.dataset.action = 'schedule_interview';
                     document.querySelector('#scheduleModal h3').textContent = 'Schedule Interview';
                     
-                    // Refresh applicant details
-                    setTimeout(() => {
-                        viewApplicantDetails(currentApplicantId);
-                        loadApplicants();
-                    }, 500); // Small delay to ensure database update is complete
+                    // Keep the loader visible until the updated applicant data is available.
+                    await viewApplicantDetails(currentApplicantId);
+                    await loadApplicants();
                 } else {
                     // Check if it's a validation message
                     if (result.error && (result.error.includes('Please select') || result.error.includes('8:00 AM and 4:00 PM'))) {
@@ -3522,6 +3561,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Prevent duplicate submissions
         preventDuplicateSubmission(async () => {
+            showActionLoading({
+                title: 'Sending Resubmission Request',
+                message: 'Please wait while the resubmission request is being processed.'
+            });
             const formData = new FormData();
             formData.append('action', 'request_resubmission');
             formData.append('applicant_id', currentApplicantId);
@@ -3543,11 +3586,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Update action buttons immediately
                     updateActionButtons('Resubmission Required');
                     
-                    // Refresh applicant details
-                    setTimeout(() => {
-                        viewApplicantDetails(currentApplicantId);
-                        loadApplicants();
-                    }, 500); // Small delay to ensure database update is complete
+                    // Keep the loader visible until the updated applicant data is available.
+                    await viewApplicantDetails(currentApplicantId);
+                    await loadApplicants();
                 } else {
                     showToast('Error requesting resubmission: ' + result.error, 'error');
                 }
@@ -3564,6 +3605,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Prevent duplicate submissions
         preventDuplicateSubmission(async () => {
+            showActionLoading({
+                title: 'Rejecting Application',
+                message: 'Please wait while the application status is being updated.'
+            });
             const formData = new FormData();
             formData.append('action', 'reject_application');
             formData.append('applicant_id', currentApplicantId);
@@ -3586,11 +3631,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Show success message
                 showToast('Application rejected successfully!', 'success');
                 
-                // Refresh applicant details and applicants list
-                setTimeout(() => {
-                    viewApplicantDetails(currentApplicantId);
-                    loadApplicants(); // This will update counts and refresh the filtered view
-                }, 500); // Small delay to ensure database update is complete
+                // Keep the loader visible until the updated applicant data is available.
+                await viewApplicantDetails(currentApplicantId);
+                await loadApplicants(); // This updates counts and refreshes the filtered view.
             } else {
                 showToast('Error rejecting application: ' + result.error, 'error');
             }
@@ -3607,6 +3650,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Prevent duplicate submissions
         preventDuplicateSubmission(async () => {
+            showActionLoading({
+                title: 'Transferring Application',
+                message: 'Please wait while the application is being transferred to the Dean.'
+            });
             const formData = new FormData();
             formData.append('action', 'transfer_to_dept_head');
             formData.append('application_id', currentApplicantId);
@@ -3624,12 +3671,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     closeTransferModal();
                     showToast('Application transferred to Dean successfully!', 'success');
                     
-                    // Refresh the current applicant details to show new status
-                    // and update the applicants list
-                    setTimeout(() => {
-                        viewApplicantDetails(currentApplicantId);
-                        loadApplicants(); // Update the list in background
-                    }, 500);
+                    // Keep the loader visible until the updated applicant data is available.
+                    await viewApplicantDetails(currentApplicantId);
+                    await loadApplicants();
                 } else {
                     showToast('Error transferring application: ' + result.message, 'error');
                 }
@@ -3646,6 +3690,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Prevent duplicate submissions
         preventDuplicateSubmission(async () => {
+            showActionLoading({
+                title: 'Processing Application Result',
+                message: 'Please wait while the application result is being saved.'
+            });
             const formData = new FormData();
             formData.append('action', 'mark_initially_hired');
             formData.append('applicant_id', currentApplicantId);
@@ -3668,11 +3716,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Show success message
                 showToast('Application marked as passed successfully!', 'success');
                 
-                // Refresh applicant details and applicants list
-                setTimeout(() => {
-                    viewApplicantDetails(currentApplicantId);
-                    loadApplicants();
-                }, 500); // Small delay to ensure database update is complete
+                // Keep the loader visible until the updated applicant data is available.
+                await viewApplicantDetails(currentApplicantId);
+                await loadApplicants();
             } else {
                 showToast('Error marking application as passed: ' + result.error, 'error');
             }
@@ -3689,6 +3735,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Prevent duplicate submissions
         preventDuplicateSubmission(async () => {
+            showActionLoading({
+                title: 'Processing Final Result',
+                message: 'Please wait while the final application result is being saved.'
+            });
             const formData = new FormData();
             formData.append('action', 'mark_permanently_hired');
             formData.append('applicant_id', currentApplicantId);
@@ -3722,11 +3772,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Show success message
                 showToast('Application final pass confirmed successfully!', 'success');
                 
-                // Refresh applicant details and applicants list
-                setTimeout(() => {
-                    viewApplicantDetails(currentApplicantId);
-                    loadApplicants();
-                }, 500);
+                // Keep the loader visible until the updated applicant data is available.
+                await viewApplicantDetails(currentApplicantId);
+                await loadApplicants();
             } else {
                 showToast('Error confirming final pass: ' + result.error, 'error');
             }
@@ -3743,6 +3791,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Prevent duplicate submissions
         preventDuplicateSubmission(async () => {
+            showActionLoading({
+                title: 'Processing Interview Result',
+                message: 'Please wait while the interview result is being saved.'
+            });
             const formData = new FormData();
             formData.append('action', 'approve_interview');
             formData.append('applicant_id', currentApplicantId);
@@ -3765,11 +3817,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Show success message
                 showToast('Interview approved successfully! You can now schedule the demo teaching.', 'success');
                 
-                // Refresh applicant details and applicants list
-                setTimeout(() => {
-                    viewApplicantDetails(currentApplicantId);
-                    loadApplicants();
-                }, 500);
+                // Keep the loader visible until the updated applicant data is available.
+                await viewApplicantDetails(currentApplicantId);
+                await loadApplicants();
             } else {
                 showToast('Error approving interview: ' + result.error, 'error');
             }
@@ -3786,6 +3836,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Prevent duplicate submissions
         preventDuplicateSubmission(async () => {
+            showActionLoading({
+                title: 'Processing Demo Teaching Result',
+                message: 'Please wait while the demo teaching result is being saved.'
+            });
             const formData = new FormData();
             formData.append('action', 'approve_demo');
             formData.append('applicant_id', currentApplicantId);
@@ -3808,11 +3862,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Show success message
                 showToast('Demo approved successfully! You can now mark the application as passed.', 'success');
                 
-                // Refresh applicant details and applicants list
-                setTimeout(() => {
-                    viewApplicantDetails(currentApplicantId);
-                    loadApplicants();
-                }, 500);
+                // Keep the loader visible until the updated applicant data is available.
+                await viewApplicantDetails(currentApplicantId);
+                await loadApplicants();
             } else {
                 showToast('Error approving demo: ' + result.error, 'error');
             }
@@ -3831,6 +3883,10 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Prevent duplicate submissions
             preventDuplicateSubmission(async () => {
+                showActionLoading({
+                    title: 'Scheduling Demo Teaching',
+                    message: 'Please wait while the demo teaching schedule is being saved.'
+                });
                 const formData = new FormData();
                 formData.append('action', 'schedule_demo');
                 formData.append('applicant_id', currentApplicantId);
@@ -3853,11 +3909,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Update action buttons
                     updateActionButtons('Demo Scheduled');
                     
-                    // Refresh applicant details
-                    setTimeout(() => {
-                        viewApplicantDetails(currentApplicantId);
-                        loadApplicants();
-                    }, 500);
+                    // Keep the loader visible until the updated applicant data is available.
+                    await viewApplicantDetails(currentApplicantId);
+                    await loadApplicants();
                 } else {
                     showToast('Error scheduling demo: ' + result.error, 'error');
                 }
@@ -3877,6 +3931,10 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Prevent duplicate submissions
             preventDuplicateSubmission(async () => {
+                showActionLoading({
+                    title: 'Processing Application Result',
+                    message: 'Please wait while the application result is being saved.'
+                });
                 const formData = new FormData();
                 formData.append('action', 'mark_initially_hired');
                 formData.append('applicant_id', currentApplicantId);
@@ -3897,11 +3955,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         // Update action buttons
                         updateActionButtons('Passed');
                         
-                        // Refresh applicant details
-                        setTimeout(() => {
-                            viewApplicantDetails(currentApplicantId);
-                            loadApplicants();
-                        }, 500);
+                        // Keep the loader visible until the updated applicant data is available.
+                        await viewApplicantDetails(currentApplicantId);
+                        await loadApplicants();
                     } else {
                         showToast('Error marking application as passed: ' + result.error, 'error');
                     }
@@ -3968,6 +4024,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Prevent duplicate submissions
         preventDuplicateSubmission(async () => {
+            showActionLoading({
+                title: 'Updating Interview Schedule',
+                message: 'Please wait while the interview schedule is being updated.'
+            });
             const formData = new FormData();
             formData.append('action', 'reschedule_interview');
             formData.append('applicant_id', currentApplicantId);
@@ -3995,11 +4055,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Update action buttons
                     updateActionButtons('Interview Scheduled');
                     
-                    // Refresh applicant details
-                    setTimeout(() => {
-                        viewApplicantDetails(currentApplicantId);
-                        loadApplicants();
-                    }, 500);
+                    // Keep the loader visible until the updated applicant data is available.
+                    await viewApplicantDetails(currentApplicantId);
+                    await loadApplicants();
                 } else {
                     // Check if it's a validation message
                     if (result.error && (result.error.includes('Please select') || result.error.includes('8:00 AM and 4:00 PM'))) {
@@ -4064,6 +4122,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Prevent duplicate submissions
         preventDuplicateSubmission(async () => {
+            showActionLoading({
+                title: 'Updating Demo Teaching Schedule',
+                message: 'Please wait while the demo teaching schedule is being updated.'
+            });
             const formData = new FormData();
             formData.append('action', 'reschedule_demo');
             formData.append('applicant_id', currentApplicantId);
@@ -4088,11 +4150,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Update action buttons
                     updateActionButtons('Demo Scheduled');
                     
-                    // Refresh applicant details
-                    setTimeout(() => {
-                        viewApplicantDetails(currentApplicantId);
-                        loadApplicants();
-                    }, 500);
+                    // Keep the loader visible until the updated applicant data is available.
+                    await viewApplicantDetails(currentApplicantId);
+                    await loadApplicants();
                 } else {
                     // Check if it's a validation message
                     if (result.error && (result.error.includes('Please select') || result.error.includes('8:00 AM and 4:00 PM'))) {

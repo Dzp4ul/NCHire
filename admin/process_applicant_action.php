@@ -923,7 +923,8 @@ try {
             break;
     }
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'error' => 'Server error: ' . $e->getMessage()]);
+    error_log('Applicant action failed: ' . $e->getMessage());
+    echo json_encode(['success' => false, 'error' => 'Unable to complete this action. Please try again.']);
 }
 
 $conn->close();
