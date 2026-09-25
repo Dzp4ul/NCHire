@@ -33,6 +33,14 @@ switch ($method) {
             while ($row = $result->fetch_assoc()) {
                 // Format lastLogin display
                 $row['lastLogin'] = $row['lastLogin'] ? $row['lastLogin'] : 'Never';
+                // Do not render a broken avatar when a legacy database value points
+                // to a file that is no longer present on disk.
+                if (!empty($row['profile_picture'])) {
+                    $profilePath = dirname(__DIR__, 2) . '/uploads/profile_pictures/' . basename($row['profile_picture']);
+                    if (!is_file($profilePath)) {
+                        $row['profile_picture'] = null;
+                    }
+                }
                 $users[] = $row;
             }
         }

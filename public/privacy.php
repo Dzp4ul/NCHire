@@ -19,8 +19,9 @@
             }
         }
     </script>
+    <link rel="stylesheet" href="assets/css/institutional-ui.css">
 </head>
-<body class="bg-gray-50">
+<body class="gt-app gt-content-shell bg-gray-50">
     <!-- Header -->
     <nav class="bg-primary text-white px-4 md:px-6 py-4 sticky top-0 z-50 shadow-md">
         <div class="max-w-7xl mx-auto flex items-center justify-between">

@@ -93,8 +93,9 @@ $conn->close();
             }
         }
     </script>
+    <link rel="stylesheet" href="../public/assets/css/institutional-ui.css">
 </head>
-<body class="relative min-h-screen flex items-center justify-center p-4" style="background-image: url('../public/assets/images/520382375_1065446909052636_3412465913398569974_n.jpg'); background-size: cover; background-position: center; background-attachment: fixed;">
+<body class="gt-app gt-auth-shell relative min-h-screen flex items-center justify-center p-4" style="background-image: url('../public/assets/images/520382375_1065446909052636_3412465913398569974_n.jpg'); background-size: cover; background-position: center; background-attachment: fixed;">
     <!-- Dark Overlay -->
     <div class="absolute inset-0 bg-primary bg-opacity-80"></div>
     

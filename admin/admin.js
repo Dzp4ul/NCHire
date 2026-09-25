@@ -38,6 +38,15 @@ function showToast(message, type = 'info', duration = 3000) {
 // Override window.alert globally to use custom toast
 window.alert = function(message) { showToast(message, 'info'); };
 
+// Stored upload values may be either a filename or an uploads-relative path.
+// Normalize both formats without changing the value persisted by the backend.
+function getApplicantUploadUrl(fileName) {
+    const normalized = String(fileName || '').replace(/^[./\\]+/, '');
+    return normalized.startsWith('uploads/')
+        ? `../user/${normalized}`
+        : `../user/uploads/${normalized}`;
+}
+
 // Prevent duplicate form submissions and provide feedback for applicant actions.
 let isSubmitting = false;
 
@@ -306,22 +315,16 @@ function displayFilteredJobs() {
                 </span>
             </td>
             <td class="px-6 py-4">
-                <div class="flex items-center gap-2">
-                    <button onclick="viewJob(${job.id})" class="text-gray-400 hover:text-gray-600" title="View">
-                        <i class="fas fa-eye"></i>
-                    </button>
-                    <button onclick="editJob(${job.id})" class="text-gray-400 hover:text-blue-600" title="Edit">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="share-job-btn text-gray-400 hover:text-green-600" 
-                            data-job-id="${job.id}" 
-                            data-job-title="${job.job_title.replace(/"/g, '&quot;')}" 
-                            title="Copy Link to Share">
-                        <i class="fas fa-share-alt"></i>
-                    </button>
-                    <button onclick="deleteJob(${job.id})" class="text-gray-400 hover:text-red-600" title="Delete">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                <div class="ui-table-actions">
+                    <button onclick="viewJob(${job.id})" class="ui-table-primary">View</button>
+                    <details class="ui-action-menu">
+                        <summary aria-label="More actions for ${job.teaching_load_title || job.job_title}"><i class="fas fa-ellipsis-h"></i></summary>
+                        <div class="ui-action-menu__items">
+                            <button onclick="editJob(${job.id})"><i class="fas fa-edit"></i>Edit</button>
+                            <button class="share-job-btn" data-job-id="${job.id}" data-job-title="${(job.job_title || job.teaching_load_title || 'Teaching Load').replace(/"/g, '&quot;')}"><i class="fas fa-share-alt"></i>Copy link</button>
+                            <button onclick="deleteJob(${job.id})" class="ui-action-menu__danger"><i class="fas fa-trash"></i>Delete</button>
+                        </div>
+                    </details>
                 </div>
             </td>
         `;
@@ -424,6 +427,17 @@ function closeSidebar() {
     sidebarOverlay.classList.add('hidden');
 }
 
+function resetWorkspacePosition(section) {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+
+    if (!section) return;
+    section.querySelectorAll('.overflow-x-auto').forEach(scroller => {
+        scroller.scrollLeft = 0;
+    });
+}
+
 // Navigation functionality
 function showSection(sectionName) {
     try {
@@ -492,6 +506,7 @@ function showSection(sectionName) {
         const targetSection = document.getElementById(sectionName + 'Section');
         if (targetSection) {
             targetSection.classList.remove('hidden');
+            resetWorkspacePosition(targetSection);
             console.log('Section shown:', sectionName + 'Section');
         } else {
             console.error('Section not found:', sectionName + 'Section');
@@ -505,7 +520,9 @@ function showSection(sectionName) {
         });
         
         // Find and activate the clicked nav item
-        const clickedButton = event ? event.target : document.querySelector(`[onclick="showSection('${sectionName}')"]`);
+        const navigationEvent = window.event;
+        const clickedButton = navigationEvent?.target?.closest?.('.nav-item')
+            || document.querySelector(`[onclick="showSection('${sectionName}')"]`);
         if (clickedButton) {
             clickedButton.classList.add('active', 'text-white');
             clickedButton.classList.remove('text-gray-700');
@@ -2509,6 +2526,7 @@ async function viewApplicantDetails(applicantId) {
             documents.forEach(doc => {
                 if (applicant[doc.field]) {
                     const fileName = applicant[doc.field];
+                    const documentUrl = getApplicantUploadUrl(fileName);
                     const fileExtension = fileName.split('.').pop().toLowerCase();
                     const isImage = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileExtension);
                     const isPdf = fileExtension === 'pdf';
@@ -2518,11 +2536,11 @@ async function viewApplicantDetails(applicantId) {
                             <div class="flex items-center justify-between mb-2">
                                 <h3 class="font-medium text-gray-900">${doc.label}</h3>
                                 <div class="flex items-center gap-2">
-                                    <button onclick="viewDocument('../user/uploads/${fileName}', '${doc.label}', '${isImage}')" 
+                                    <button onclick="viewDocument('${documentUrl}', '${doc.label}', '${isImage}')"
                                             class="text-blue-600 hover:text-blue-800 text-sm">
                                         <i class="fas fa-eye"></i> View
                                     </button>
-                                    <a href="../user/uploads/${fileName}" 
+                                    <a href="${documentUrl}"
                                        download 
                                        class="text-green-600 hover:text-green-800 text-sm">
                                         <i class="fas fa-download"></i> Download
@@ -2535,10 +2553,10 @@ async function viewApplicantDetails(applicantId) {
                             </div>
                             ${isImage ? `
                                 <div class="mt-3">
-                                    <img src="../user/uploads/${fileName}" 
+                                    <img src="${documentUrl}"
                                          alt="${doc.label}" 
                                          class="w-full h-32 object-cover rounded border cursor-pointer"
-                                         onclick="viewDocument('../user/uploads/${fileName}', '${doc.label}', true)">
+                                         onclick="viewDocument('${documentUrl}', '${doc.label}', true)">
                                 </div>
                             ` : ''}
                         </div>
@@ -2661,7 +2679,7 @@ async function viewApplicantDetails(applicantId) {
             const psychReceiptDetails = document.getElementById('psychReceiptDetails');
             
             if (applicant.psych_exam_receipt) {
-                const receiptPath = '../user/uploads/' + applicant.psych_exam_receipt;
+                const receiptPath = getApplicantUploadUrl(applicant.psych_exam_receipt);
                 const fileExtension = applicant.psych_exam_receipt.split('.').pop().toLowerCase();
                 const isPDF = fileExtension === 'pdf';
                 
@@ -2723,7 +2741,9 @@ async function viewApplicantDetails(applicantId) {
             document.querySelectorAll('.section').forEach(section => {
                 section.classList.add('hidden');
             });
-            document.getElementById('applicantDetailsSection').classList.remove('hidden');
+            const applicantDetailsSection = document.getElementById('applicantDetailsSection');
+            applicantDetailsSection.classList.remove('hidden');
+            resetWorkspacePosition(applicantDetailsSection);
             
         } else {
             alert('Error loading applicant details: ' + data.error);

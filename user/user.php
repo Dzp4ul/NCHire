@@ -1394,8 +1394,9 @@ DEFAULT: '8px',
 }
 }
 </script>
+<link rel="stylesheet" href="../public/assets/css/institutional-ui.css">
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="gt-app gt-user-shell bg-gray-50 min-h-screen">
 <?php 
 // No longer show success message on reload since we're using AJAX
 // This code is kept for backwards compatibility but won't be used
@@ -1750,67 +1751,79 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
 </div>
 
 <main id="mainContent" class="max-w-[1400px] mx-auto px-12 py-8">
-<div id="jobHeader" class="mb-8">
-<h1 id="teachingLoadsTitle" class="text-4xl font-bold text-gray-900 mb-3">Available Teaching Loads</h1>
-<p class="text-lg text-gray-600">Browse open teaching assignments for the active academic period.</p>
-</div>
-<!-- Search, Filter and Sort Section -->
-<div id="searchFilters" class="mb-6 space-y-4">
-  <!-- Search Bar -->
-  <div class="relative">
-    <div class="absolute left-3 top-1/2 transform -translate-y-1/2">
-      <i class="ri-search-line text-gray-400 text-lg"></i>
-    </div>
-    <input type="text" id="searchInput" placeholder="Search subject codes, subjects, programs, departments, or schedules..." 
-           class="w-full pl-10 pr-4 py-3.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-base">
+<header id="jobHeader" class="ui-page-header">
+  <div class="ui-page-header__main">
+    <p class="ui-eyebrow">Norzagaray College recruitment</p>
+    <h1 id="teachingLoadsTitle" class="ui-page-title">Available Teaching Loads</h1>
+    <p class="ui-page-description">Find open assignments that match your academic background and teaching experience.</p>
   </div>
-  
-  <!-- Filter and Sort Controls -->
-  <div class="flex flex-wrap gap-3 items-center">
+</header>
+<!-- Search, Filter and Sort Section -->
+<section id="searchFilters" class="ui-filter-bar" aria-label="Teaching opportunity filters">
+  <!-- Search Bar -->
+  <div class="ui-filter-bar__controls ui-job-filter-grid">
+    <div class="ui-filter-bar__search">
+      <label for="searchInput">Search opportunities</label>
+      <div class="relative">
+        <div class="absolute left-3 top-1/2 transform -translate-y-1/2">
+          <i class="ri-search-line text-gray-400 text-lg"></i>
+        </div>
+        <input type="text" id="searchInput" placeholder="Search subject, program, department, or schedule..."
+               class="w-full pl-10 pr-4 py-3.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-base">
+      </div>
+    </div>
+
     <!-- Department Filter -->
-    <div class="relative">
+    <div class="ui-filter-field relative">
+      <label for="departmentFilter">Department</label>
       <select id="departmentFilter" class="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2.5 pr-8 text-base focus:ring-2 focus:ring-primary focus:border-transparent">
         <option value="">All Departments</option>
         <option value="computing studies">Computing Studies</option>
         <option value="hospitality management">Hospitality Management</option>
         <option value="education">Education</option>
       </select>
-      <div class="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
+      <div class="absolute right-2 bottom-3 pointer-events-none">
         <i class="ri-arrow-down-s-line text-gray-400"></i>
       </div>
     </div>
     
     <!-- Job Type Filter -->
-    <div class="relative">
+    <div class="ui-filter-field relative">
+      <label for="jobTypeFilter">Employment type</label>
       <select id="jobTypeFilter" class="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2.5 pr-8 text-base focus:ring-2 focus:ring-primary focus:border-transparent">
         <option value="">All Types</option>
         <option value="full-time">Full-time</option>
         <option value="part-time">Part-time</option>
       </select>
-      <div class="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
+      <div class="absolute right-2 bottom-3 pointer-events-none">
         <i class="ri-arrow-down-s-line text-gray-400"></i>
       </div>
     </div>
     
     <!-- Sort Dropdown -->
-    <div class="relative">
+    <div class="ui-filter-field relative">
+      <label for="sortSelect">Sort by</label>
       <select id="sortSelect" class="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2.5 pr-8 text-base focus:ring-2 focus:ring-primary focus:border-transparent">
         <option value="newest">Newest First</option>
         <option value="oldest">Oldest First</option>
       </select>
-      <div class="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
+      <div class="absolute right-2 bottom-3 pointer-events-none">
         <i class="ri-sort-desc text-gray-400"></i>
       </div>
     </div>
     
     <!-- Active Filters Display -->
-    <div id="activeFilters" class="flex flex-wrap gap-2 ml-auto">
+    <div id="activeFilters" class="ui-active-filters">
       <!-- Active filter tags will appear here -->
     </div>
   </div>
-</div>
+</section>
 <!-- Job Listings Container -->
-<div id="jobListings" class="grid gap-6">
+<section id="jobListings" class="ui-results-workspace">
+    <div class="ui-results-heading">
+      <div><p class="ui-eyebrow">Open positions</p><h2>Teaching Opportunities</h2></div>
+      <div id="jobResultsSummary" class="ui-results-heading__summary" aria-live="polite"></div>
+    </div>
     <!-- Loading state -->
     <div id="jobsLoading" class="flex justify-center items-center py-12">
         <div class="text-center">
@@ -1830,7 +1843,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
             <p class="text-sm">Try adjusting your search criteria</p>
         </div>
     </div>
-</div>
+</section>
 
 <!-- Pagination Controls -->
 <div id="paginationContainer" class="mt-8 flex justify-center items-center space-x-4">
@@ -1860,217 +1873,179 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
 
 <!-- Detailed Job View Section -->
 <div id="jobDetailView" class="hidden">
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <!-- Job Header with Background -->
-        <div class="bg-gradient-to-r from-blue-800 to-blue-900 text-white p-8 relative">
-            <div class="absolute top-4 left-4">
-                <button id="backToJobs" class="text-white hover:text-gray-200 transition-colors flex items-center gap-2">
-                    <i class="ri-arrow-left-line text-xl"></i>
-                    <span>Back to Jobs</span>
-                </button>
-            </div>
-            <div class="max-w-6xl w-full mx-auto">
-                <div class="flex items-start justify-between">
-                    <div class="flex-1">
-                        <h1 id="detailJobTitle" class="text-3xl font-bold mb-4"></h1>
-                        <div id="detailJobMeta" class="flex flex-wrap items-center gap-6 text-blue-100 text-sm mb-4">
-                            <!-- Meta info with icons will be populated here -->
-                        </div>
-                        <div id="detailSalary" class="text-white text-xl font-semibold">
-                            <span><!-- Salary will be populated here --></span>
-                        </div>
-                    </div>
-                    <div id="detailDeadline" class="text-right ml-8">
-                        <div class="text-blue-100 text-sm font-medium">DEADLINE OF SUBMISSIONS</div>
-                        <div id="detailDeadlineDate" class="text-white text-lg font-bold">Loading...</div>
+    <div class="ui-page-stack ui-job-detail">
+        <nav class="ui-breadcrumb" aria-label="Breadcrumb">
+            <span>Job Opportunities</span>
+            <i class="ri-arrow-right-s-line" aria-hidden="true"></i>
+            <span aria-current="page">Teaching Load Details</span>
+        </nav>
+
+        <button id="backToJobs" class="ui-back-link" type="button">
+            <i class="ri-arrow-left-line" aria-hidden="true"></i>
+            <span>Back to Job Opportunities</span>
+        </button>
+
+        <header class="ui-page-header ui-job-header">
+            <div class="ui-page-header__main">
+                <p class="ui-eyebrow">Teaching opportunity</p>
+                <h1 id="detailJobTitle" class="ui-page-title"></h1>
+                <div id="detailJobMeta" class="ui-inline-meta">
+                    <!-- Meta information will be populated here -->
+                </div>
+                <div class="ui-header-support">
+                    <span class="ui-header-support__label">Projected compensation</span>
+                    <div id="detailSalary" class="ui-header-support__value">
+                        <span><!-- Salary will be populated here --></span>
                     </div>
                 </div>
             </div>
-        </div>
+            <div id="detailDeadline" class="ui-deadline">
+                <span class="ui-deadline__label">Application deadline</span>
+                <strong id="detailDeadlineDate" class="ui-deadline__value">Loading...</strong>
+            </div>
+        </header>
 
-        <!-- Job Content -->
-        <div class="p-8">
-            <div class="max-w-6xl mx-auto">
-                <!-- Job Highlights Section -->
-                <div class="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border-l-4 border-blue-600">
-                    <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                        <i class="ri-star-line text-blue-600 mr-2"></i>
-                        JOB HIGHLIGHTS
-                    </h2>
-                    <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div class="bg-white rounded-lg p-4 shadow-sm">
-                            <div class="flex items-center mb-2">
-                                <i class="ri-calendar-check-line text-blue-600 text-xl mr-2"></i>
-                                <h3 class="font-semibold text-gray-900">Job Type</h3>
-                            </div>
-                            <p id="highlightJobType" class="text-gray-700">Loading...</p>
-                        </div>
-                        <div class="bg-white rounded-lg p-4 shadow-sm">
-                            <div class="flex items-center mb-2">
-                                <i class="ri-map-pin-2-line text-blue-600 text-xl mr-2"></i>
-                                <h3 class="font-semibold text-gray-900">Location</h3>
-                            </div>
-                            <p id="highlightLocation" class="text-gray-700">Loading...</p>
-                        </div>
-                        <div class="bg-white rounded-lg p-4 shadow-sm">
-                            <div class="flex items-center mb-2">
-                                <i class="ri-building-2-line text-blue-600 text-xl mr-2"></i>
-                                <h3 class="font-semibold text-gray-900">Department</h3>
-                            </div>
-                            <p id="highlightDepartment" class="text-gray-700">Loading...</p>
-                        </div>
-                        <div class="bg-white rounded-lg p-4 shadow-sm">
-                            <div class="flex items-center mb-2">
-                                <i class="ri-book-2-line text-blue-600 text-xl mr-2"></i>
-                                <h3 class="font-semibold text-gray-900">Subject</h3>
-                            </div>
-                            <p id="highlightSubject" class="text-gray-700">Loading...</p>
-                        </div>
+        <div class="ui-detail-layout">
+            <main class="ui-detail-main">
+                <section class="ui-content-section">
+                    <div class="ui-section-header">
+                        <p class="ui-eyebrow">About the role</p>
+                        <h2>Position Overview</h2>
                     </div>
-                </div>
-
-                <!-- Job Description Section -->
-                <div class="mb-8 bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                    <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                        <i class="ri-file-text-line text-blue-600 mr-2"></i>
-                        POSITION OVERVIEW
-                    </h2>
-                    <div id="detailJobDescription" class="text-gray-700 space-y-2 leading-relaxed">
+                    <div id="detailJobDescription" class="ui-prose">
                         <!-- Job description will be populated here -->
                     </div>
-                </div>
+                </section>
 
-                <!-- Duties & Responsibilities Section -->
-                <div id="dutiesSection" class="mb-8 bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                    <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                        <i class="ri-task-line text-blue-600 mr-2"></i>
-                        DUTIES & RESPONSIBILITIES
-                    </h2>
-                    <div id="detailDuties" class="text-gray-700 space-y-2">
+                <section id="dutiesSection" class="ui-content-section">
+                    <div class="ui-section-header">
+                        <p class="ui-eyebrow">Responsibilities</p>
+                        <h2>Duties &amp; Responsibilities</h2>
+                    </div>
+                    <div id="detailDuties" class="ui-prose">
                         <!-- Duties will be populated here -->
                     </div>
-                </div>
+                </section>
 
-                <!-- Minimum Qualifications Section -->
-                <div class="mb-8 bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                    <h2 class="text-xl font-bold text-gray-900 mb-6 flex items-center">
-                        <i class="ri-shield-check-line text-blue-600 mr-2"></i>
-                        MINIMUM QUALIFICATIONS
-                    </h2>
-                    
-                    <div class="grid md:grid-cols-2 gap-8 mb-6">
-                        <div class="bg-gray-50 rounded-lg p-4">
-                            <h3 class="text-gray-900 font-semibold mb-3 flex items-center">
-                                <i class="ri-graduation-cap-line text-blue-600 mr-2"></i>
-                                EDUCATION
-                            </h3>
-                            <p id="detailEducation" class="text-gray-700">Loading...</p>
+                <section class="ui-content-section">
+                    <div class="ui-section-header">
+                        <p class="ui-eyebrow">Candidate requirements</p>
+                        <h2>Minimum Qualifications</h2>
+                    </div>
+                    <dl class="ui-definition-grid">
+                        <div>
+                            <dt>Education</dt>
+                            <dd id="detailEducation">Loading...</dd>
                         </div>
-                        <div class="bg-gray-50 rounded-lg p-4">
-                            <h3 class="text-gray-900 font-semibold mb-3 flex items-center">
-                                <i class="ri-briefcase-line text-blue-600 mr-2"></i>
-                                EXPERIENCE
-                            </h3>
-                            <p id="detailExperience" class="text-gray-700">Loading...</p>
+                        <div>
+                            <dt>Experience</dt>
+                            <dd id="detailExperience">Loading...</dd>
                         </div>
-                    </div>
+                        <div>
+                            <dt>Training</dt>
+                            <dd id="detailTraining">Loading...</dd>
+                        </div>
+                        <div>
+                            <dt>Eligibility</dt>
+                            <dd id="detailEligibility">Loading...</dd>
+                        </div>
+                    </dl>
+                </section>
 
-                    <div class="bg-gray-50 rounded-lg p-4 mb-6">
-                        <h3 class="text-gray-900 font-semibold mb-3 flex items-center">
-                            <i class="ri-book-open-line text-blue-600 mr-2"></i>
-                            TRAINING
-                        </h3>
-                        <p id="detailTraining" class="text-gray-700">Loading...</p>
+                <section id="requirementsSection" class="ui-content-section">
+                    <div class="ui-section-header">
+                        <p class="ui-eyebrow">Application checklist</p>
+                        <h2>Required Documents</h2>
+                        <p>Prepare these files before starting your application.</p>
                     </div>
-
-                    <div class="bg-gray-50 rounded-lg p-4">
-                        <h3 class="text-gray-900 font-semibold mb-3 flex items-center">
-                            <i class="ri-medal-line text-blue-600 mr-2"></i>
-                            ELIGIBILITY
-                        </h3>
-                        <p id="detailEligibility" class="text-gray-700">Loading...</p>
-                    </div>
-                </div>
-
-                <!-- Required Documents Section -->
-                <div id="requirementsSection" class="mb-8 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-6 border-l-4 border-amber-500">
-                    <h2 class="text-xl font-bold text-amber-800 mb-4 flex items-center">
-                        <i class="ri-file-list-3-line mr-2"></i>
-                        REQUIRED DOCUMENTS FOR APPLICATION
-                    </h2>
-                    <p class="text-sm text-amber-700 mb-4">Please prepare the following documents before applying:</p>
-                    <div id="detailJobRequirements" class="space-y-3">
+                    <div id="detailJobRequirements" class="ui-checklist">
                         <!-- Job requirements will be populated here -->
                     </div>
-                </div>
+                </section>
 
-                <!-- Required Competencies Section -->
-                <div class="mb-8 bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                    <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                        <i class="ri-lightbulb-line text-blue-600 mr-2"></i>
-                        REQUIRED COMPETENCIES
-                    </h2>
-                    <div id="detailCompetency" class="text-gray-700 space-y-2 leading-relaxed">Loading...</div>
-                </div>
+                <section class="ui-content-section">
+                    <div class="ui-section-header">
+                        <p class="ui-eyebrow">Professional profile</p>
+                        <h2>Required Competencies</h2>
+                    </div>
+                    <div id="detailCompetency" class="ui-prose">Loading...</div>
+                </section>
+            </main>
 
-                <!-- Apply Button -->
-                <div class="flex justify-center pt-6 border-t border-gray-200">
-                    <button id="detailApplyBtn" class="px-8 py-3 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors font-medium apply-btn">
-                        Apply Now
-                    </button>
+            <aside class="ui-detail-aside" aria-label="Job summary and application actions">
+                <div class="ui-sticky-aside">
+                    <section class="ui-summary-panel">
+                        <div class="ui-section-header ui-section-header--compact">
+                            <p class="ui-eyebrow">At a glance</p>
+                            <h2>Job Summary</h2>
+                        </div>
+                        <dl class="ui-summary-list">
+                            <div><dt>Employment type</dt><dd id="highlightJobType">Loading...</dd></div>
+                            <div><dt>Department</dt><dd id="highlightDepartment">Loading...</dd></div>
+                            <div><dt>Subject area</dt><dd id="highlightSubject">Loading...</dd></div>
+                            <div><dt>Location</dt><dd id="highlightLocation">Loading...</dd></div>
+                        </dl>
+                    </section>
+
+                    <section class="ui-action-panel">
+                        <h2>Ready to apply?</h2>
+                        <p>Review the qualifications and required documents before continuing.</p>
+                        <button id="detailApplyBtn" class="ui-button ui-button--primary ui-button--block apply-btn" type="button">
+                            Apply for this teaching load
+                        </button>
+                    </section>
                 </div>
-            </div>
+            </aside>
         </div>
     </div>
 </div>
 
 <!-- Application Wizard (full-screen) -->
-<div id="applicationWizard" class="hidden fixed inset-0 bg-gray-50 z-50 overflow-y-auto" style="background-color: #f9fafb !important;">
-    <div class="min-h-screen bg-white" style="background-color: white !important;">
+<div id="applicationWizard" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div class="ui-application-wizard">
         <!-- Wizard Header -->
-        <div class="bg-gradient-to-r from-blue-800 to-blue-900 text-white sticky top-0 z-10 shadow-lg" style="background: linear-gradient(to right, #1e40af, #1e3a8a) !important; color: white !important; padding: 1rem !important; position: sticky !important; top: 0 !important; z-index: 10 !important; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;">
-            <div class="flex items-center justify-between mb-3" style="display: flex !important; align-items: center !important; justify-content: space-between !important; margin-bottom: 0.75rem !important;">
-                <button id="backFromWizard" class="text-white hover:text-gray-200 transition-colors flex items-center" style="color: white !important; display: flex !important; align-items: center !important; font-size: 0.875rem !important;">
-                    <i class="ri-arrow-left-line text-lg mr-2"></i>Back to Jobs
+        <header class="ui-wizard-header">
+            <div class="ui-wizard-header__top">
+                <button id="backFromWizard" class="ui-back-link" type="button">
+                    <i class="ri-arrow-left-line text-lg mr-2"></i>Back to Job Opportunities
                 </button>
-                <div class="text-sm opacity-80" id="wizardJobTitle" style="font-size: 0.8rem !important; opacity: 0.8 !important;">Applying for: <span>-</span></div>
+                <div id="wizardJobTitle">Application for <span>-</span></div>
             </div>
             <!-- Progress Steps -->
-            <div class="max-w-6xl mx-auto" style="max-width: 72rem !important; margin-left: auto !important; margin-right: auto !important;">
-                <div class="flex items-center justify-between" style="display: flex !important; align-items: center !important; justify-content: space-between !important;">
+            <div class="ui-wizard-progress">
+                <div class="ui-wizard-progress__track" aria-label="Application progress">
                     <!-- Step 1 -->
-                    <div class="flex-1 flex items-center" style="flex: 1 !important; display: flex !important; align-items: center !important;">
-                        <div class="w-7 h-7 rounded-full flex items-center justify-center font-semibold step-dot" data-step="1" style="width: 1.75rem !important; height: 1.75rem !important; border-radius: 50% !important; display: flex !important; align-items: center !important; justify-content: center !important; font-weight: 600 !important; background: #f59e0b !important; color: #1e40af !important; font-size: 0.875rem !important;">1</div>
-                        <div class="flex-1 h-0.5 mx-1 bg-white bg-opacity-30 step-line" data-after="1" style="flex: 1 !important; height: 2px !important; margin: 0 0.25rem !important; background-color: rgba(255, 255, 255, 0.3) !important;"></div>
+                    <div class="ui-wizard-progress__step">
+                        <div class="step-dot" data-step="1">1</div>
+                        <div class="step-line" data-after="1"></div>
                     </div>
                     <!-- Step 2 -->
-                    <div class="flex-1 flex items-center" style="flex: 1 !important; display: flex !important; align-items: center !important;">
-                        <div class="w-7 h-7 rounded-full flex items-center justify-center font-semibold step-dot" data-step="2" style="width: 1.75rem !important; height: 1.75rem !important; border-radius: 50% !important; display: flex !important; align-items: center !important; justify-content: center !important; font-weight: 600 !important; background: rgba(255,255,255,0.3) !important; color: white !important; font-size: 0.875rem !important;">2</div>
-                        <div class="flex-1 h-0.5 mx-1 bg-white bg-opacity-30 step-line" data-after="2" style="flex: 1 !important; height: 2px !important; margin: 0 0.25rem !important; background-color: rgba(255, 255, 255, 0.3) !important;"></div>
+                    <div class="ui-wizard-progress__step">
+                        <div class="step-dot" data-step="2">2</div>
+                        <div class="step-line" data-after="2"></div>
                     </div>
                     <!-- Step 3 -->
-                    <div class="flex-1 flex items-center" style="flex: 1 !important; display: flex !important; align-items: center !important;">
-                        <div class="w-7 h-7 rounded-full flex items-center justify-center font-semibold step-dot" data-step="3" style="width: 1.75rem !important; height: 1.75rem !important; border-radius: 50% !important; display: flex !important; align-items: center !important; justify-content: center !important; font-weight: 600 !important; background: rgba(255,255,255,0.3) !important; color: white !important; font-size: 0.875rem !important;">3</div>
-                        <div class="flex-1 h-0.5 mx-1 bg-white bg-opacity-30 step-line" data-after="3" style="flex: 1 !important; height: 2px !important; margin: 0 0.25rem !important; background-color: rgba(255, 255, 255, 0.3) !important;"></div>
+                    <div class="ui-wizard-progress__step">
+                        <div class="step-dot" data-step="3">3</div>
+                        <div class="step-line" data-after="3"></div>
                     </div>
                     <!-- Step 4 -->
-                    <div class="flex-1 flex items-center" style="flex: 1 !important; display: flex !important; align-items: center !important;">
-                        <div class="w-7 h-7 rounded-full flex items-center justify-center font-semibold step-dot" data-step="4" style="width: 1.75rem !important; height: 1.75rem !important; border-radius: 50% !important; display: flex !important; align-items: center !important; justify-content: center !important; font-weight: 600 !important; background: rgba(255,255,255,0.3) !important; color: white !important; font-size: 0.875rem !important;">4</div>
-                        <div class="flex-1 h-0.5 mx-1 bg-white bg-opacity-30 step-line" data-after="4" style="flex: 1 !important; height: 2px !important; margin: 0 0.25rem !important; background-color: rgba(255, 255, 255, 0.3) !important;"></div>
+                    <div class="ui-wizard-progress__step">
+                        <div class="step-dot" data-step="4">4</div>
+                        <div class="step-line" data-after="4"></div>
                     </div>
                     <!-- Step 5 -->
-                    <div class="flex-1 flex items-center" style="flex: 1 !important; display: flex !important; align-items: center !important;">
-                        <div class="w-7 h-7 rounded-full flex items-center justify-center font-semibold step-dot" data-step="5" style="width: 1.75rem !important; height: 1.75rem !important; border-radius: 50% !important; display: flex !important; align-items: center !important; justify-content: center !important; font-weight: 600 !important; background: rgba(255,255,255,0.3) !important; color: white !important; font-size: 0.875rem !important;">5</div>
-                        <div class="flex-1 h-0.5 mx-1 bg-white bg-opacity-30 step-line" data-after="5" style="flex: 1 !important; height: 2px !important; margin: 0 0.25rem !important; background-color: rgba(255, 255, 255, 0.3) !important;"></div>
+                    <div class="ui-wizard-progress__step">
+                        <div class="step-dot" data-step="5">5</div>
                     </div>
                 </div>
-                  <div class="mt-2 text-center text-blue-100 text-xs" id="wizardStepLabel" style="margin-top: 0.5rem !important; text-align: center !important; color: #bfdbfe !important; font-size: 0.75rem !important;">Step 1 of 5: Submit Requirements</div>
+                <div id="wizardStepLabel">Step 1 of 5: Submit Requirements</div>
             </div>
-        </div>
+        </header>
 
         <!-- Wizard Body -->
-        <div class="p-4 pb-16" style="min-height: 400px; background: #f8fafc !important; padding: 1.5rem !important; padding-bottom: 4rem !important; padding-top: 1rem !important;">
-            <div class="max-w-4xl mx-auto" style="position: relative; z-index: 1; max-width: 56rem; margin: 0 auto;">
+        <div class="ui-wizard-body">
+            <div class="ui-wizard-content">
                 <!-- Step 1: Submit Requirements -->
                 <section id="step1" class="wizard-step">
                     <h2 class="text-lg font-bold text-gray-900 mb-2">Submit Requirements</h2>
@@ -2575,9 +2550,11 @@ searchResults.classList.add('hidden');
         const jobElement = Array.from(document.querySelectorAll('h3')).find(el => el.textContent === jobTitle);
         if (jobElement) {
           jobElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          jobElement.closest('.bg-white').classList.add('ring-2', 'ring-primary');
+          const resultCard = jobElement.closest('.job-card, .bg-white');
+          if (!resultCard) return;
+          resultCard.classList.add('ring-2', 'ring-primary');
           setTimeout(() => {
-            jobElement.closest('.bg-white').classList.remove('ring-2', 'ring-primary');
+            resultCard.classList.remove('ring-2', 'ring-primary');
           }, 2000);
         }
       }
@@ -6276,27 +6253,35 @@ const filterModal = document.getElementById('filterModal');
 const sortBtn = document.getElementById('sortBtn');
 const sortModal = document.getElementById('sortModal');
 const modalSaveBtn = document.getElementById('modalSaveBtn');
+if (filterBtn && filterModal) {
 filterBtn.addEventListener('click', () => {
 filterModal.classList.remove('hidden');
 filterModal.classList.add('flex');
 });
+}
 document.querySelectorAll('.closeFilterModal').forEach(btn => {
 btn.addEventListener('click', () => {
+if (filterModal) {
 filterModal.classList.add('hidden');
 filterModal.classList.remove('flex');
+}
 });
 });
+if (sortBtn && sortModal) {
 sortBtn.addEventListener('click', () => {
 sortModal.classList.remove('hidden');
 sortModal.classList.add('flex');
 });
+}
 document.querySelectorAll('.closeSortModal').forEach(btn => {
 btn.addEventListener('click', () => {
+if (sortModal) {
 sortModal.classList.add('hidden');
 sortModal.classList.remove('flex');
+}
 });
 });
-modalSaveBtn.addEventListener('click', function() {
+if (modalSaveBtn) modalSaveBtn.addEventListener('click', function() {
 const savedState = this.getAttribute('data-saved') === 'true';
 const icon = this.querySelector('i');
 if (!savedState) {
@@ -6325,13 +6310,13 @@ setTimeout(() => {
 notification.remove();
 }, 3000);
 }
-filterModal.addEventListener('click', function(e) {
+if (filterModal) filterModal.addEventListener('click', function(e) {
 if (e.target === this) {
 this.classList.add('hidden');
 this.classList.remove('flex');
 }
 });
-sortModal.addEventListener('click', function(e) {
+if (sortModal) sortModal.addEventListener('click', function(e) {
 if (e.target === this) {
 this.classList.add('hidden');
 this.classList.remove('flex');
@@ -6825,6 +6810,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // Check if coming from email link
   const urlParams = new URLSearchParams(window.location.search);
   const viewParam = urlParams.get('view');
+  const sharedJobId = urlParams.get('job_id');
   
   // Set initial active state
   let initialSection = 'dashboard';
@@ -6838,7 +6824,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Function to load content dynamically
   function loadContent(url, callback) {
-    fetch(url)
+    fetch(url, {
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
       .then((response) => {
         if (!response.ok) throw new Error('Network response was not ok');
         return response.text();
@@ -6899,7 +6889,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // Check if there's a pending wizard to open - if so, skip content loading
   const hasPendingWizard = sessionStorage.getItem('openApplicationId');
   
-  if (!hasPendingWizard) {
+  if (!hasPendingWizard && !sharedJobId) {
     // Auto-load content based on saved state or URL parameter
     if (viewParam === 'applications') {
       // Coming from email link
@@ -7181,7 +7171,6 @@ document.addEventListener('DOMContentLoaded', function () {
   setInterval(loadNotifications, 30000);
 
   // Auto-open job details if coming from shared link (reuse urlParams from above)
-  const sharedJobId = urlParams.get('job_id');
   if (sharedJobId) {
     console.log('?? Shared link detected, opening job details for ID:', sharedJobId);
     // Wait a moment for page to fully load
@@ -8105,54 +8094,44 @@ function displayJobs(jobs) {
     const description = truncateText(job.job_description || '', 360);
     const applyDisabled = remaining <= 0;
 
-    const jobCard = document.createElement('div');
-    jobCard.className = 'bg-white rounded-xl shadow-sm border border-gray-200 p-7 hover:shadow-md transition-shadow mb-6';
+    const jobCard = document.createElement('article');
+    jobCard.className = 'job-card ui-opportunity-row';
     jobCard.innerHTML = `
-      <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-5">
-        <div class="min-w-0">
-          <div class="flex flex-wrap items-center gap-2 mb-3">
-            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">Open</span>
-            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-50 text-blue-800 border border-blue-100">${escapeHtml(job.job_type || 'Teaching Load')}</span>
-          </div>
-          <h3 class="text-2xl font-semibold text-gray-900 mb-2">${escapeHtml(title)}</h3>
-          ${subjectLine && subjectLine !== title ? `<p class="text-base text-gray-700 mb-2">${escapeHtml(subjectLine)}</p>` : ''}
-          <div class="flex flex-wrap items-center text-sm text-gray-600 gap-x-5 gap-y-2">
-            <span class="inline-flex items-center"><i class="ri-building-line mr-2 text-base"></i>${escapeHtml(job.department_role || 'Department not set')}</span>
-            <span class="inline-flex items-center"><i class="ri-community-line mr-2 text-base"></i>${escapeHtml(job.program || job.department_role || 'Program not set')}</span>
-            <span class="inline-flex items-center"><i class="ri-calendar-event-line mr-2 text-base"></i>${escapeHtml(job.academic_period_label || `${job.academic_year || ''} ${job.semester || ''}`.trim())}</span>
+      <div class="ui-opportunity-row__main">
+        <div class="ui-opportunity-row__heading">
+          <div class="min-w-0">
+            <div class="ui-opportunity-row__labels">
+              <span class="ui-status ui-status--success">Open</span>
+              <span>${escapeHtml(job.job_type || 'Teaching Load')}</span>
+            </div>
+            <h3>${escapeHtml(title)}</h3>
+            ${subjectLine && subjectLine !== title ? `<p class="ui-opportunity-row__subject">${escapeHtml(subjectLine)}</p>` : ''}
           </div>
         </div>
-        <div class="lg:text-right shrink-0">
-          <p class="text-sm text-gray-500">Vacancy</p>
-          <p class="text-lg font-semibold text-gray-900">${escapeHtml(slotsText)}</p>
+
+        <div class="ui-opportunity-row__meta">
+          <span><i class="ri-building-line"></i>${escapeHtml(job.department_role || 'Department not set')}</span>
+          <span><i class="ri-community-line"></i>${escapeHtml(job.program || job.department_role || 'Program not set')}</span>
+          <span><i class="ri-calendar-event-line"></i>${escapeHtml(job.academic_period_label || `${job.academic_year || ''} ${job.semester || ''}`.trim())}</span>
         </div>
+
+        ${description ? `<p class="ui-opportunity-row__description">${escapeHtml(description)}</p>` : ''}
+
+        <dl class="ui-opportunity-facts">
+          <div><dt>Schedule</dt><dd>${escapeHtml(schedule)}</dd></div>
+          <div><dt>Load</dt><dd>${escapeHtml(hours)}${units ? ` · ${escapeHtml(units)}` : ''}</dd></div>
+          <div><dt>Compensation</dt><dd>${escapeHtml(job.salary_display || job.salary_range || 'Rate to be determined')}<sup>*</sup></dd></div>
+        </dl>
       </div>
 
-      ${description ? `<p class="text-base text-gray-700 mb-5 leading-relaxed">${escapeHtml(description)}</p>` : ''}
-
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
-        <div class="border border-gray-200 rounded-lg p-3">
-          <p class="text-xs uppercase text-gray-500 font-medium">Schedule</p>
-          <p class="text-sm text-gray-900 mt-1">${escapeHtml(schedule)}</p>
+      <aside class="ui-opportunity-row__aside">
+        <div class="ui-opportunity-row__vacancy"><span>Vacancy</span><strong>${escapeHtml(slotsText)}</strong></div>
+        <div class="ui-opportunity-row__deadline"><span>Apply by</span><strong>${escapeHtml(job.application_deadline || 'Not set')}</strong></div>
+        <div class="ui-opportunity-row__actions">
+          <button class="ui-button ui-button--secondary ui-button--block view-details-btn" data-job-id="${job.id}">View details</button>
+          <button class="ui-button ui-button--primary ui-button--block apply-btn ${applyDisabled ? 'opacity-50 cursor-not-allowed' : ''}" data-job-id="${job.id}" data-job-title="${escapeHtml(title)}" data-job-type="${escapeHtml(job.job_type || '')}" ${applyDisabled ? 'disabled' : ''}>Apply now</button>
         </div>
-        <div class="border border-gray-200 rounded-lg p-3">
-          <p class="text-xs uppercase text-gray-500 font-medium">Load Hours</p>
-          <p class="text-sm text-gray-900 mt-1">${escapeHtml(hours)}${units ? ` | ${escapeHtml(units)}` : ''}</p>
-        </div>
-        <div class="border border-gray-200 rounded-lg p-3">
-          <p class="text-xs uppercase text-gray-500 font-medium">Compensation</p>
-          <p class="text-sm text-gray-900 mt-1">${escapeHtml(job.salary_display || job.salary_range || 'Rate to be determined')}<sup class="ml-0.5 text-blue-700">*</sup></p>
-          <p class="text-[11px] leading-4 text-gray-500 mt-1">*${escapeHtml(job.salary_projection?.disclaimer || 'Guide only; final compensation is subject to profile and credential verification.')}</p>
-        </div>
-      </div>
-
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <p class="text-sm text-gray-500">Application deadline: ${escapeHtml(job.application_deadline || 'Not set')}</p>
-        <div class="flex space-x-3">
-          <button class="px-5 py-2.5 text-primary border border-primary rounded-lg hover:bg-primary hover:text-white transition-colors text-base whitespace-nowrap view-details-btn" data-job-id="${job.id}">View Teaching Load</button>
-          <button class="px-7 py-2.5 ${applyDisabled ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-primary text-white hover:bg-blue-700'} rounded-lg transition-colors text-base apply-btn" data-job-id="${job.id}" data-job-type="${escapeHtml(job.job_type || '')}" ${applyDisabled ? 'disabled' : ''}>Apply</button>
-        </div>
-      </div>
+      </aside>
     `;
     container.appendChild(jobCard);
   });
@@ -8168,6 +8147,10 @@ function updatePagination(pagination) {
   const paginationInfo = document.getElementById('paginationInfo');
   if (paginationInfo) {
     paginationInfo.textContent = `Showing ${pagination.showing_from}-${pagination.showing_to} of ${pagination.total_jobs} teaching loads`;
+  }
+  const jobResultsSummary = document.getElementById('jobResultsSummary');
+  if (jobResultsSummary) {
+    jobResultsSummary.textContent = `${pagination.total_jobs} ${pagination.total_jobs === 1 ? 'opportunity' : 'opportunities'}`;
   }
   
   // Update previous button
@@ -8868,7 +8851,11 @@ function attachJobEventListeners() {
       }
       
       // Otherwise, it's a new application - show terms modal first
-      const jobTitle = this.closest('.bg-white').querySelector('h3').textContent;
+      const jobContainer = this.closest('.job-card, .ui-opportunity-row, .bg-white');
+      const jobTitle = this.getAttribute('data-job-title')
+        || jobContainer?.querySelector('h3')?.textContent
+        || document.getElementById('detailJobTitle')?.textContent
+        || 'Teaching Opportunity';
       
       // Store job info for application form
       window.selectedJobId = jobId;
@@ -9224,15 +9211,19 @@ function showFullTimeEligibilityModal(hasOngoingMasters = false) {
     : '';
   document.body.insertAdjacentHTML('beforeend', `
     <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-4" id="fullTimeEligibilityModal" role="dialog" aria-modal="true" aria-labelledby="fullTimeEligibilityTitle">
-      <div class="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-200">
-        <div class="p-6 text-center">
-          <i class="ri-information-line text-4xl text-blue-600 mb-3"></i>
-          <h2 id="fullTimeEligibilityTitle" class="text-xl font-bold text-gray-900 mb-3">Full-Time Eligibility Requirement</h2>
-          <p class="text-gray-600 leading-relaxed">Full-time teaching loads require a completed Master\'s or Doctorate degree.${ongoingMessage}</p>
+      <div class="ui-modal-surface max-w-md w-full">
+        <div class="ui-modal-header">
+          <div>
+            <p class="ui-eyebrow">Eligibility check</p>
+            <h3 id="fullTimeEligibilityTitle">Full-Time Eligibility Requirement</h3>
+          </div>
+          <button type="button" id="closeFullTimeEligibility" class="ui-modal-close" aria-label="Close eligibility notice"><i class="ri-close-line"></i></button>
         </div>
-        <div class="px-6 pb-6 flex justify-end gap-3">
-          <button type="button" id="closeFullTimeEligibility" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">Close</button>
-          <a href="user_profile.php#education" class="hidden px-6 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors" id="goToEducationProfile">Go to Profile</a>
+        <div class="ui-modal-body">
+          <p class="ui-modal-lead">Full-time teaching loads require a completed Master\'s or Doctorate degree.${ongoingMessage}</p>
+        </div>
+        <div class="ui-modal-footer">
+          <a href="user_profile.php#education" class="hidden ui-button ui-button--primary" id="goToEducationProfile">Go to Profile</a>
         </div>
       </div>
     </div>
@@ -9263,56 +9254,36 @@ function showTermsModal() {
   }
   
   const termsModalHTML = `
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" id="termsModal">
-      <!-- Outer Box -->
-      <div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full border-2 border-gray-200">
-        <!-- Header -->
-        <div class="p-6 border-b border-gray-200">
-          <div class="flex justify-between items-center">
-            <h2 class="text-2xl font-bold text-gray-900">Application Terms & Conditions</h2>
-            <button id="closeTermsModal" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600">
-              <i class="ri-close-line text-xl"></i>
-            </button>
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" id="termsModal" role="dialog" aria-modal="true" aria-labelledby="termsModalTitle">
+      <div class="ui-modal-surface ui-modal-surface--wide w-full">
+        <div class="ui-modal-header">
+          <div>
+            <p class="ui-eyebrow">Before you apply</p>
+            <h3 id="termsModalTitle">Application Terms & Conditions</h3>
+            <p>Review the submission and privacy requirements for this application.</p>
           </div>
+          <button id="closeTermsModal" class="ui-modal-close" type="button" aria-label="Close terms and conditions">
+            <i class="ri-close-line"></i>
+          </button>
         </div>
-
-        <!-- Inner Scrollable Box -->
-        <div class="p-6">
-          <div class="border-2 border-gray-300 rounded-lg p-6 bg-gray-50 overflow-y-auto" style="max-height: 400px;">
-            <!-- Important Information Alert -->
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <div class="flex items-start">
-                <i class="ri-information-line text-blue-600 text-xl mr-3 mt-0.5"></i>
-                <div>
-                  <h3 class="font-semibold text-blue-900 mb-2">Important Information</h3>
-                  <p class="text-blue-800 text-sm">Please read and understand the following terms and conditions before submitting your application.</p>
-                </div>
-              </div>
-            </div>
-
-            <!-- Terms and Conditions Content -->
-            <div class="text-sm text-gray-700 leading-relaxed">
-              <p class="mb-4">Before submitting your application, please read and understand the following terms and conditions. All required documents must be submitted in PDF format (maximum 5MB each), ensuring they are clear and complete to avoid rejection. Your personal information will remain confidential and will be used solely for recruitment purposes in compliance with data protection regulations. By applying, you confirm that all provided information is true and accurate, and you agree to participate in the recruitment process if selected. Submission of an application does not guarantee employment.</p>
-            </div>
+        <div class="ui-modal-body ui-terms-body">
+          <div class="ui-terms-copy">
+            <p>All required documents must be submitted in PDF format and remain within the stated file-size limit. Documents should be clear and complete to avoid delays or rejection.</p>
+            <p>Your personal information will remain confidential and will be used solely for recruitment purposes in accordance with applicable data-protection requirements.</p>
+            <p>By continuing, you confirm that the information you provide is true and accurate, and that you agree to participate in the recruitment process if selected. Submission does not guarantee employment.</p>
           </div>
-        </div>
-
-        <!-- Checkbox (Outside Scrollable Area) -->
-        <div class="px-6 pb-4">
-          <div class="flex items-center space-x-3">
+          <label class="ui-consent-row" for="agreeTerms">
             <input type="checkbox" id="agreeTerms" class="w-5 h-5 text-primary border-gray-300 rounded focus:ring-primary">
-            <label for="agreeTerms" class="text-sm font-medium text-gray-700">
+            <span>
               I have read and agree to the terms and conditions, and I understand the application requirements.
-            </label>
-          </div>
+            </span>
+          </label>
         </div>
-
-        <!-- Footer Buttons -->
-        <div class="p-6 border-t border-gray-200 flex justify-end space-x-3">
-          <button id="cancelApplication" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+        <div class="ui-modal-footer">
+          <button id="cancelApplication" class="ui-button ui-button--secondary" type="button">
             Cancel
           </button>
-          <button id="proceedToApplication" class="px-6 py-2 bg-blue-200 text-blue-400 rounded-lg cursor-not-allowed transition-colors" disabled>
+          <button id="proceedToApplication" class="ui-button ui-button--primary" type="button" disabled>
             Proceed to Application
           </button>
         </div>
@@ -9338,11 +9309,11 @@ function showTermsModal() {
     if (this.checked) {
       // Enable button
       proceedBtn.disabled = false;
-      proceedBtn.className = 'px-6 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer';
+      proceedBtn.className = 'ui-button ui-button--primary';
     } else {
       // Disable button
       proceedBtn.disabled = true;
-      proceedBtn.className = 'px-6 py-2 bg-blue-200 text-blue-400 rounded-lg cursor-not-allowed transition-colors';
+      proceedBtn.className = 'ui-button ui-button--primary';
     }
   });
   

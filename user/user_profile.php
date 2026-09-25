@@ -538,13 +538,13 @@ if (empty($qualifications_data)) $ranking_profile_missing[] = 'certifications, l
     }
     
     /* Main content padding */
-    .max-w-7xl {
+    #profileMainContent .max-w-7xl {
         padding-left: 1rem !important;
         padding-right: 1rem !important;
     }
     
     /* Profile sections */
-    .grid {
+    #profileMainContent .grid {
         grid-template-columns: 1fr !important;
     }
     
@@ -559,23 +559,23 @@ if (empty($qualifications_data)) $ranking_profile_missing[] = 'certifications, l
     }
     
     /* Buttons */
-    .flex.gap-3 {
+    #profileMainContent .flex.gap-3 {
         flex-direction: column;
     }
     
-    .flex.gap-3 button {
+    #profileMainContent .flex.gap-3 button {
         width: 100%;
     }
     
     /* Profile picture upload */
-    .relative.group {
+    #profileMainContent .relative.group {
         width: 100%;
         max-width: 150px;
         margin: 0 auto;
     }
     
     /* Skills and experience items */
-    .flex.items-center.justify-between {
+    #profileMainContent .flex.items-center.justify-between {
         flex-direction: column;
         align-items: flex-start;
         gap: 0.5rem;
@@ -594,19 +594,19 @@ if (empty($qualifications_data)) $ranking_profile_missing[] = 'certifications, l
     }
     
     /* Profile header */
-    .mb-8 h1 {
+    #profileMainContent .mb-8 h1 {
         font-size: 1.5rem !important;
     }
     
     /* Section titles */
-    h2 {
+    #profileMainContent h2 {
         font-size: 1.25rem !important;
     }
 }
 
 /* Tablet adjustments */
 @media (min-width: 769px) and (max-width: 1024px) {
-    .max-w-7xl {
+    #profileMainContent .max-w-7xl {
         padding-left: 2rem !important;
         padding-right: 2rem !important;
     }
@@ -659,8 +659,17 @@ DEFAULT: '8px',
 }
 }
 </script>
+<link rel="stylesheet" href="../public/assets/css/institutional-ui.css">
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="gt-app gt-user-shell gt-profile-shell bg-gray-50 min-h-screen">
+
+<?php
+$user_profile_data = ['profile_picture' => $applicant['profile_picture'] ?? ''];
+$profile_is_embedded = strcasecmp($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '', 'XMLHttpRequest') === 0;
+if (!$profile_is_embedded) {
+    require __DIR__ . '/components/header.php';
+}
+?>
 
 <!-- Custom Toast Notification Container -->
 <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
@@ -918,16 +927,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <div id="profileMainContent">
 <main class="max-w-7xl mx-auto px-6 py-8">
-<div class="mb-8">
+<div class="ui-page-stack">
+<header class="ui-page-header">
+  <div class="ui-page-header__main">
+    <p class="ui-eyebrow">Applicant account</p>
+    <h1 class="ui-page-title">My Profile</h1>
+    <p class="ui-page-description">Maintain the personal and professional information used in teaching-load applications.</p>
+  </div>
+</header>
 
-<h1 class="text-3xl font-bold text-gray-900 mb-2">My Profile</h1>
-<p class="text-gray-600">Manage your personal information and account settings</p>
-</div>
-
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-<div class="lg:col-span-1">
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-<div class="text-center">
+<section class="ui-profile-hero">
+<div class="ui-profile-identity">
 <div class="relative inline-block">
 <div class="w-32 h-32 bg-gradient-to-br from-primary to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 overflow-hidden" id="profilePictureContainer">
 <?php if (!empty($applicant['profile_picture']) && file_exists('uploads/profile_pictures/' . $applicant['profile_picture'])): ?>
@@ -950,24 +960,21 @@ document.addEventListener('DOMContentLoaded', function() {
 <i class="ri-camera-line text-lg"></i>
 </button>
 </div>
-<h3 class="text-xl font-semibold text-gray-900 mb-2"><?php echo htmlspecialchars($applicant['applicant_fname'] . ' ' . $applicant['applicant_lname']); ?></h3>
-
-<div class="text-sm text-gray-500 space-y-1">
-<p>Supported formats: JPG, PNG, GIF</p>
-<p>Maximum size: 5MB</p>
+<div>
+<p class="ui-eyebrow">Candidate profile</p>
+<h2><?php echo htmlspecialchars($applicant['applicant_fname'] . ' ' . $applicant['applicant_lname']); ?></h2>
+<p><?php echo htmlspecialchars($applicant['applicant_email']); ?></p>
+<span>Profile photo: JPG, PNG or GIF &middot; maximum 5MB</span>
 </div>
 <input type="file" id="photoUpload" accept="image/*" class="hidden">
 </div>
-</div>
-</div>
 
-<div class="lg:col-span-2" id="personalInfo">
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-<div class="flex items-center justify-between mb-6">
-<h3 class="text-xl font-semibold text-gray-900">Personal Information</h3>
-<button class="text-primary hover:text-blue-700 text-sm font-medium" id="editPersonalBtn">Edit</button>
+<div class="ui-profile-details" id="personalInfo">
+<div class="ui-section-header ui-profile-details__header">
+<div><p class="ui-eyebrow">Contact and identity</p><h2>Personal Information</h2></div>
+<button class="ui-button ui-button--secondary" id="editPersonalBtn" type="button"><i class="ri-edit-line"></i>Edit details</button>
 </div>
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="ui-form-grid">
 <div>
 <label class="block text-sm font-medium text-gray-700 mb-2">First Name</label>
 <input type="text" name="applicant_fname" value="<?php echo htmlspecialchars($applicant['applicant_fname']); ?>" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm" pattern="[A-Za-z\s\-']+" title="Please enter only letters, spaces, hyphens, and apostrophes" disabled>
@@ -995,13 +1002,12 @@ document.addEventListener('DOMContentLoaded', function() {
 <textarea name="applicant_address" rows="3" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm resize-none" disabled placeholder="Enter your complete address"><?php echo htmlspecialchars($applicant['applicant_address']); ?></textarea>
 </div>
 </div>
-<div class="hidden mt-6 flex justify-end space-x-4" id="personalActions">
-<button class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors !rounded-button" id="cancelPersonalBtn">Cancel</button>
-<button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors text-sm !rounded-button" id="savePersonalBtn">Save Changes</button>
+<div class="hidden ui-form-actions" id="personalActions">
+<button class="ui-button ui-button--secondary" id="cancelPersonalBtn" type="button">Cancel</button>
+<button class="ui-button ui-button--primary" id="savePersonalBtn" type="button">Save Changes</button>
 </div>
 </div>
-</div>
-</div>
+</section>
 
 <?php if (!empty($ranking_profile_missing)): ?>
 <div class="mb-6 border border-amber-200 bg-amber-50 rounded-xl p-4">
@@ -1015,9 +1021,9 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 <?php endif; ?>
 
-<div class="bg-white rounded-xl shadow-sm border border-gray-200">
-<div class="border-b border-gray-200">
-<nav class="flex space-x-8 px-6 overflow-x-auto">
+<div class="ui-profile-workspace">
+<div class="ui-profile-tabs">
+<nav class="flex space-x-8 overflow-x-auto" aria-label="Profile sections">
 <button class="py-4 px-1 border-b-2 border-primary text-primary font-medium text-sm whitespace-nowrap tab-btn" data-tab="education">Education</button>
 <button class="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium text-sm whitespace-nowrap tab-btn" data-tab="experience">Work Experience</button>
 <button class="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium text-sm whitespace-nowrap tab-btn" data-tab="skills">Skills</button>
@@ -1026,7 +1032,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </nav>
 </div>
 
-<div class="p-6">
+<div class="ui-profile-workspace__content">
 <div id="education" class="tab-content">
 <div class="flex items-center justify-between mb-6">
 <h3 class="text-xl font-semibold text-gray-900">Education Background</h3>

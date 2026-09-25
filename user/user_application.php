@@ -4,12 +4,19 @@
 session_start();
 ?>
 
-<div class="mb-8">
-  <h1 class="text-3xl font-bold text-gray-900 mb-2">My Applications</h1>
-  <p class="text-gray-600">Track and manage your job applications</p>
-</div>
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-  <div class="grid grid-cols-[1fr,auto,auto,auto] gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-600">
+<div class="ui-page-stack ui-applications-page">
+<header class="ui-page-header">
+  <div class="ui-page-header__main">
+    <p class="ui-eyebrow">Your recruitment activity</p>
+    <h1 class="ui-page-title">My Applications</h1>
+    <p class="ui-page-description">Track each application, review its progress, and maintain required attachments.</p>
+  </div>
+</header>
+<section class="ui-data-region">
+  <div class="ui-data-region__header">
+    <div><p class="ui-eyebrow">Application history</p><h2>Submitted Applications</h2></div>
+  </div>
+  <div class="ui-application-table-head grid grid-cols-[1fr,auto,auto,auto] gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-600">
     <div>Position</div>
     <div>Status</div>
     <div>Applied Date</div>
@@ -101,6 +108,7 @@ session_start();
       }
     ?>
   </div>
+</section>
 </div>
 
 <!-- Add/Update Attachments Modal -->

@@ -590,29 +590,32 @@ $recent_activity = $conn->query($recent_activity_query);
             background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
         }
     </style>
+    <link rel="stylesheet" href="../public/assets/css/institutional-ui.css">
 </head>
-<body class="bg-gray-50">
+<body class="gt-app gt-admin-shell bg-gray-50">
     <!-- Mobile sidebar overlay -->
     <div id="sidebarOverlay" class="fixed inset-0 z-40 lg:hidden bg-black bg-opacity-50 hidden"></div>
 
     <!-- Sidebar -->
-    <div id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform -translate-x-full lg:translate-x-0 sidebar-transition">
-        <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200">
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform -translate-x-full lg:translate-x-0 sidebar-transition" aria-label="Administration navigation">
+        <div class="ui-sidebar-brand">
             <div class="flex items-center gap-3">
                 <img src="https://static.readdy.ai/image/2d44f09b25f25697de5dc274e7f0a5a3/04242d6bffded145c33d09c9dcfae98c.png" 
                      alt="NCHire Logo" class="w-8 h-8 object-contain">
-                <span class="text-xl font-bold text-primary">NCHire Admin</span>
+                <div><span class="text-xl font-bold text-primary">NCHire</span><small><?php echo htmlspecialchars($admin_role_display); ?> workspace</small></div>
             </div>
             <button id="closeSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
                 <i class="fas fa-times text-xl"></i>
             </button>
         </div>
 
-        <nav class="mt-8 px-4">
+        <nav class="ui-sidebar-nav">
+            <p class="ui-sidebar-nav__label">Overview</p>
             <button onclick="showSection('dashboard')" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg mb-2 text-gray-700 hover:bg-gray-100">
                 <i class="fas fa-chart-line w-5 h-5"></i>
                 Dashboard
             </button>
+            <p class="ui-sidebar-nav__label">Management</p>
             <?php if ($admin_role !== 'Admin'): ?>
             <button onclick="showSection('jobs')" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg mb-2 text-gray-700 hover:bg-gray-100">
                 <i class="fas fa-briefcase w-5 h-5"></i>
@@ -636,7 +639,7 @@ $recent_activity = $conn->query($recent_activity_query);
             </button>
             <?php endif; ?>
         </nav>
-    </div>
+    </aside>
 
     <!-- Main content -->
     <div class="lg:ml-64">
@@ -647,6 +650,7 @@ $recent_activity = $conn->query($recent_activity_query);
                     <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
                         <i class="fas fa-bars text-xl"></i>
                     </button>
+                    <span class="lg:hidden text-sm font-semibold text-primary">NCHire Admin</span>
                 </div>
                 
                 <div class="flex items-center gap-4">
@@ -719,132 +723,92 @@ $recent_activity = $conn->query($recent_activity_query);
         <!-- Page content -->
         <main class="p-6">
             <!-- Dashboard Section -->
-            <div id="dashboardSection" class="section">
-                <div class="flex items-center justify-between mb-6">
-                    <h1 class="text-3xl font-bold text-gray-900">Dashboard</h1>
+            <div id="dashboardSection" class="section ui-page-stack">
+                <header class="ui-page-header">
+                    <div class="ui-page-header__main">
+                        <p class="ui-eyebrow">Recruitment operations</p>
+                        <h1 class="ui-page-title">Dashboard</h1>
+                        <p class="ui-page-description">Monitor active teaching loads, applicant movement, and staffing capacity.</p>
+                    </div>
                     <div id="filterStatus" class="hidden bg-blue-100 border border-blue-300 text-blue-800 px-4 py-2 rounded-lg text-sm font-medium">
                         <i class="fas fa-filter mr-2"></i>
                         <span id="filterStatusText">Filters active</span>
                     </div>
-                </div>
+                </header>
 
-                <!-- Stats Cards -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                    <!-- Total Teaching Loads Card -->
-                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-600 mb-1">Total Teaching Loads</p>
-                                <p class="text-3xl font-bold text-gray-900" id="totalJobs"><?php echo $stats['total_jobs']; ?></p>
-                            </div>
-                            <div class="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
-                                <i class="fas fa-briefcase text-white text-xl"></i>
-                            </div>
+                <section class="ui-dashboard-summary" aria-labelledby="dashboardSummaryTitle">
+                    <div class="ui-section-header ui-section-header--compact">
+                        <p class="ui-eyebrow">Current workload</p>
+                        <h2 id="dashboardSummaryTitle">Recruitment Overview</h2>
+                    </div>
+                    <div class="ui-stat-strip">
+                        <div class="ui-stat-item">
+                            <p>Total Teaching Loads</p>
+                            <strong id="totalJobs"><?php echo $stats['total_jobs']; ?></strong>
+                            <span>Published and managed</span>
+                        </div>
+                        <div class="ui-stat-item">
+                            <p>Total Applicants</p>
+                            <strong id="totalApplicants"><?php echo $stats['total_applicants']; ?></strong>
+                            <span>Across all active loads</span>
+                        </div>
+                        <div class="ui-stat-item">
+                            <p>Active Users</p>
+                            <strong id="activeUsers"><?php echo $stats['active_users']; ?></strong>
+                            <span>Registered job seekers</span>
+                        </div>
+                        <div class="ui-stat-item ui-stat-item--attention">
+                            <p id="pendingReviewsLabel"><?php
+                                if ($admin_role === 'Secretary') {
+                                    echo 'Pending Review';
+                                } else if ($admin_role === 'Department Head') {
+                                    echo 'Dept. Pending';
+                                } else {
+                                    echo 'Pending Reviews';
+                                }
+                            ?></p>
+                            <strong id="pendingReviews"><?php
+                                if ($admin_role === 'Secretary') {
+                                    echo $stats['secretary_pending'];
+                                } else if ($admin_role === 'Department Head') {
+                                    echo $stats['dept_pending'];
+                                } else {
+                                    echo ($stats['secretary_pending'] + $stats['dept_pending']);
+                                }
+                            ?></strong>
+                            <span>Requires staff attention</span>
                         </div>
                     </div>
+                </section>
 
-                    <!-- Total Applicants Card -->
-                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-600 mb-1">Total Applicants</p>
-                                <p class="text-3xl font-bold text-gray-900" id="totalApplicants"><?php echo $stats['total_applicants']; ?></p>
-                            </div>
-                            <div class="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
-                                <i class="fas fa-users text-white text-xl"></i>
-                            </div>
-                        </div>
+                <section class="ui-capacity-band" aria-labelledby="capacityTitle">
+                    <div class="ui-capacity-band__intro">
+                        <p class="ui-eyebrow">Staffing capacity</p>
+                        <h2 id="capacityTitle">Open Teaching Needs</h2>
+                        <p>Vacancy distribution for the active academic period.</p>
                     </div>
-
-                    <!-- Active Users Card -->
-                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-600 mb-1">Active Users</p>
-                                <p class="text-3xl font-bold text-gray-900" id="activeUsers"><?php echo $stats['active_users']; ?></p>
-                            </div>
-                            <div class="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center">
-                                <i class="fas fa-user-check text-white text-xl"></i>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Pending Reviews Card -->
-                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-600 mb-1" id="pendingReviewsLabel">
-                                    <?php 
-                                    if ($admin_role === 'Secretary') {
-                                        echo 'Pending Review';
-                                    } else if ($admin_role === 'Department Head') {
-                                        echo 'Dept. Pending';
-                                    } else {
-                                        echo 'Pending Reviews';
-                                    }
-                                    ?>
-                                </p>
-                                <p class="text-3xl font-bold text-gray-900" id="pendingReviews">
-                                    <?php 
-                                    if ($admin_role === 'Secretary') {
-                                        echo $stats['secretary_pending'];
-                                    } else if ($admin_role === 'Department Head') {
-                                        echo $stats['dept_pending'];
-                                    } else {
-                                        echo ($stats['secretary_pending'] + $stats['dept_pending']);
-                                    }
-                                    ?>
-                                </p>
-                            </div>
-                            <div class="w-12 h-12 bg-orange-500 rounded-lg flex items-center justify-center">
-                                <i class="fas fa-clock text-white text-xl"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Teaching Load Vacancy Summary -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-600 mb-1">Subjects With Vacancies</p>
-                                <p class="text-3xl font-bold text-gray-900"><?php echo (int)($vacancy_stats['subject_count'] ?? 0); ?></p>
-                            </div>
-                            <div class="w-12 h-12 bg-cyan-500 rounded-lg flex items-center justify-center">
-                                <i class="fas fa-book-open text-white text-xl"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-600 mb-1">Open Instructor Slots</p>
-                                <p class="text-3xl font-bold text-gray-900"><?php echo (int)($vacancy_stats['slot_count'] ?? 0); ?></p>
-                            </div>
-                            <div class="w-12 h-12 bg-emerald-500 rounded-lg flex items-center justify-center">
-                                <i class="fas fa-user-plus text-white text-xl"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-600 mb-1">Programs With Vacancies</p>
-                                <p class="text-3xl font-bold text-gray-900"><?php echo (int)($vacancy_stats['program_count'] ?? 0); ?></p>
-                            </div>
-                            <div class="w-12 h-12 bg-indigo-500 rounded-lg flex items-center justify-center">
-                                <i class="fas fa-layer-group text-white text-xl"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-                    <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+                    <dl class="ui-capacity-band__metrics">
                         <div>
-                            <h2 class="text-lg font-semibold text-gray-900">Vacant Teaching Loads</h2>
-                            <p class="text-sm text-gray-500 mt-1"><?php echo htmlspecialchars(nc_format_academic_period(['academic_year' => nc_current_academic_year(), 'semester' => nc_current_semester()])); ?></p>
+                            <dt>Subjects with vacancies</dt>
+                            <dd><?php echo (int)($vacancy_stats['subject_count'] ?? 0); ?></dd>
+                        </div>
+                        <div>
+                            <dt>Open instructor slots</dt>
+                            <dd><?php echo (int)($vacancy_stats['slot_count'] ?? 0); ?></dd>
+                        </div>
+                        <div>
+                            <dt>Programs with vacancies</dt>
+                            <dd><?php echo (int)($vacancy_stats['program_count'] ?? 0); ?></dd>
+                        </div>
+                    </dl>
+                </section>
+
+                <section class="ui-data-region">
+                    <div class="ui-data-region__header">
+                        <div>
+                            <p class="ui-eyebrow">Priority work</p>
+                            <h2>Vacant Teaching Loads</h2>
+                            <p><?php echo htmlspecialchars(nc_format_academic_period(['academic_year' => nc_current_academic_year(), 'semester' => nc_current_semester()])); ?></p>
                         </div>
                     </div>
                     <div class="overflow-x-auto">
@@ -878,14 +842,17 @@ $recent_activity = $conn->query($recent_activity_query);
                             </tbody>
                         </table>
                     </div>
-                </div>
+                </section>
 
                 <!-- Charts Row -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div class="ui-dashboard-split">
                     <!-- Applications Chart -->
-                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                    <section class="ui-analytics-panel">
                         <div class="flex items-center justify-between mb-4">
-                            <h2 class="text-lg font-semibold text-gray-900">Applications Overview</h2>
+                            <div>
+                                <p class="ui-eyebrow">Trend</p>
+                                <h2 class="text-lg font-semibold text-gray-900">Applications Overview</h2>
+                            </div>
                             <div class="flex gap-2">
                                 <select id="schoolYearFilter" onchange="updateChart()" class="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                     <option value="">All School Years</option>
@@ -922,11 +889,14 @@ $recent_activity = $conn->query($recent_activity_query);
                                 <?php endfor; ?>
                             </div>
                         </div>
-                    </div>
+                    </section>
 
                     <!-- Recent Activity -->
-                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                        <h2 class="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h2>
+                    <section class="ui-activity-panel">
+                        <div class="ui-section-header ui-section-header--compact">
+                            <p class="ui-eyebrow">Audit trail</p>
+                            <h2>Recent Activity</h2>
+                        </div>
                         <div class="h-80 overflow-y-auto space-y-4 pr-2" id="recentActivityContainer">
                             <?php if ($recent_activity && $recent_activity->num_rows > 0): ?>
                                 <?php while ($activity = $recent_activity->fetch_assoc()): ?>
@@ -1069,7 +1039,7 @@ $recent_activity = $conn->query($recent_activity_query);
                                 </div>
                             <?php endif; ?>
                         </div>
-                    </div>
+                    </section>
                 </div>
                 
                 <!-- Immediate cleanup script for Recent Activity -->
@@ -1097,10 +1067,10 @@ $recent_activity = $conn->query($recent_activity_query);
                 </script>
 
                 <!-- Recent Tables -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="ui-dashboard-split">
                     <!-- Recent Teaching Loads -->
-                    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-                        <div class="p-6 border-b border-gray-200">
+                    <section class="ui-data-region">
+                        <div class="ui-data-region__header">
                             <h2 class="text-lg font-semibold text-gray-900">Recent Teaching Loads</h2>
                         </div>
                         <div class="overflow-x-auto">
@@ -1138,11 +1108,11 @@ $recent_activity = $conn->query($recent_activity_query);
                                 </tbody>
                             </table>
                         </div>
-                    </div>
+                    </section>
 
                     <!-- Recent Applicants -->
-                    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-                        <div class="p-6 border-b border-gray-200">
+                    <section class="ui-data-region">
+                        <div class="ui-data-region__header">
                             <h2 class="text-lg font-semibold text-gray-900">Recent Applicants</h2>
                         </div>
                         <div class="overflow-x-auto">
@@ -1230,24 +1200,31 @@ $recent_activity = $conn->query($recent_activity_query);
                                 </tbody>
                             </table>
                         </div>
-                    </div>
+                    </section>
                 </div>
             </div>
 
             <!-- Teaching Loads Section -->
-            <div id="jobsSection" class="section hidden">
-                <div class="flex items-center justify-between mb-6">
-                    <h1 class="text-3xl font-bold text-gray-900">Teaching Loads</h1>
-                    <button onclick="openCreateJobModal()" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors flex items-center gap-2">
-    <i class="fas fa-plus"></i>
-    Create Teaching Load
-</button>
-                </div>
+            <div id="jobsSection" class="section hidden ui-page-stack">
+                <header class="ui-page-header">
+                    <div class="ui-page-header__main">
+                        <p class="ui-eyebrow">Workforce planning</p>
+                        <h1 class="ui-page-title">Teaching Loads</h1>
+                        <p class="ui-page-description">Create and manage open teaching assignments for the active academic period.</p>
+                    </div>
+                    <div class="ui-page-header__actions">
+                        <button onclick="openCreateJobModal()" class="ui-button ui-button--primary" type="button">
+                            <i class="fas fa-plus"></i>
+                            Create Teaching Load
+                        </button>
+                    </div>
+                </header>
 
                 <!-- Filters -->
-                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
-                    <div class="flex flex-col md:flex-row gap-4">
-                        <div class="flex-1">
+                <section class="ui-filter-bar" aria-label="Teaching load filters">
+                    <div class="ui-filter-bar__controls">
+                        <div class="ui-filter-bar__search">
+                            <label for="jobSearchInput">Search teaching loads</label>
                             <div class="relative">
                                 <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                                 <input type="text" id="jobSearchInput" placeholder="Search teaching loads..." 
@@ -1255,24 +1232,27 @@ $recent_activity = $conn->query($recent_activity_query);
                                        class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                             </div>
                         </div>
-                        <div class="flex gap-2">
+                        <div class="ui-filter-field">
+                            <label for="jobStatusFilter">Status</label>
                             <select id="jobStatusFilter" onchange="filterJobs()" 
                                     class="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                                 <option value="all">All Status</option>
                                 <option value="active">Active</option>
                                 <option value="closed">Closed</option>
                             </select>
-                            <button onclick="openMoreFiltersModal()" 
-                                    class="border border-gray-300 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors flex items-center gap-2">
-                                <i class="fas fa-filter"></i>
-                                More Filters
-                            </button>
                         </div>
+                        <button onclick="openMoreFiltersModal()" class="ui-button ui-button--secondary ui-filter-bar__action" type="button">
+                            <i class="fas fa-sliders-h"></i>
+                            More Filters
+                        </button>
                     </div>
-                </div>
+                </section>
 
                 <!-- Teaching Loads Table -->
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <section class="ui-data-region">
+                    <div class="ui-data-region__header">
+                        <div><p class="ui-eyebrow">Results</p><h2>Available Teaching Loads</h2></div>
+                    </div>
                     <div class="overflow-x-auto">
                         <table class="w-full">
                             <thead class="bg-gray-50">
@@ -1290,70 +1270,61 @@ $recent_activity = $conn->query($recent_activity_query);
                             </tbody>
                         </table>
                     </div>
-                </div>
+                </section>
             </div>
 
             <!-- Applicants Section -->
-            <div id="applicantsSection" class="section hidden">
-                <div class="mb-6">
-                    <h1 class="text-3xl font-bold text-gray-900">Applicants</h1>
-                </div>
+            <div id="applicantsSection" class="section hidden ui-page-stack">
+                <header class="ui-page-header">
+                    <div class="ui-page-header__main">
+                        <p class="ui-eyebrow">Recruitment pipeline</p>
+                        <h1 class="ui-page-title">Applicants</h1>
+                        <p class="ui-page-description">Review candidates, track recruitment stages, and make role-authorized decisions.</p>
+                    </div>
+                </header>
 
                 <!-- Stats Cards -->
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-600">Total Applicants</p>
-                                <p class="text-2xl font-bold text-gray-900" data-stat="total_applicants"><?php echo $stats['total_applicants']; ?></p>
-                            </div>
-                            <i class="fas fa-user text-2xl text-blue-500"></i>
-                        </div>
+                <section class="ui-dashboard-summary ui-dashboard-summary--compact" aria-label="Applicant pipeline summary">
+                    <div class="ui-stat-strip">
+                    <div class="ui-stat-item">
+                        <p>Total Applicants</p>
+                        <strong data-stat="total_applicants"><?php echo $stats['total_applicants']; ?></strong>
+                        <span>All active applications</span>
                     </div>
-                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-600">Interviews Scheduled</p>
-                                <p class="text-2xl font-bold text-gray-900" data-stat="interview_scheduled"><?php echo $stats['interview_scheduled']; ?></p>
-                            </div>
-                            <i class="fas fa-calendar text-2xl text-blue-500"></i>
-                        </div>
+                    <div class="ui-stat-item">
+                        <p>Interviews Scheduled</p>
+                        <strong data-stat="interview_scheduled"><?php echo $stats['interview_scheduled']; ?></strong>
+                        <span>Awaiting interview outcome</span>
                     </div>
-                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-600">Demo Scheduled</p>
-                                <p class="text-2xl font-bold text-gray-900" data-stat="demo_scheduled"><?php echo $stats['demo_scheduled']; ?></p>
-                            </div>
-                            <i class="fas fa-chalkboard-teacher text-2xl text-indigo-500"></i>
-                        </div>
+                    <div class="ui-stat-item">
+                        <p>Demo Scheduled</p>
+                        <strong data-stat="demo_scheduled"><?php echo $stats['demo_scheduled']; ?></strong>
+                        <span>Teaching demonstrations set</span>
                     </div>
-                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 card-hover">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-600">Passed</p>
-                                <p class="text-2xl font-bold text-gray-900" data-stat="hired"><?php echo $stats['hired']; ?></p>
-                            </div>
-                            <i class="fas fa-check-circle text-2xl text-green-500"></i>
-                        </div>
+                    <div class="ui-stat-item">
+                        <p>Passed</p>
+                        <strong data-stat="hired"><?php echo $stats['hired']; ?></strong>
+                        <span>Completed recruitment review</span>
                     </div>
-                </div>
+                    </div>
+                </section>
 
                 <!-- Job-specific candidate ranking decision support -->
-                <div class="bg-white rounded-lg shadow-sm border border-blue-200 mb-6 overflow-hidden">
-                    <div class="p-5 bg-blue-50 border-b border-blue-100 flex flex-col lg:flex-row lg:items-end gap-4 justify-between">
+                <section class="ui-analytics-workspace">
+                    <div class="ui-analytics-workspace__header">
                         <div>
-                            <h2 class="text-lg font-semibold text-blue-950"><i class="fas fa-ranking-star mr-2"></i>AI Candidate Ranking</h2>
-                            <p class="text-sm text-blue-800 mt-1">Deterministic, explainable scoring by teaching load. AI adds a cached explanation only when ranking details are opened.</p>
+                            <p class="ui-eyebrow">Decision support</p>
+                            <h2>Candidate Ranking</h2>
+                            <p>Compare teaching-load requirements with the applicants assigned to that posting.</p>
                         </div>
-                        <div class="flex flex-col sm:flex-row gap-2 sm:items-end">
-                            <div>
+                        <div class="ui-analytics-workspace__controls">
+                            <div class="ui-filter-field">
                                 <label for="rankingJobFilter" class="block text-xs font-medium text-gray-700 mb-1">Selected Job / Teaching Load</label>
                                 <select id="rankingJobFilter" onchange="loadCandidateRanking()" class="min-w-72 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
                                     <option value="">Select a posting</option>
                                 </select>
                             </div>
-                            <button type="button" id="recalculateRankingBtn" onclick="recalculateCandidateRanking()" class="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 text-sm disabled:opacity-50" disabled><i class="fas fa-rotate mr-2"></i>Recalculate</button>
+                            <button type="button" id="recalculateRankingBtn" onclick="recalculateCandidateRanking()" class="ui-button ui-button--secondary" disabled><i class="fas fa-rotate mr-2"></i>Recalculate</button>
                         </div>
                     </div>
                     <div id="rankingNotice" class="px-5 pt-4 text-sm text-gray-600">Select a job posting to compare its requirements with applicants assigned to it.</div>
@@ -1375,14 +1346,14 @@ $recent_activity = $conn->query($recent_activity_query);
                         </table>
                     </div>
                     <div class="px-5 py-4 border-t border-gray-100 text-xs text-gray-500">Decision-support only. Rankings do not automatically reject or hire applicants.</div>
-                </div>
+                </section>
 
                 <!-- Filter Section -->
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 p-4">
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <section class="ui-filter-bar" aria-label="Applicant filters">
+                    <div class="ui-filter-bar__controls ui-filter-bar__controls--four">
                         <!-- Search by Name -->
                         <div>
-                            <label for="nameSearch" class="block text-sm font-medium text-gray-700 mb-1">Search Applicant:</label>
+                            <label for="nameSearch">Search Applicant</label>
                             <input type="text" id="nameSearch" placeholder="Search by name..." 
                                    oninput="applyAllFilters()"
                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
@@ -1390,7 +1361,7 @@ $recent_activity = $conn->query($recent_activity_query);
                         
                         <!-- Status Filter -->
                         <div>
-                            <label for="statusFilter" class="block text-sm font-medium text-gray-700 mb-1">Filter by Status:</label>
+                            <label for="statusFilter">Status</label>
                             <select id="statusFilter" onchange="applyAllFilters()" 
                                     class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                                 <option value="all">All Applicants</option>
@@ -1410,30 +1381,31 @@ $recent_activity = $conn->query($recent_activity_query);
                         
                         <!-- From Date -->
                         <div>
-                            <label for="fromDate" class="block text-sm font-medium text-gray-700 mb-1">From Date:</label>
+                            <label for="fromDate">From date</label>
                             <input type="date" id="fromDate" onchange="applyAllFilters()"
                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                         
                         <!-- To Date -->
                         <div>
-                            <label for="toDate" class="block text-sm font-medium text-gray-700 mb-1">To Date:</label>
+                            <label for="toDate">To date</label>
                             <input type="date" id="toDate" onchange="applyAllFilters()"
                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                     </div>
                     
                     <!-- Clear Filters Button -->
-                    <div class="mt-3 flex justify-end">
+                    <div class="ui-filter-bar__footer">
                         <button onclick="clearAllFilters()" 
-                                class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors">
-                            <i class="fas fa-times mr-2"></i>Clear Filters
+                                class="ui-back-link" type="button">
+                            <i class="fas fa-undo-alt mr-2"></i>Reset filters
                         </button>
                     </div>
-                </div>
+                </section>
 
                 <!-- Applicants Table -->
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <section class="ui-data-region">
+                    <div class="ui-data-region__header"><div><p class="ui-eyebrow">Results</p><h2>Applicant Directory</h2></div></div>
                     <div class="overflow-x-auto">
                         <table class="w-full">
                             <thead class="bg-gray-50">
@@ -1472,203 +1444,188 @@ $recent_activity = $conn->query($recent_activity_query);
                             </button>
                         </div>
                     </div>
-                </div>
+                </section>
             </div>
 
             <!-- Applicant Details Section -->
-            <div id="applicantDetailsSection" class="section hidden">
-                <div class="flex items-center gap-4 mb-6">
-                    <button onclick="showSection('applicants')" class="text-gray-600 hover:text-gray-800">
-                        <i class="fas fa-arrow-left text-xl"></i>
-                    </button>
-                    <h1 class="text-2xl font-bold text-gray-900">Applicant Details</h1>
-                </div>
+            <div id="applicantDetailsSection" class="section hidden ui-page-stack">
+                <nav class="ui-breadcrumb" aria-label="Breadcrumb">
+                    <span>Recruitment</span>
+                    <i class="fas fa-chevron-right" aria-hidden="true"></i>
+                    <span>Applicants</span>
+                    <i class="fas fa-chevron-right" aria-hidden="true"></i>
+                    <span aria-current="page">Applicant Details</span>
+                </nav>
 
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <!-- Left Column - Applicant Info -->
-                    <div class="lg:col-span-2 space-y-6">
-                        <!-- Personal Information -->
-                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                            <h2 class="text-lg font-semibold text-gray-900 mb-4">Personal Information</h2>
-                            <div id="personalInfo" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button onclick="showSection('applicants')" class="ui-back-link" type="button">
+                    <i class="fas fa-arrow-left" aria-hidden="true"></i>
+                    <span>Back to Applicants</span>
+                </button>
+
+                <header class="ui-page-header">
+                    <div class="ui-page-header__main">
+                        <p class="ui-eyebrow">Application review</p>
+                        <h1 class="ui-page-title">Applicant Details</h1>
+                        <p class="ui-page-description">Review the applicant profile, supporting credentials, and recruitment progress.</p>
+                    </div>
+                    <div id="actionStatusBadge" class="ui-page-header__actions" aria-live="polite"></div>
+                </header>
+
+                <div class="ui-detail-layout ui-applicant-layout">
+                    <div class="ui-detail-main">
+                        <section class="ui-content-section">
+                            <div class="ui-section-header">
+                                <p class="ui-eyebrow">Applicant profile</p>
+                                <h2>Personal Information</h2>
+                            </div>
+                            <div id="personalInfo" class="ui-definition-grid">
                                 <!-- Personal info will be loaded here -->
                             </div>
-                        </div>
+                        </section>
 
-                        <!-- Projected Compensation -->
-                        <div class="bg-white rounded-lg shadow-sm border border-blue-100 p-6">
-                            <h2 class="text-lg font-semibold text-gray-900 mb-4">Projected Compensation</h2>
-                            <div id="salaryProjectionInfo" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <section class="ui-content-section">
+                            <div class="ui-section-header">
+                                <p class="ui-eyebrow">Position classification</p>
+                                <h2>Projected Compensation</h2>
+                            </div>
+                            <div id="salaryProjectionInfo" class="ui-definition-grid">
                                 <p class="text-gray-500 italic">Salary projection will be loaded here.</p>
                             </div>
-                        </div>
+                        </section>
 
-                        <!-- Education -->
-                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                            <h2 class="text-lg font-semibold text-gray-900 mb-4">Education</h2>
-                            <div id="educationInfo" class="space-y-4">
-                                <!-- Education info will be loaded here -->
-                            </div>
-                        </div>
+                        <section class="ui-content-section">
+                            <div class="ui-section-header"><p class="ui-eyebrow">Academic background</p><h2>Education</h2></div>
+                            <div id="educationInfo" class="ui-record-list"><!-- Education info will be loaded here --></div>
+                        </section>
 
-                        <!-- Work Experience -->
-                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                            <h2 class="text-lg font-semibold text-gray-900 mb-4">Work Experience</h2>
-                            <div id="experienceInfo" class="space-y-4">
-                                <!-- Experience info will be loaded here -->
-                            </div>
-                        </div>
+                        <section class="ui-content-section">
+                            <div class="ui-section-header"><p class="ui-eyebrow">Employment history</p><h2>Work Experience</h2></div>
+                            <div id="experienceInfo" class="ui-record-list"><!-- Experience info will be loaded here --></div>
+                        </section>
 
-                        <!-- Skills -->
-                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                            <h2 class="text-lg font-semibold text-gray-900 mb-4">Skills</h2>
-                            <div id="skillsInfo" class="space-y-4">
-                                <!-- Skills info will be loaded here -->
-                            </div>
-                        </div>
+                        <section class="ui-content-section">
+                            <div class="ui-section-header"><p class="ui-eyebrow">Capabilities</p><h2>Skills</h2></div>
+                            <div id="skillsInfo" class="ui-record-list"><!-- Skills info will be loaded here --></div>
+                        </section>
 
-                        <!-- Certifications, licenses, and training -->
-                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                            <h2 class="text-lg font-semibold text-gray-900 mb-4">Certifications, Licenses & Training</h2>
-                            <div id="qualificationsInfo" class="space-y-4"><p class="text-gray-500 italic">No structured qualifications provided</p></div>
-                        </div>
+                        <section class="ui-content-section">
+                            <div class="ui-section-header"><p class="ui-eyebrow">Additional credentials</p><h2>Certifications, Licenses &amp; Training</h2></div>
+                            <div id="qualificationsInfo" class="ui-record-list"><p class="text-gray-500 italic">No structured qualifications provided</p></div>
+                        </section>
 
-                        <!-- Submitted Documents -->
-                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                            <h2 class="text-lg font-semibold text-gray-900 mb-4">Submitted Documents</h2>
-                            <div id="documentsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <!-- Documents will be loaded here -->
-                            </div>
-                        </div>
+                        <section class="ui-content-section">
+                            <div class="ui-section-header"><p class="ui-eyebrow">Application files</p><h2>Submitted Documents</h2></div>
+                            <div id="documentsGrid" class="ui-document-list"><!-- Documents will be loaded here --></div>
+                        </section>
                     </div>
 
-                    <!-- Right Column - Actions -->
-                    <div class="space-y-6">
-                        <!-- Action Buttons -->
-                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                            <h2 class="text-lg font-semibold text-gray-900 mb-4">Actions</h2>
-                            <div id="actionButtons" class="space-y-3">
+                    <aside class="ui-detail-aside" aria-label="Applicant actions and recruitment schedule">
+                        <div class="ui-sticky-aside">
+                            <section class="ui-summary-panel ui-action-workspace">
+                                <div class="ui-section-header ui-section-header--compact">
+                                    <p class="ui-eyebrow">Workflow</p>
+                                    <h2>Application Actions</h2>
+                                    <p>Available actions reflect the applicant's current stage and your role.</p>
+                                </div>
+                                <div id="actionButtons" class="ui-action-list">
                                 <!-- Secretary Action: Transfer to Dean -->
                                 <button id="transferToDeptHeadBtn" onclick="openTransferModal()" 
-                                        class="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 hidden">
+                                        class="ui-button ui-button--primary ui-button--block hidden">
                                     <i class="fas fa-share"></i>
                                     Transfer to Dean
                                 </button>
                                 
                                 <button id="scheduleBtn" onclick="openScheduleModal()" 
-                                        class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+                                        class="ui-button ui-button--primary ui-button--block">
                                     <i class="fas fa-calendar-alt"></i>
                                     Schedule Interview
                                 </button>
                                 
                                 <button id="approveInterviewBtn" onclick="openApproveInterviewModal()" 
-                                        class="w-full bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors flex items-center justify-center gap-2 hidden">
+                                        class="ui-button ui-button--primary ui-button--block hidden">
                                     <i class="fas fa-user-check"></i>
                                     Approve Interview
                                 </button>
                                 
                                 <button id="rescheduleInterviewBtn" onclick="openRescheduleInterviewModal()" 
-                                        class="w-full bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors flex items-center justify-center gap-2 hidden">
+                                        class="ui-button ui-button--secondary ui-button--block hidden">
                                     <i class="fas fa-calendar-edit"></i>
                                     Reschedule Interview
                                 </button>
                                 
                                 <button id="scheduleDemoBtn" onclick="openDemoScheduleModal()" 
-                                        class="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 hidden">
+                                        class="ui-button ui-button--primary ui-button--block hidden">
                                     <i class="fas fa-chalkboard-teacher"></i>
                                     Schedule Demo Teaching
                                 </button>
                                 
                                 <button id="approveDemoBtn" onclick="openApproveDemoModal()" 
-                                        class="w-full bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 hidden">
+                                        class="ui-button ui-button--primary ui-button--block hidden">
                                     <i class="fas fa-check-double"></i>
                                     Approve Demo
                                 </button>
                                 
                                 <button id="rescheduleDemoBtn" onclick="openRescheduleDemoModal()" 
-                                        class="w-full bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors flex items-center justify-center gap-2 hidden">
+                                        class="ui-button ui-button--secondary ui-button--block hidden">
                                     <i class="fas fa-calendar-edit"></i>
                                     Reschedule Demo Teaching
                                 </button>
                                 
                                 <button id="hireBtn" onclick="openHireModal()" 
-                                        class="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 hidden">
+                                        class="ui-button ui-button--primary ui-button--block hidden">
                                     <i class="fas fa-check-circle"></i>
                                     Mark Application Passed
                                 </button>
                                 
                                 <button id="resubmitBtn" onclick="openResubmitModal()" 
-                                        class="w-full bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors flex items-center justify-center gap-2">
+                                        class="ui-button ui-button--secondary ui-button--block">
                                     <i class="fas fa-redo"></i>
                                     Request Resubmission
                                 </button>
                                 
                                 <button id="rejectBtn" onclick="openRejectModal()" 
-                                        class="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2">
+                                        class="ui-button ui-button--danger ui-button--block">
                                     <i class="fas fa-times"></i>
                                     Reject Application
                                 </button>
                             </div>
-                        </div>
+                            </section>
 
-                        <!-- Interview Information -->
-                        <div id="interviewInfo" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6" style="display: none;">
-                            <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                                <i class="fas fa-calendar-check text-blue-600"></i>
-                                Interview Details
-                            </h2>
-                            <div id="interviewDetails" class="space-y-3">
-                                <!-- Interview details will be loaded here -->
-                            </div>
-                        </div>
+                            <section id="interviewInfo" class="ui-summary-panel ui-stage-panel" style="display: none;">
+                                <div class="ui-section-header ui-section-header--compact"><p class="ui-eyebrow">Recruitment stage</p><h2>Interview Details</h2></div>
+                                <div id="interviewDetails" class="ui-summary-list"><!-- Interview details will be loaded here --></div>
+                            </section>
                         
-                        <!-- Demo Teaching Information -->
-                        <div id="demoInfo" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6" style="display: none;">
-                            <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                                <i class="fas fa-chalkboard-teacher text-indigo-600"></i>
-                                Demo Teaching Details
-                            </h2>
-                            <div id="demoDetails" class="space-y-3">
-                                <!-- Demo details will be loaded here -->
-                            </div>
-                        </div>
+                            <section id="demoInfo" class="ui-summary-panel ui-stage-panel" style="display: none;">
+                                <div class="ui-section-header ui-section-header--compact"><p class="ui-eyebrow">Recruitment stage</p><h2>Demo Teaching Details</h2></div>
+                                <div id="demoDetails" class="ui-summary-list"><!-- Demo details will be loaded here --></div>
+                            </section>
                         
-                        <!-- Psychological Exam Receipt -->
-                        <div id="psychReceiptInfo" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6" style="display: none;">
-                            <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                                <i class="fas fa-brain text-purple-600"></i>
-                                Psychological Exam Receipt
-                            </h2>
-                            <div id="psychReceiptDetails" class="space-y-3">
-                                <!-- Receipt details will be loaded here -->
-                            </div>
+                            <section id="psychReceiptInfo" class="ui-summary-panel ui-stage-panel" style="display: none;">
+                                <div class="ui-section-header ui-section-header--compact"><p class="ui-eyebrow">Pre-employment</p><h2>Psychological Exam Receipt</h2></div>
+                                <div id="psychReceiptDetails" class="ui-summary-list"><!-- Receipt details will be loaded here --></div>
+                            </section>
                         </div>
-                    </div>
+                    </aside>
                 </div>
             </div>
 
             <!-- Archive Section -->
-            <div id="archiveSection" class="section hidden">
-                <div class="flex items-center justify-between mb-6">
-                    <h1 class="text-3xl font-bold text-gray-900">Archive</h1>
-                    <p class="text-gray-600">Rejected and Cancelled applicants</p>
-                </div>
-
-                <!-- Archive Stats -->
-                <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-6">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-sm font-medium text-gray-600">Total Archived Applicants</p>
-                            <p class="text-2xl font-bold text-gray-900" id="archivedCount">0</p>
-                        </div>
-                        <i class="fas fa-archive text-3xl text-gray-400"></i>
+            <div id="archiveSection" class="section hidden ui-page-stack">
+                <header class="ui-page-header">
+                    <div class="ui-page-header__main">
+                        <p class="ui-eyebrow">Recruitment records</p>
+                        <h1 class="ui-page-title">Archive</h1>
+                        <p class="ui-page-description">Review rejected and cancelled applications retained for institutional records.</p>
                     </div>
-                </div>
+                    <div class="ui-page-header__actions ui-inline-count"><strong id="archivedCount">0</strong><span>Archived applicants</span></div>
+                </header>
 
                 <!-- Search and Filter -->
-                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
-                    <div class="flex flex-col md:flex-row gap-4">
-                        <div class="flex-1">
+                <section class="ui-filter-bar" aria-label="Archive filters">
+                    <div class="ui-filter-bar__controls">
+                        <div class="ui-filter-bar__search">
+                            <label for="archiveSearch">Search archived applicants</label>
                             <div class="relative">
                                 <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                                 <input type="text" id="archiveSearch" placeholder="Search archived applicants..." 
@@ -1676,7 +1633,8 @@ $recent_activity = $conn->query($recent_activity_query);
                                        class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                             </div>
                         </div>
-                        <div class="w-full md:w-48">
+                        <div class="ui-filter-field">
+                            <label for="archiveStatusFilter">Archive status</label>
                             <select id="archiveStatusFilter" onchange="filterArchiveByStatus(this.value)" 
                                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                                 <option value="all">All Status</option>
@@ -1685,10 +1643,11 @@ $recent_activity = $conn->query($recent_activity_query);
                             </select>
                         </div>
                     </div>
-                </div>
+                </section>
 
                 <!-- Archived Applicants Table -->
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <section class="ui-data-region">
+                    <div class="ui-data-region__header"><div><p class="ui-eyebrow">Historical records</p><h2>Archived Applications</h2></div></div>
                     <div class="overflow-x-auto">
                         <table class="w-full">
                             <thead class="bg-gray-50">
@@ -1712,25 +1671,32 @@ $recent_activity = $conn->query($recent_activity_query);
                             </tbody>
                         </table>
                     </div>
-                </div>
+                </section>
             </div>
 
             <!-- Users Section (Admin Only) -->
             <?php if ($admin_role === 'Admin'): ?>
-            <div id="usersSection" class="section hidden">
-                <div class="flex items-center justify-between mb-6">
-                    <h1 class="text-3xl font-bold text-gray-900">Users</h1>
-                    <button onclick="openCreateUserModal()" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors flex items-center gap-2">
-                        <i class="fas fa-plus"></i>
-                        Create User
-                    </button>
-                </div>
+            <div id="usersSection" class="section hidden ui-page-stack">
+                <header class="ui-page-header">
+                    <div class="ui-page-header__main">
+                        <p class="ui-eyebrow">System administration</p>
+                        <h1 class="ui-page-title">Users</h1>
+                        <p class="ui-page-description">Manage staff accounts, role assignments, departments, and access status.</p>
+                    </div>
+                    <div class="ui-page-header__actions">
+                        <button onclick="openCreateUserModal()" class="ui-button ui-button--primary" type="button">
+                            <i class="fas fa-plus"></i>
+                            Create User
+                        </button>
+                    </div>
+                </header>
 
                 <!-- Search and Filters -->
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <section class="ui-filter-bar" aria-label="User filters">
+                    <div class="ui-filter-bar__controls ui-filter-bar__controls--four">
                         <!-- Search Bar -->
-                        <div class="md:col-span-2">
+                        <div class="ui-filter-bar__search" style="grid-column: span 2;">
+                            <label for="userSearch">Search users</label>
                             <div class="relative">
                                 <input type="text" id="userSearch" placeholder="Search by name or email..." 
                                        class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -1740,7 +1706,8 @@ $recent_activity = $conn->query($recent_activity_query);
                         </div>
                         
                         <!-- Role Filter -->
-                        <div>
+                        <div class="ui-filter-field">
+                            <label for="roleFilter">Role</label>
                             <select id="roleFilter" 
                                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                                     onchange="filterUsers()">
@@ -1752,7 +1719,8 @@ $recent_activity = $conn->query($recent_activity_query);
                         </div>
                         
                         <!-- Status Filter -->
-                        <div>
+                        <div class="ui-filter-field">
+                            <label for="statusFilter">Account status</label>
                             <select id="statusFilter" 
                                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                                     onchange="filterUsers()">
@@ -1764,18 +1732,19 @@ $recent_activity = $conn->query($recent_activity_query);
                     </div>
                     
                     <!-- Results Count and Clear Button -->
-                    <div class="mt-3 flex items-center justify-between">
+                    <div class="ui-filter-bar__footer justify-between">
                         <span id="userResultsCount" class="text-sm text-gray-600">Loading...</span>
                         <button onclick="clearUserFilters()" 
-                                class="text-sm text-primary hover:text-blue-800 font-medium flex items-center gap-1">
-                            <i class="fas fa-times-circle"></i>
-                            Clear Filters
+                                class="ui-back-link" type="button">
+                            <i class="fas fa-undo-alt"></i>
+                            Reset filters
                         </button>
                     </div>
-                </div>
+                </section>
 
                 <!-- Users Table -->
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <section class="ui-data-region">
+                    <div class="ui-data-region__header"><div><p class="ui-eyebrow">Directory</p><h2>Staff Accounts</h2></div></div>
                     <div class="overflow-x-auto">
                         <table class="w-full">
                             <thead class="bg-gray-50">
@@ -1793,7 +1762,7 @@ $recent_activity = $conn->query($recent_activity_query);
                             </tbody>
                         </table>
                     </div>
-                </div>
+                </section>
             </div>
             <?php endif; ?>
     </main>
@@ -2679,137 +2648,138 @@ $recent_activity = $conn->query($recent_activity_query);
         </div>
     </div>
 
-<div id="viewJobModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
-  <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+<div id="viewJobModal" class="ui-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="viewJobModalTitle">
+  <div class="ui-modal ui-job-detail-modal">
     <!-- Header -->
-    <div class="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6 rounded-t-xl sticky top-0 z-10">
+    <header class="ui-job-detail-modal__header">
       <div class="flex items-center justify-between">
         <div class="flex-1">
-          <h2 class="text-2xl font-bold mb-2 job-title"></h2>
-          <div class="flex flex-wrap gap-4 text-sm text-blue-100">
+          <p class="ui-eyebrow">Teaching load details</p>
+          <h2 id="viewJobModalTitle" class="job-title"></h2>
+          <div class="ui-inline-meta">
             <span class="flex items-center"><i class="fas fa-building mr-2"></i><span class="job-dept"></span></span>
             <span class="flex items-center"><i class="fas fa-clock mr-2"></i><span class="job-type"></span></span>
             <span class="flex items-center"><i class="fas fa-map-marker-alt mr-2"></i><span class="job-loc"></span></span>
           </div>
         </div>
-        <button onclick="closeViewJobModal()" class="text-white hover:text-gray-200 transition-colors">
-          <i class="fas fa-times text-2xl"></i>
+        <button onclick="closeViewJobModal()" class="ui-icon-button" type="button" aria-label="Close teaching load details">
+          <i class="fas fa-times" aria-hidden="true"></i>
         </button>
       </div>
-      <div class="mt-4 flex items-center justify-between">
-        <div class="text-white text-xl font-semibold">
+      <div class="ui-job-detail-modal__headline-summary">
+        <div class="ui-job-detail-modal__salary">
           <i class="fas fa-money-check-alt mr-2"></i><span class="job-salary"></span><sup>*</sup>
           <p class="text-xs font-normal text-blue-100 mt-1">*Guide only—not the actual salary. Final compensation varies by verified profile and credentials.</p>
         </div>
-        <div class="text-right">
-          <div class="text-blue-100 text-xs font-medium">APPLICATION DEADLINE</div>
-          <div class="text-white text-lg font-bold job-deadline"></div>
+        <div class="ui-deadline">
+          <div class="ui-deadline__label">Application deadline</div>
+          <div class="ui-deadline__value job-deadline"></div>
         </div>
       </div>
-    </div>
+    </header>
     
     <!-- Content -->
-    <div class="p-6 space-y-6">
+    <div class="ui-job-detail-modal__body">
       <!-- Teaching Load Highlights -->
-      <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-5 border-l-4 border-blue-600">
+      <aside class="ui-job-summary-panel" aria-label="Teaching load summary">
         <h3 class="text-lg font-bold text-gray-900 mb-3 flex items-center">
           <i class="fas fa-star text-blue-600 mr-2"></i>Teaching Load Highlights
         </h3>
         <div class="grid grid-cols-3 gap-4">
-          <div class="bg-white rounded-lg p-3 shadow-sm">
+          <div class="ui-job-summary-item">
             <div class="text-xs text-gray-500 font-semibold mb-1">Load Type</div>
             <div class="text-gray-900 font-medium job-type-highlight"></div>
           </div>
-          <div class="bg-white rounded-lg p-3 shadow-sm">
+          <div class="ui-job-summary-item">
             <div class="text-xs text-gray-500 font-semibold mb-1">Academic Period</div>
             <div class="text-gray-900 font-medium job-loc-highlight"></div>
           </div>
-          <div class="bg-white rounded-lg p-3 shadow-sm">
+          <div class="ui-job-summary-item">
             <div class="text-xs text-gray-500 font-semibold mb-1">Department</div>
             <div class="text-gray-900 font-medium job-dept-highlight"></div>
           </div>
         </div>
-      </div>
+      </aside>
       
       <!-- Teaching Load Overview -->
-      <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <section class="ui-modal-content-section ui-job-overview">
         <h3 class="text-lg font-bold text-gray-900 mb-3 flex items-center">
           <i class="fas fa-file-alt text-blue-600 mr-2"></i>Teaching Load Overview
         </h3>
         <div class="text-gray-700 space-y-2 job-desc"></div>
-      </div>
+      </section>
       
       <!-- Duties & Responsibilities -->
-      <div id="job-duties-section" class="bg-white border border-gray-200 rounded-xl p-5" style="display: none;">
+      <section id="job-duties-section" class="ui-modal-content-section ui-job-duties-section" style="display: none;">
         <h3 class="text-lg font-bold text-gray-900 mb-3 flex items-center">
           <i class="fas fa-tasks text-blue-600 mr-2"></i>Duties & Responsibilities
         </h3>
         <div class="text-gray-700 space-y-2 job-duties"></div>
-      </div>
+      </section>
       
       <!-- Minimum Qualifications -->
-      <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <section class="ui-modal-content-section ui-job-qualifications">
         <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
           <i class="fas fa-check-circle text-blue-600 mr-2"></i>Minimum Qualifications
         </h3>
         <div class="grid grid-cols-2 gap-4 mb-4">
-          <div class="bg-gray-50 rounded-lg p-4">
+          <div class="ui-modal-definition-item">
             <div class="text-sm font-semibold text-gray-900 mb-2 flex items-center">
               <i class="fas fa-graduation-cap text-blue-600 mr-2"></i>Education
             </div>
             <div class="text-gray-700 job-education"></div>
           </div>
-          <div class="bg-gray-50 rounded-lg p-4">
+          <div class="ui-modal-definition-item">
             <div class="text-sm font-semibold text-gray-900 mb-2 flex items-center">
               <i class="fas fa-briefcase text-blue-600 mr-2"></i>Experience
             </div>
             <div class="text-gray-700 job-experience"></div>
           </div>
         </div>
-        <div class="bg-gray-50 rounded-lg p-4 mb-4">
+        <div class="ui-modal-definition-item">
           <div class="text-sm font-semibold text-gray-900 mb-2 flex items-center">
             <i class="fas fa-book text-blue-600 mr-2"></i>Training
           </div>
           <div class="text-gray-700 job-training"></div>
         </div>
-        <div class="bg-gray-50 rounded-lg p-4">
+        <div class="ui-modal-definition-item">
           <div class="text-sm font-semibold text-gray-900 mb-2 flex items-center">
             <i class="fas fa-medal text-blue-600 mr-2"></i>Eligibility
           </div>
           <div class="text-gray-700 job-eligibility"></div>
         </div>
-      </div>
+      </section>
       
       <!-- Required Documents -->
-      <div class="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-5 border-l-4 border-amber-500">
+      <aside class="ui-job-documents-panel" aria-label="Required application documents">
         <h3 class="text-lg font-bold text-amber-800 mb-3 flex items-center">
           <i class="fas fa-file-alt text-amber-600 mr-2"></i>Required Documents for Application
         </h3>
         <p class="text-sm text-amber-700 mb-3">Applicants must submit the following documents:</p>
         <div class="grid grid-cols-2 gap-2 text-sm">
-          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-check text-green-600 mr-2"></i>Application Letter</div>
-          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-check text-green-600 mr-2"></i>Updated Resume</div>
-          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-check text-green-600 mr-2"></i>Transcript of Record</div>
-          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-check text-green-600 mr-2"></i>Diploma</div>
-          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-info-circle text-blue-600 mr-2"></i>Professional License <span class="text-xs text-gray-500">(Optional)</span></div>
-          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-check text-green-600 mr-2"></i>Certificate of Employment</div>
-          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-check text-green-600 mr-2"></i>Training Certificates</div>
-          <div class="flex items-center bg-white p-2 rounded"><i class="fas fa-info-circle text-blue-600 mr-2"></i>Masteral Certificate <span class="text-xs text-gray-500">(Optional)</span></div>
+          <div class="ui-check-list-item"><i class="fas fa-check"></i>Application Letter</div>
+          <div class="ui-check-list-item"><i class="fas fa-check"></i>Updated Resume</div>
+          <div class="ui-check-list-item"><i class="fas fa-check"></i>Transcript of Record</div>
+          <div class="ui-check-list-item"><i class="fas fa-check"></i>Diploma</div>
+          <div class="ui-check-list-item ui-check-list-item--optional"><i class="fas fa-minus"></i>Professional License <span>(Optional)</span></div>
+          <div class="ui-check-list-item"><i class="fas fa-check"></i>Certificate of Employment</div>
+          <div class="ui-check-list-item"><i class="fas fa-check"></i>Training Certificates</div>
+          <div class="ui-check-list-item ui-check-list-item--optional"><i class="fas fa-minus"></i>Masteral Certificate <span>(Optional)</span></div>
         </div>
-      </div>
+      </aside>
       
       <!-- Required Competencies -->
-      <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <section class="ui-modal-content-section ui-job-competencies">
         <h3 class="text-lg font-bold text-gray-900 mb-3 flex items-center">
           <i class="fas fa-lightbulb text-blue-600 mr-2"></i>Required Competencies
         </h3>
         <div class="text-gray-700 space-y-2 job-competency"></div>
-      </div>
+      </section>
     </div>
     
     <!-- Footer -->
-    <div class="bg-gray-50 p-4 rounded-b-xl flex justify-end gap-3 sticky bottom-0">
-      <button onclick="closeViewJobModal()" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium">
+    <div class="ui-modal-footer">
+      <button onclick="closeViewJobModal()" class="ui-button ui-button--secondary" type="button">
         Close
       </button>
     </div>
@@ -3546,7 +3516,7 @@ $recent_activity = $conn->query($recent_activity_query);
             if (applicantsTable && applicants) {
                 let applicantsHtml = '';
                 applicants.forEach(applicant => {
-                    const statusInfo = getStatusBadge(applicant.status);
+                    const statusInfo = getDashboardStatusBadge(applicant.status);
                     applicantsHtml += `
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4">
@@ -3568,7 +3538,7 @@ $recent_activity = $conn->query($recent_activity_query);
         }
         
         // Get status badge styling
-        function getStatusBadge(status) {
+        function getDashboardStatusBadge(status) {
             const badges = {
                 'Approved': { class: 'bg-green-100 text-green-800', text: 'Approved' },
                 'Submitted': { class: 'bg-blue-100 text-blue-800', text: 'Submitted' },
@@ -3692,16 +3662,16 @@ $recent_activity = $conn->query($recent_activity_query);
 
     <!-- Schedule Interview Modal -->
     <div id="scheduleModal" class="fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-900">Schedule Interview</h3>
-                <button onclick="closeScheduleModal()" class="text-gray-400 hover:text-gray-600">
+        <div class="ui-modal-surface w-full max-w-md mx-4" role="dialog" aria-modal="true" aria-labelledby="scheduleModalTitle">
+            <header class="ui-modal-header">
+                <div><p class="ui-eyebrow">Interview stage</p><h3 id="scheduleModalTitle">Schedule Interview</h3><p>Select an available date, time, and campus room.</p></div>
+                <button onclick="closeScheduleModal()" class="ui-modal-close" type="button" aria-label="Close schedule interview dialog">
                     <i class="fas fa-times"></i>
                 </button>
-            </div>
+            </header>
             
             <form id="scheduleForm">
-                <div class="space-y-4">
+                <div class="ui-modal-body ui-form-stack">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
                         <input type="date" id="interviewDate" required 
@@ -3724,32 +3694,32 @@ $recent_activity = $conn->query($recent_activity_query);
                     </div>
                 </div>
                 
-                <div class="flex gap-3 mt-6">
+                <footer class="ui-modal-footer">
                     <button type="button" onclick="closeScheduleModal()" 
-                            class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                            class="ui-button ui-button--secondary">
                         Cancel
                     </button>
                     <button type="submit" 
-                            class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            class="ui-button ui-button--primary">
                         Schedule Interview
                     </button>
-                </div>
+                </footer>
             </form>
         </div>
     </div>
 
     <!-- Reschedule Interview Modal -->
     <div id="rescheduleInterviewModal" class="fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-900">Reschedule Interview</h3>
-                <button onclick="closeRescheduleInterviewModal()" class="text-gray-400 hover:text-gray-600">
+        <div class="ui-modal-surface w-full max-w-md mx-4" role="dialog" aria-modal="true" aria-labelledby="rescheduleInterviewTitle">
+            <header class="ui-modal-header">
+                <div><p class="ui-eyebrow">Interview stage</p><h3 id="rescheduleInterviewTitle">Reschedule Interview</h3><p>Set a replacement schedule and record the reason for the change.</p></div>
+                <button onclick="closeRescheduleInterviewModal()" class="ui-modal-close" type="button" aria-label="Close reschedule interview dialog">
                     <i class="fas fa-times"></i>
                 </button>
-            </div>
+            </header>
             
             <form id="rescheduleInterviewForm">
-                <div class="space-y-4">
+                <div class="ui-modal-body ui-form-stack">
                     <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
                         <p class="text-sm text-amber-800">
                             <i class="fas fa-info-circle mr-2"></i>
@@ -3779,16 +3749,16 @@ $recent_activity = $conn->query($recent_activity_query);
                     </div>
                 </div>
                 
-                <div class="flex gap-3 mt-6">
+                <footer class="ui-modal-footer">
                     <button type="button" onclick="closeRescheduleInterviewModal()" 
-                            class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                            class="ui-button ui-button--secondary">
                         Cancel
                     </button>
                     <button type="submit" 
-                            class="flex-1 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700">
+                            class="ui-button ui-button--primary">
                         Reschedule Interview
                     </button>
-                </div>
+                </footer>
             </form>
         </div>
     </div>
@@ -3947,16 +3917,16 @@ $recent_activity = $conn->query($recent_activity_query);
 
     <!-- Reject Application Modal -->
     <div id="rejectModal" class="fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-900">Reject Application</h3>
-                <button onclick="closeRejectModal()" class="text-gray-400 hover:text-gray-600">
+        <div class="ui-modal-surface w-full max-w-md mx-4" role="dialog" aria-modal="true" aria-labelledby="rejectModalTitle">
+            <header class="ui-modal-header">
+                <div><p class="ui-eyebrow">Final decision</p><h3 id="rejectModalTitle">Reject Application</h3><p>Provide a clear reason that will be recorded with this application.</p></div>
+                <button onclick="closeRejectModal()" class="ui-modal-close" type="button" aria-label="Close reject application dialog">
                     <i class="fas fa-times"></i>
                 </button>
-            </div>
+            </header>
             
             <form id="rejectForm">
-                <div class="space-y-4">
+                <div class="ui-modal-body ui-form-stack">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Reason for Rejection</label>
                         <textarea id="rejectionReason" rows="4" required
@@ -3965,16 +3935,16 @@ $recent_activity = $conn->query($recent_activity_query);
                     </div>
                 </div>
                 
-                <div class="flex gap-3 mt-6">
+                <footer class="ui-modal-footer">
                     <button type="button" onclick="closeRejectModal()" 
-                            class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                            class="ui-button ui-button--secondary">
                         Cancel
                     </button>
                     <button type="submit" 
-                            class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                            class="ui-button ui-button--danger">
                         Reject Application
                     </button>
-                </div>
+                </footer>
             </form>
         </div>
     </div>

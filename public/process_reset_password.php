@@ -5,8 +5,9 @@
 <meta charset="UTF-8" />
 <title>Forgot Password - NCHire</title>
 <link href="https://cdn.tailwindcss.com" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/institutional-ui.css">
 </head>
-<body class="bg-gray-50 flex items-center justify-center min-h-screen">
+<body class="gt-app gt-auth-shell bg-gray-50 flex items-center justify-center min-h-screen">
   <div class="bg-white p-8 rounded shadow-md w-full max-w-md">
     <h2 class="text-2xl font-bold mb-6 text-center text-primary">Forgot Password</h2>
 
