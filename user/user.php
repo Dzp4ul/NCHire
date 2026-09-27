@@ -200,17 +200,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         
         // Set error handler for AJAX to return JSON
         set_error_handler(function($errno, $errstr, $errfile, $errline) {
+            error_log("Application submission error: {$errstr} in {$errfile}:{$errline}");
             while (ob_get_level()) ob_end_clean();
             header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => "PHP Error: $errstr in $errfile on line $errline"]);
+            echo json_encode(['success' => false, 'error' => 'Unable to process the application. Please try again.']);
             exit();
         });
         
         // Set exception handler for AJAX
         set_exception_handler(function($exception) {
+            error_log('Application submission exception: ' . $exception->getMessage());
             while (ob_get_level()) ob_end_clean();
             header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Exception: ' . $exception->getMessage()]);
+            echo json_encode(['success' => false, 'error' => 'Unable to process the application. Please try again.']);
             exit();
         });
         
@@ -455,7 +457,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
     
     // Get draft documents from database
     $draft_docs = null;
-    $draft_stmt = $conn->prepare("SELECT application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, certificate_of_grades, proof_of_enrollment, letter_of_intent FROM user_draft_documents WHERE user_id = ?");
+    $draft_stmt = $conn->prepare("SELECT application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, certificate_of_grades, proof_of_enrollment, faculty_evaluation, letter_of_intent FROM user_draft_documents WHERE user_id = ?");
     $draft_stmt->bind_param("i", $user_id);
     $draft_stmt->execute();
     $draft_result = $draft_stmt->get_result();
@@ -609,6 +611,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         $proof_of_enrollment = copyDraftFile($draft_docs['proof_of_enrollment'], $user_id, $uploadDir);
     }
 
+    // Faculty Evaluation is optional and primarily used for renewal applications.
+    $faculty_evaluation = uploadFile('faculty_evaluation', $uploadDir);
+    if (!$faculty_evaluation && isset($_POST['existing_faculty_evaluation']) && !empty($_POST['existing_faculty_evaluation']) && $draft_docs && !empty($draft_docs['faculty_evaluation'])) {
+        $faculty_evaluation = copyDraftFile($draft_docs['faculty_evaluation'], $user_id, $uploadDir);
+    }
+    if (!$faculty_evaluation && isset($_FILES['faculty_evaluation']) && !empty($_FILES['faculty_evaluation']['name'])) {
+        $upload_errors[] = 'Faculty Evaluation upload failed';
+    }
+
     $letter_of_intent = uploadFile('letter_of_intent', $uploadDir);
     error_log("Letter of Intent upload result: " . ($letter_of_intent ?? 'NULL'));
     // Only use draft if explicitly loaded
@@ -632,6 +643,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         'masteral_cert' => $masteral_cert,
         'certificate_of_grades' => $certificate_of_grades,
         'proof_of_enrollment' => $proof_of_enrollment,
+        'faculty_evaluation' => $faculty_evaluation,
     ];
 
     // A normal new load/semester application may reuse valid files from any
@@ -864,7 +876,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         error_log("RESUBMISSION DETECTED: App ID = $resubmit_app_id, User ID = $user_id");
         
         // First, get the existing file data and job_id
-        $existing_stmt = $conn->prepare("SELECT job_id, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, certificate_of_grades, proof_of_enrollment, letter_of_intent FROM job_applicants WHERE id = ? AND user_id = ?");
+        $existing_stmt = $conn->prepare("SELECT job_id, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, certificate_of_grades, proof_of_enrollment, faculty_evaluation, letter_of_intent FROM job_applicants WHERE id = ? AND user_id = ?");
         $existing_stmt->bind_param("ii", $resubmit_app_id, $user_id);
         $existing_stmt->execute();
         $existing_result = $existing_stmt->get_result();
@@ -895,6 +907,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
             $masteral_cert = $masteral_cert ?: $existing_data['masteral_cert'];
             $certificate_of_grades = $certificate_of_grades ?: ($existing_data['certificate_of_grades'] ?? null);
             $proof_of_enrollment = $proof_of_enrollment ?: ($existing_data['proof_of_enrollment'] ?? null);
+            $faculty_evaluation = $faculty_evaluation ?: ($existing_data['faculty_evaluation'] ?? null);
             $letter_of_intent = $letter_of_intent ?: ($existing_data['letter_of_intent'] ?? null);
 
             if ($master_status['requires_ongoing_documents'] && (!$certificate_of_grades || !$proof_of_enrollment)) {
@@ -929,15 +942,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
                 masteral_cert = ?,
                 certificate_of_grades = ?,
                 proof_of_enrollment = ?,
+                faculty_evaluation = ?,
                 letter_of_intent = ?,
                 status = 'Resubmitted',
                 resubmission_documents = NULL,
                 resubmission_notes = NULL
                 WHERE id = ? AND user_id = ?");
             
-            $update_stmt->bind_param("sssssssssssii", 
+            $update_stmt->bind_param("ssssssssssssii",
                 $application_letter, $resume, $tor, $diploma, 
-                $professional_license, $coe, $seminars_trainings, $masteral_cert, $certificate_of_grades, $proof_of_enrollment, $letter_of_intent,
+                $professional_license, $coe, $seminars_trainings, $masteral_cert, $certificate_of_grades, $proof_of_enrollment, $faculty_evaluation, $letter_of_intent,
                 $resubmit_app_id, $user_id);
             
             if ($update_stmt->execute()) {
@@ -1011,7 +1025,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
                     header('Content-Type: application/json');
                     echo json_encode([
                         'success' => false,
-                        'error' => 'Database error: ' . $update_stmt->error,
+                        'error' => 'Unable to update the application. Please try again.',
                         'message' => 'Failed to update application. Please try again.'
                     ]);
                     exit();
@@ -1064,16 +1078,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         $workflow_stage = 'secretary_review';
         $stmt = $conn->prepare("INSERT INTO job_applicants 
             (applicant_name, position, applied_date, status, workflow_stage, full_name, applicant_email, contact_num, user_id, job_id, assigned_to_department,
-             application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, letter_of_intent) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+             application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, faculty_evaluation, letter_of_intent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         
         // Files are already filenames (not full paths) from uploadFile function
         // Types: s=string, i=integer (20 params: 8s + 2i + 1s + 9s = 18s + 2i)
         // FIXED: assigned_to_department is STRING not integer!
-        $stmt->bind_param("ssssssssiissssssssss", 
+        $stmt->bind_param("ssssssssiisssssssssss",
             $applicant_name, $position, $applied_date, $status, $workflow_stage, $full_name, $applicant_email, $contact_num, 
             $user_id, $job_id, $job_department, $application_letter, $resume, $tor, $diploma, 
-            $professional_license, $coe, $seminars_trainings, $masteral_cert, $letter_of_intent);
+            $professional_license, $coe, $seminars_trainings, $masteral_cert, $faculty_evaluation, $letter_of_intent);
 
         if ($stmt->execute()) {
         // Success - Get the application ID
@@ -1105,6 +1119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
             'masteral_cert' => $masteral_cert,
             'certificate_of_grades' => $certificate_of_grades,
             'proof_of_enrollment' => $proof_of_enrollment,
+            'faculty_evaluation' => $faculty_evaluation,
         ];
         foreach ($active_document_values as $field => $fileName) {
             if (empty($fileName)) {
@@ -1168,7 +1183,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
                 header('Content-Type: application/json');
                 echo json_encode([
                     'success' => false,
-                    'error' => 'Database error: ' . $conn->error,
+                    'error' => 'Unable to save the application. Please try again.',
                     'message' => 'Failed to save application. Please try again.'
                 ]);
                 exit();
@@ -1183,7 +1198,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
                 errorNotification.innerHTML = `
                     <div class='flex items-center'>
                         <i class='ri-error-warning-line mr-2'></i>
-                        <span>Error saving application: " . addslashes($conn->error) . "</span>
+                        <span>Unable to save the application. Please try again.</span>
                     </div>
                 `;
                 document.body.appendChild(errorNotification);
@@ -2113,9 +2128,9 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                 <!-- Step 1: Submit Requirements -->
                 <section id="step1" class="wizard-step">
                     <header class="ui-wizard-step-header">
-                        <p class="ui-eyebrow">Application documents</p>
-                        <h2 class="text-lg font-bold text-gray-900 mb-2">Submit Requirements</h2>
-                        <p class="text-gray-600 mb-4">Upload your required documents. Accepted formats: PDF, DOC, DOCX, JPG, PNG. Maximum size: 5MB per file.</p>
+                        <p class="ui-eyebrow">Step 1 &middot; Requirements</p>
+                        <h2 class="text-lg font-bold text-gray-900 mb-2">Application Requirements</h2>
+                        <p class="text-gray-600 mb-4">Upload the required documents for your application. Files marked with <span class="text-red-600" aria-hidden="true">*</span> are required.</p>
                     </header>
                     
                     <form id="requirementsForm" class="space-y-4" method="POST" enctype="multipart/form-data" novalidate>
@@ -2156,171 +2171,81 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                         </div>
 
                         <!-- Document Requirements -->
-                        <section class="ui-wizard-documents bg-white rounded-lg border border-gray-200 shadow-sm">
-                            <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 rounded-t-lg">
-                                <div class="flex items-center">
-                                    <i class="ri-file-text-line text-lg mr-2"></i>
-                                    <div>
-                                        <h3 class="text-lg font-semibold">Required Documents</h3>
-                                        <p class="text-blue-100 text-xs mt-1">Please upload all required documents below</p>
-                                    </div>
+                        <section class="ui-wizard-documents" aria-labelledby="requirementsDocumentsTitle">
+                            <div class="ui-requirements-intro">
+                                <div>
+                                    <h3 id="requirementsDocumentsTitle">Document checklist</h3>
+                                    <p>Upload clear, readable copies. Existing active documents can be reused for renewal applications.</p>
+                                </div>
+                                <div class="ui-requirements-info" aria-label="File requirements">
+                                    <span><i class="ri-file-type-line"></i> PDF, DOC, DOCX, JPG, PNG</span>
+                                    <span><i class="ri-hard-drive-2-line"></i> Maximum 5 MB per file</span>
+                                    <span><i class="ri-asterisk"></i> Required documents marked with *</span>
+                                    <span><i class="ri-eye-line"></i> Files must be clear and readable</span>
                                 </div>
                             </div>
-                            
-                            <div class="p-4 space-y-4">
-                                <!-- File Requirements Notice -->
-                                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                                    <div class="flex items-start">
-                                        <i class="ri-information-line text-amber-600 text-base mr-2 mt-0.5"></i>
-                                        <div class="text-sm text-amber-800">
-                                            <p class="font-semibold mb-1">File Requirements:</p>
-                                            <ul class="list-disc list-inside space-y-0.5 text-xs">
-                                                <li>Accepted formats: PDF, DOC, DOCX, JPG, PNG</li>
-                                                <li>Maximum file size: 5MB per file</li>
-                                                <li>Files marked with <span class="text-red-500">*</span> are required</li>
-                                                <li>Ensure documents are clear and readable</li>
-                                            </ul>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Primary Documents -->
-                                <div class="grid md:grid-cols-2 gap-6">
-                                    <div class="space-y-2">
-                                        <label class="block text-sm font-semibold text-gray-700">
-                                            <i class="ri-file-text-line mr-2 text-blue-600"></i>Application Letter <span class="text-red-500">*</span>
-                                        </label>
-                                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-blue-400 transition-colors">
-                                            <input type="file" name="applicationLetter" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required
-                                                   class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="space-y-2">
-                                        <label class="block text-sm font-semibold text-gray-700">
-                                            <i class="ri-file-text-line mr-2 text-blue-600"></i>Updated and Comprehensive Resume<span class="text-red-500">*</span>
-                                        </label>
-                                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-blue-400 transition-colors">
-                                            <input type="file" name="resume_file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required
-                                                   class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="space-y-2">
-                                        <label class="block text-sm font-semibold text-gray-700">
-                                            <i class="ri-file-text-line mr-2 text-blue-600"></i>Letter of Intent <span class="text-red-500">*</span>
-                                        </label>
-                                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-blue-400 transition-colors">
-                                            <input type="file" name="letter_of_intent" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required
-                                                   class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                                        </div>
-                                    </div>
-                                </div>
 
-                                <!-- Educational Documents -->
-                                <div class="border-t pt-3">
-                                    <h4 class="text-base font-semibold text-gray-800 mb-3">Educational Documents</h4>
-                                    <div class="grid md:grid-cols-2 gap-4">
-                                        <div class="space-y-2">
-                                            <label class="block text-sm font-semibold text-gray-700">
-                                                <i class="ri-file-text-line mr-2 text-blue-600"></i>Transcript of Records (TOR) <span class="text-red-500">*</span>
-                                            </label>
-                                            <div class="border-2 border-dashed border-gray-300 rounded-lg p-3 hover:border-blue-400 transition-colors">
-                                                <input type="file" name="transcript" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required
-                                                       class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="space-y-2">
-                                            <label class="block text-sm font-semibold text-gray-700">
-                                                <i class="ri-file-text-line mr-2 text-blue-600"></i>Diploma <span class="text-red-500">*</span>
-                                            </label>
-                                            <div class="border-2 border-dashed border-gray-300 rounded-lg p-3 hover:border-blue-400 transition-colors">
-                                                <input type="file" name="diploma" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required
-                                                       class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                                            </div>
-                                        </div>
+                            <div class="ui-document-sections">
+                                <?php
+                                $documentDefinitions = nc_application_document_definitions();
+                                $documentSections = [
+                                    'application' => ['title' => 'Application Documents', 'description' => 'Core documents that introduce your application.'],
+                                    'education' => ['title' => 'Educational Documents', 'description' => 'Records that confirm your academic qualifications.'],
+                                    'professional' => ['title' => 'Professional Documents', 'description' => 'Employment, license, and training credentials.'],
+                                    'optional' => ['title' => 'Optional / Renewal Documents', 'description' => 'Supporting records for applicable qualifications and renewal applications.'],
+                                ];
+                                foreach ($documentSections as $category => $section):
+                                    $categoryDocuments = array_filter(
+                                        $documentDefinitions,
+                                        static fn(array $document): bool => ($document['category'] ?? '') === $category
+                                    );
+                                ?>
+                                <section class="ui-document-section border-t pt-3" data-document-category="<?= htmlspecialchars($category) ?>">
+                                    <div class="ui-document-section__header">
+                                        <h4><?= htmlspecialchars($section['title']) ?></h4>
+                                        <p><?= htmlspecialchars($section['description']) ?></p>
                                     </div>
-                                </div>
-
-                                <!-- Professional Documents -->
-                                <div class="border-t pt-3">
-                                    <h4 class="text-base font-semibold text-gray-800 mb-3">Professional Documents</h4>
-                                    <div class="grid md:grid-cols-2 gap-4">
-                                        <div class="space-y-2">
-                                            <label class="block text-sm font-semibold text-gray-700">
-                                                <i class="ri-file-text-line mr-2 text-blue-600"></i>Professional License <span class="text-green-600">(Optional)</span>
-                                            </label>
-                                            <div class="border-2 border-dashed border-gray-300 rounded-lg p-3 hover:border-blue-400 transition-colors">
-                                                <input type="file" name="license" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                                       class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                    <div class="ui-document-grid">
+                                        <?php foreach ($categoryDocuments as $field => $document):
+                                            $isRequired = !empty($document['required']);
+                                            $isRenewalOnly = !empty($document['renewal_only']);
+                                            $inputName = $document['input'];
+                                            $label = $document['display_label'] ?? $document['label'];
+                                            $badge = $isRequired ? 'Required' : ($isRenewalOnly ? 'Optional &bull; Renewal' : (!empty($document['conditional']) ? 'Conditional' : 'Optional'));
+                                            $helper = $document['helper_text'] ?? ($document['conditional'] ?? ($isRequired ? 'Required document' : 'Optional supporting document'));
+                                        ?>
+                                        <article class="space-y-2 ui-document-card<?= $isRenewalOnly ? ' renewal-only-document hidden' : '' ?>" data-document-field="<?= htmlspecialchars($field) ?>" data-required="<?= $isRequired ? 'true' : 'false' ?>">
+                                            <div class="ui-document-card__heading">
+                                                <span class="ui-document-card__icon" aria-hidden="true"><i class="ri-file-text-line"></i></span>
+                                                <div class="ui-document-card__title">
+                                                    <label for="document_<?= htmlspecialchars($field) ?>">
+                                                        <?= htmlspecialchars($label) ?><?php if ($isRequired): ?> <span class="ui-required-mark" aria-label="required">*</span><?php endif; ?>
+                                                    </label>
+                                                    <span class="ui-document-badge <?= $isRequired ? 'is-required' : ($isRenewalOnly ? 'is-renewal' : 'is-optional') ?>"><?= $badge ?></span>
+                                                </div>
                                             </div>
-                                        </div>
-                                        
-                                        <div class="space-y-2">
-                                            <label class="block text-sm font-semibold text-gray-700">
-                                                <i class="ri-file-text-line mr-2 text-blue-600"></i>Certificate of Employment (COE) <span class="text-red-500">*</span>
-                                            </label>
-                                            <div class="border-2 border-dashed border-gray-300 rounded-lg p-3 hover:border-blue-400 transition-colors">
-                                                <input type="file" name="coe" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required
-                                                       class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                            <p class="ui-document-card__helper"><?= htmlspecialchars($helper) ?></p>
+                                            <div class="border-dashed ui-document-upload">
+                                                <input id="document_<?= htmlspecialchars($field) ?>" type="file" name="<?= htmlspecialchars($inputName) ?>" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"<?= !empty($document['multiple']) ? ' multiple' : '' ?><?= $isRequired ? ' required' : '' ?>
+                                                       class="ui-document-file-input">
+                                                <p class="ui-document-upload__hint"><i class="ri-upload-cloud-2-line"></i> Choose file<?= !empty($document['multiple']) ? 's' : '' ?> &middot; Maximum 5 MB each</p>
+                                                <p class="ui-document-inline-error hidden" role="alert"></p>
                                             </div>
-                                        </div>
+                                        </article>
+                                        <?php endforeach; ?>
                                     </div>
-                                </div>
-
-                                <!-- Additional Certificates -->
-                                <div class="border-t pt-3">
-                                    <h4 class="text-base font-semibold text-gray-800 mb-3">Additional Certificates</h4>
-                                    <div class="space-y-2">
-                                        <label class="block text-sm font-semibold text-gray-700">
-                                            <i class="ri-file-text-line mr-2 text-blue-600"></i>Seminars/Trainings Certificates <span class="text-red-500">*</span>
-                                        </label>
-                                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-3 hover:border-blue-400 transition-colors">
-                                            <input type="file" name="certificates[]" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required
-                                                   class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                                        </div>
-                                        <p class="text-xs text-gray-500 mt-1">You can select multiple files at once. Hold Ctrl/Cmd to select multiple files.</p>
-                                    </div>
-                                    
-                                    <!-- Masteral Certificate (Optional) -->
-                                    <div class="space-y-2 mt-4">
-                                        <label class="block text-sm font-semibold text-gray-700">
-                                            <i class="ri-file-text-line mr-2 text-blue-600"></i>Masteral Certificate <span class="text-green-600">(Optional)</span>
-                                        </label>
-                                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-3 hover:border-blue-400 transition-colors">
-                                            <input type="file" name="masteral_cert" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                                   class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                                        </div>
-                                        <p class="text-xs text-gray-500 mt-1">If you have a master's degree, upload your certificate here.</p>
-                                    </div>
-                                    <div class="grid md:grid-cols-2 gap-4 mt-4">
-                                        <div class="space-y-2">
-                                            <label class="block text-sm font-semibold text-gray-700">
-                                                <i class="ri-file-text-line mr-2 text-blue-600"></i>Certificate of Grades <span class="text-amber-600">(Required if master's is ongoing)</span>
-                                            </label>
-                                            <div class="border-2 border-dashed border-gray-300 rounded-lg p-3 hover:border-blue-400 transition-colors">
-                                                <input type="file" name="certificate_of_grades" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                                       class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                                            </div>
-                                        </div>
-                                        <div class="space-y-2">
-                                            <label class="block text-sm font-semibold text-gray-700">
-                                                <i class="ri-file-text-line mr-2 text-blue-600"></i>Proof of Enrollment <span class="text-amber-600">(Required if master's is ongoing)</span>
-                                            </label>
-                                            <div class="border-2 border-dashed border-gray-300 rounded-lg p-3 hover:border-blue-400 transition-colors">
-                                                <input type="file" name="proof_of_enrollment" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                                       class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                </section>
+                                <?php endforeach; ?>
                             </div>
                         </section>
 
                         <!-- Form Actions -->
-                        <div class="ui-wizard-actions flex justify-between items-center pt-6 border-t">
-                            <div class="flex gap-3">
+                        <div class="ui-wizard-actions ui-requirements-actions flex justify-between items-center pt-6 border-t">
+                            <div id="requiredDocumentsStatus" class="ui-required-status" role="status" aria-live="polite">
+                                <i class="ri-information-line"></i>
+                                <span>Checking required documents&hellip;</span>
+                            </div>
+                            <div class="ui-requirements-action-buttons flex gap-3">
                                 <button type="button" id="saveDraftBtn" class="flex items-center px-6 py-3 border-2 border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors font-semibold">
                                     <i class="ri-save-line mr-2"></i>Save Draft
                                 </button>
@@ -2328,7 +2253,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                                     <i class="ri-send-plane-line mr-2"></i>Submit Application
                                 </button>
                             </div>
-                            <button type="button" id="step1NextBtn" onclick="setStep(2)" class="hidden flex items-center px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 to-blue-800 transition-all shadow-lg font-semibold">
+                            <button type="button" id="step1NextBtn" onclick="setStep(2)" class="hidden flex items-center px-8 py-3 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors font-semibold">
                                 Next <i class="ri-arrow-right-line ml-2"></i>
                             </button>
                         </div>
@@ -2953,7 +2878,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 'seminars_trainings': { name: 'certificates[]', label: 'Seminars/Trainings' },
                 'masteral_cert': { name: 'masteral_cert', label: 'Masteral Certificate' },
                 'certificate_of_grades': { name: 'certificate_of_grades', label: 'Certificate of Grades' },
-                'proof_of_enrollment': { name: 'proof_of_enrollment', label: 'Proof of Enrollment' }
+                'proof_of_enrollment': { name: 'proof_of_enrollment', label: 'Proof of Enrollment' },
+                'faculty_evaluation': { name: 'faculty_evaluation', label: 'Faculty Evaluation' }
               };
               
               Object.keys(docMap).forEach(dbField => {
@@ -3007,10 +2933,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div class="flex-1 min-w-0">
                               <div class="font-semibold text-green-900 text-sm">Saved Draft - Ready to Use</div>
                               ${filenames.map(filename => {
-                                const displayName = filename.replace(/^draft_\d+_\d+_/, '');
+                                const displayName = getDocumentFileDisplay(filename);
                                 return `<div class="text-sm text-green-700 mt-1 flex items-center gap-1">
                                   <i class="ri-file-text-fill flex-shrink-0"></i>
-                                  <span class="break-all">${displayName}</span>
+                                  <span class="break-all" title="${escapeDocumentHtml(displayName.title)}">${escapeDocumentHtml(displayName.label)}</span>
                                 </div>`;
                               }).join('')}
                               <div class="mt-2 text-xs text-green-600">
@@ -3064,7 +2990,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   // Show file input again
                   if (input) {
                     input.removeAttribute('style');
-                    input.setAttribute('required', 'required');
+                    input.required = isApplicationDocumentRequired(field);
                     input.removeAttribute('data-draft-available');
                     input.removeAttribute('data-draft-files');
                   }
@@ -3895,6 +3821,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (rf_cellphone) rf_cellphone.value = app.contact_num || '';
         const rf_application_type = document.getElementById('rf_application_type');
         if (rf_application_type) rf_application_type.value = app.application_type || 'new';
+        syncRenewalDocumentVisibility(app.application_type || 'new');
         
         console.log('? Step 2 job info populated - job_id:', app.job_id);
       }, 200);
@@ -3915,7 +3842,8 @@ document.addEventListener('DOMContentLoaded', function() {
               'seminars_trainings': 'Seminars/Training Certificates',
               'masteral_cert': 'Masteral Certificate',
               'certificate_of_grades': 'Certificate of Grades',
-              'proof_of_enrollment': 'Proof of Enrollment'
+              'proof_of_enrollment': 'Proof of Enrollment',
+              'faculty_evaluation': 'Faculty Evaluation'
             };
             
             const requestedDocsList = resubmissionDocs.map(doc => 
@@ -4249,7 +4177,8 @@ document.addEventListener('DOMContentLoaded', function() {
           'certificates[]': 'seminars_trainings',
           'masteral_cert': 'masteral_cert',
           'certificate_of_grades': 'certificate_of_grades',
-          'proof_of_enrollment': 'proof_of_enrollment'
+          'proof_of_enrollment': 'proof_of_enrollment',
+          'faculty_evaluation': 'faculty_evaluation'
         };
         
         const documentField = docInputMap[inputName];
@@ -4344,8 +4273,8 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
     
-    // Remove all uploaded file indicators (green boxes showing "Uploaded: filename")
-    wizard.querySelectorAll('.border-dashed .bg-green-50').forEach(indicator => {
+    // Remove generated submitted-file states before returning to edit mode.
+    wizard.querySelectorAll('.approved-file, .resubmission-file-notice, .border-dashed .bg-green-50').forEach(indicator => {
       indicator.remove();
     });
     
@@ -4765,6 +4694,99 @@ document.addEventListener('DOMContentLoaded', function() {
       .replace(/'/g, '&#039;');
   }
 
+  const applicationDocumentInputMap = {
+    application_letter: 'applicationLetter',
+    resume: 'resume_file',
+    letter_of_intent: 'letter_of_intent',
+    tor: 'transcript',
+    diploma: 'diploma',
+    professional_license: 'license',
+    coe: 'coe',
+    seminars_trainings: 'certificates[]',
+    masteral_cert: 'masteral_cert',
+    certificate_of_grades: 'certificate_of_grades',
+    proof_of_enrollment: 'proof_of_enrollment',
+    faculty_evaluation: 'faculty_evaluation'
+  };
+
+  function requiresOngoingGraduateDocuments() {
+    return initialEducation.some(education =>
+      String(education.education_level || '').toLowerCase() === 'master' &&
+      String(education.education_status || '').toLowerCase() === 'ongoing'
+    );
+  }
+
+  function isApplicationDocumentRequired(field) {
+    const baseRequired = [
+      'application_letter', 'resume', 'letter_of_intent', 'tor',
+      'diploma', 'coe', 'seminars_trainings'
+    ];
+    return baseRequired.includes(field) || (
+      requiresOngoingGraduateDocuments() && ['certificate_of_grades', 'proof_of_enrollment'].includes(field)
+    );
+  }
+
+  function syncRenewalDocumentVisibility(applicationType) {
+    const isRenewal = String(applicationType || '').toLowerCase() === 'renewing';
+    document.querySelectorAll('#step1 .renewal-only-document').forEach(card => {
+      card.classList.toggle('hidden', !isRenewal);
+      card.setAttribute('aria-hidden', isRenewal ? 'false' : 'true');
+      const input = card.querySelector('input[type="file"]');
+      if (input && !isRenewal) input.value = '';
+    });
+  }
+
+  function setDocumentInlineError(input, message = '') {
+    const error = input?.closest('.ui-document-upload')?.querySelector('.ui-document-inline-error');
+    if (!error) return;
+    error.textContent = message;
+    error.classList.toggle('hidden', !message);
+    input?.closest('.ui-document-card')?.classList.toggle('has-error', Boolean(message));
+  }
+
+  function getDocumentFileDisplay(fileValue, multiple = false) {
+    const rawNames = multiple ? String(fileValue || '').split(',') : [String(fileValue || '')];
+    const names = rawNames.map(fileName => {
+      const baseName = fileName.trim().split(/[\\/]/).pop() || '';
+      return baseName
+        .replace(/^draft_\d+_\d+_(?:\d+_)?(?:[a-f0-9]{12}_)?/i, '')
+        .replace(/^\d+_[a-f0-9]{12}_(?:\d+_)?/i, '');
+    }).filter(Boolean);
+    return {
+      label: names.length > 1 ? `${names.length} files uploaded` : (names[0] || 'Document uploaded'),
+      title: names.join(', ')
+    };
+  }
+
+  function documentInputHasValue(input) {
+    if (!input) return false;
+    const fieldName = String(input.name || '').replace('[]', '');
+    const existingInput = document.querySelector(`#requirementsForm input[name="existing_${fieldName}"]`);
+    const container = input.closest('.ui-document-upload');
+    return Boolean(
+      (input.files && input.files.length) ||
+      (existingInput && existingInput.value) ||
+      input.dataset.reusableFile ||
+      container?.querySelector('.approved-file, .reusable-document-display, .draft-file-display')
+    );
+  }
+
+  function updateRequiredDocumentsStatus() {
+    const status = document.getElementById('requiredDocumentsStatus');
+    if (!status) return;
+    let missingCount = 0;
+    Object.entries(applicationDocumentInputMap).forEach(([field, inputName]) => {
+      if (!isApplicationDocumentRequired(field)) return;
+      const input = document.querySelector(`#requirementsForm input[name="${inputName}"]`);
+      if (!documentInputHasValue(input)) missingCount++;
+    });
+    status.classList.toggle('is-complete', missingCount === 0);
+    status.innerHTML = missingCount === 0
+      ? '<i class="ri-checkbox-circle-line"></i><span>All required documents uploaded</span>'
+      : `<i class="ri-information-line"></i><span>${missingCount} required document${missingCount === 1 ? '' : 's'} remaining</span>`;
+  }
+  window.updateRequiredDocumentsStatus = updateRequiredDocumentsStatus;
+
   async function loadReusableDocumentsForRenewal() {
     const loadKey = String(context.jobId || 'new');
     if (window._reusableDocumentsLoadKey === loadKey || window._loadingReusableDocuments) {
@@ -4785,6 +4807,7 @@ document.addEventListener('DOMContentLoaded', function() {
       window._reusableDocumentsLoadKey = loadKey;
       const isExisting = Boolean(data.is_existing_applicant);
       if (categoryInput) categoryInput.value = isExisting ? 'renewing' : 'new';
+      syncRenewalDocumentVisibility(isExisting ? 'renewing' : 'new');
       if (categoryDisplay) {
         categoryDisplay.innerHTML = isExisting
           ? '<i class="ri-user-follow-line text-emerald-600 text-lg"></i><span><strong>Existing / Renewing Applicant</strong> &mdash; determined from your NCHire application history</span>'
@@ -4808,10 +4831,12 @@ document.addEventListener('DOMContentLoaded', function() {
         input.style.display = 'none';
 
         const files = (documentInfo.files || []).map(fileName => {
-          const safeName = escapeDocumentHtml(fileName);
+          const fileDisplay = getDocumentFileDisplay(fileName);
+          const safeName = escapeDocumentHtml(fileDisplay.label);
+          const safeTitle = escapeDocumentHtml(fileDisplay.title);
           const relativePath = String(fileName).replace(/^uploads[\\/]/, '').split(/[\\/]/).map(encodeURIComponent).join('/');
           const safeUrl = `uploads/${relativePath}`;
-          return `<a href="${safeUrl}" target="_blank" rel="noopener" class="text-emerald-700 hover:underline break-all"><i class="ri-file-text-line mr-1"></i>${safeName}</a>`;
+          return `<a href="${safeUrl}" target="_blank" rel="noopener" title="${safeTitle}" class="text-emerald-700 hover:underline"><i class="ri-file-text-line mr-1"></i>${safeName}</a>`;
         }).join('<br>');
         const currentDisplay = document.createElement('div');
         currentDisplay.className = 'reusable-document-display mb-3 p-3 bg-emerald-50 border border-emerald-300 rounded-lg';
@@ -4833,6 +4858,7 @@ document.addEventListener('DOMContentLoaded', function() {
           input.click();
         });
       });
+      updateRequiredDocumentsStatus();
 
       if (notice) {
         if (isExisting) {
@@ -4861,6 +4887,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     } finally {
       window._loadingReusableDocuments = false;
+      updateRequiredDocumentsStatus();
     }
   }
 
@@ -4914,6 +4941,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const categoryDisplay = document.getElementById('applicantCategoryDisplay');
     const existingDocumentNotice = document.getElementById('existingDocumentNotice');
     if (categoryInput) categoryInput.value = 'new';
+    syncRenewalDocumentVisibility('new');
     if (categoryDisplay) categoryDisplay.innerHTML = '<i class="ri-loader-4-line animate-spin text-blue-600"></i><span>Checking your application history...</span>';
     if (existingDocumentNotice) {
       existingDocumentNotice.classList.add('hidden');
@@ -4962,8 +4990,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Clear all file upload indicators and reset containers
     document.querySelectorAll('#step1 .border-dashed').forEach(container => {
-      // Remove warning messages
-      container.querySelectorAll('.bg-orange-100, .bg-green-50').forEach(msg => msg.remove());
+      // Remove warning messages and generated submitted-file states.
+      container.querySelectorAll('.approved-file, .resubmission-file-notice, .bg-orange-100, .bg-green-50').forEach(msg => msg.remove());
       // Reset border colors
       container.classList.remove('border-orange-400', 'bg-orange-50', 'border-green-400', 'border-green-500', 'bg-green-50');
       container.classList.add('border-gray-300');
@@ -5185,7 +5213,8 @@ document.addEventListener('DOMContentLoaded', function() {
           'seminars_trainings': { name: 'certificates[]', label: 'Seminars/Trainings' },
           'masteral_cert': { name: 'masteral_cert', label: 'Masteral Certificate' },
           'certificate_of_grades': { name: 'certificate_of_grades', label: 'Certificate of Grades' },
-          'proof_of_enrollment': { name: 'proof_of_enrollment', label: 'Proof of Enrollment' }
+          'proof_of_enrollment': { name: 'proof_of_enrollment', label: 'Proof of Enrollment' },
+          'faculty_evaluation': { name: 'faculty_evaluation', label: 'Faculty Evaluation' }
         };
         
         Object.keys(docMap).forEach(dbField => {
@@ -5239,10 +5268,10 @@ document.addEventListener('DOMContentLoaded', function() {
                       <div class="flex-1 min-w-0">
                         <div class="font-semibold text-green-900 text-sm">Saved Draft - Ready to Use</div>
                         ${filenames.map(filename => {
-                          const displayName = filename.replace(/^draft_\d+_\d+_/, '');
+                          const displayName = getDocumentFileDisplay(filename);
                           return `<div class="text-sm text-green-700 mt-1 flex items-center gap-1">
                             <i class="ri-file-text-fill flex-shrink-0"></i>
-                            <span class="break-all">${displayName}</span>
+                            <span class="break-all" title="${escapeDocumentHtml(displayName.title)}">${escapeDocumentHtml(displayName.label)}</span>
                           </div>`;
                         }).join('')}
                         <div class="mt-2 text-xs text-green-600">
@@ -5287,15 +5316,13 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (input) {
               input.removeAttribute('style');
-              // Only add required for non-optional fields
-              if (!['license', 'masteral_cert'].includes(field)) {
-                input.setAttribute('required', 'required');
-              }
+              input.required = isApplicationDocumentRequired(field);
               input.removeAttribute('data-draft-available');
               input.removeAttribute('data-draft-files');
             }
             
             showToast('Draft removed. Please upload a new file.', 'warning');
+            updateRequiredDocumentsStatus();
           });
         });
         
@@ -5308,6 +5335,7 @@ document.addEventListener('DOMContentLoaded', function() {
     } finally {
       btn.disabled = false;
       btn.innerHTML = originalHtml;
+      updateRequiredDocumentsStatus();
     }
   });
   
@@ -5389,7 +5417,8 @@ document.addEventListener('DOMContentLoaded', function() {
           'seminars_trainings': { name: 'certificates[]', label: 'Seminars/Trainings' },
           'masteral_cert': { name: 'masteral_cert', label: 'Masteral Certificate' },
           'certificate_of_grades': { name: 'certificate_of_grades', label: 'Certificate of Grades' },
-          'proof_of_enrollment': { name: 'proof_of_enrollment', label: 'Proof of Enrollment' }
+          'proof_of_enrollment': { name: 'proof_of_enrollment', label: 'Proof of Enrollment' },
+          'faculty_evaluation': { name: 'faculty_evaluation', label: 'Faculty Evaluation' }
         };
         
         // Update UI for each saved file
@@ -5468,10 +5497,10 @@ document.addEventListener('DOMContentLoaded', function() {
                       <div class="flex-1 min-w-0">
                         <div class="font-semibold text-green-900 text-sm">Saved Draft - Ready to Use</div>
                         ${filenames.map(filename => {
-                          const displayName = filename.replace(/^draft_\d+_\d+_/, '');
+                          const displayName = getDocumentFileDisplay(filename);
                           return `<div class="text-sm text-green-700 mt-1 flex items-center gap-1">
                             <i class="ri-file-text-fill flex-shrink-0"></i>
-                            <span class="break-all">${displayName}</span>
+                            <span class="break-all" title="${escapeDocumentHtml(displayName.title)}">${escapeDocumentHtml(displayName.label)}</span>
                           </div>`;
                         }).join('')}
                         <div class="mt-2 text-xs text-green-600">
@@ -5503,7 +5532,8 @@ document.addEventListener('DOMContentLoaded', function() {
                   container.removeAttribute('style');
                   
                   input.removeAttribute('style');
-                  input.setAttribute('required', 'required');
+                  input.required = isApplicationDocumentRequired(dbField);
+                  updateRequiredDocumentsStatus();
                   
                   const notif = document.createElement('div');
                   notif.className = 'fixed top-4 right-4 bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded shadow-md animate-fade-in z-[10001]';
@@ -5543,6 +5573,7 @@ document.addEventListener('DOMContentLoaded', function() {
     } finally {
       btn.disabled = false;
       btn.innerHTML = originalHtml;
+      updateRequiredDocumentsStatus();
     }
   });
   
@@ -5573,11 +5604,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { name: 'coe', label: 'Certificate of Employment', dbField: 'coe' },
         { name: 'certificates[]', label: 'Seminars/Training Certificates', dbField: 'seminars_trainings' }
       ];
-      const requiresOngoingGraduateDocuments = initialEducation.some(education =>
-        String(education.education_level || '').toLowerCase() === 'master' &&
-        String(education.education_status || '').toLowerCase() === 'ongoing'
-      );
-      if (requiresOngoingGraduateDocuments) {
+      if (requiresOngoingGraduateDocuments()) {
         requiredFields.push(
           { name: 'certificate_of_grades', label: 'Certificate of Grades', dbField: 'certificate_of_grades' },
           { name: 'proof_of_enrollment', label: 'Proof of Enrollment', dbField: 'proof_of_enrollment' }
@@ -5602,6 +5629,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const draftInput = this.querySelector(`input[name="existing_${fieldNameWithoutBrackets}"]`);
         
         if (fileInput) {
+          setDocumentInlineError(fileInput, '');
           const hasFile = fileInput.files && fileInput.files.length > 0;
           const hasDraft = draftInput && draftInput.value;
           const hasReusableDocument = Boolean(fileInput.dataset.reusableFile);
@@ -5610,6 +5638,7 @@ document.addEventListener('DOMContentLoaded', function() {
           
           if (!hasFile && !hasDraft && !hasReusableDocument) {
             missingFiles.push(field.label);
+            setDocumentInlineError(fileInput, 'Please upload this required document.');
           }
         }
       }
@@ -5617,6 +5646,8 @@ document.addEventListener('DOMContentLoaded', function() {
       if (missingFiles.length > 0) {
         const messagePrefix = isResubmissionMode ? 'Please upload the following requested files: ' : 'Please upload the following required files: ';
         showToast(messagePrefix + missingFiles.join(', '), 'warning', 6000);
+        updateRequiredDocumentsStatus();
+        this.querySelector('.ui-document-card.has-error')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return; // Stop submission
       }
       
@@ -5749,36 +5780,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('addFileIndicatorsForApplication function not found!');
               }
               
-              // Also manually update the UI as a fallback
-              console.log('Manually updating file indicators...');
-              const fileInputs = requirementsForm.querySelectorAll('input[type="file"]');
-              fileInputs.forEach(input => {
-                const container = input.closest('.border-dashed');
-                if (container && input.files && input.files.length > 0) {
-                  const fileName = input.files[0].name;
-                  console.log('Found uploaded file:', fileName);
-                  
-                  // Hide input
-                  input.style.display = 'none';
-                  input.disabled = true;
-                  input.required = false;
-                  
-                  // Update container styling
-                  container.classList.remove('border-gray-300', 'hover:border-blue-400');
-                  container.classList.add('border-green-400', 'bg-green-50');
-                  container.style.borderColor = '#4ade80';
-                  container.style.backgroundColor = '#f0fdf4';
-                  
-                  // Add green indicator
-                  container.innerHTML = `
-                    <div class="flex items-center p-2">
-                      <i class="ri-checkbox-circle-fill text-green-600 text-lg mr-2"></i>
-                      <span class="text-green-700 text-sm font-medium">Uploaded: ${fileName}</span>
-                    </div>
-                  `;
-                }
-              });
-              
               // Hide the submit button and show the Next button
               const submitBtn = requirementsForm.querySelector('button[type="submit"]');
               const nextBtn = document.getElementById('step1NextBtn');
@@ -5862,14 +5863,17 @@ document.addEventListener('DOMContentLoaded', function() {
       if (!indicator) {
         // Create uploaded indicator (hidden by default)
         indicator = document.createElement('div');
-        indicator.className = 'file-upload-indicator hidden w-full flex items-start justify-between';
+        indicator.className = 'file-upload-indicator hidden w-full flex items-center justify-between gap-3';
         indicator.innerHTML = `
-          <div class="flex items-start text-green-700 flex-1 min-w-0">
-            <i class="ri-checkbox-circle-fill mr-2 text-lg flex-shrink-0"></i>
-            <span class="text-sm font-medium break-all filename"></span>
+          <div class="flex items-center text-green-700 flex-1 min-w-0">
+            <i class="ri-checkbox-circle-fill mr-2 text-base flex-shrink-0"></i>
+            <div class="min-w-0">
+              <strong class="block text-xs text-green-800">Uploaded successfully</strong>
+              <span class="text-xs filename" title=""></span>
+            </div>
           </div>
-          <button type="button" class="remove-file text-red-600 hover:text-red-800 ml-2 flex-shrink-0">
-            <i class="ri-close-circle-fill text-xl"></i>
+          <button type="button" class="remove-file flex-shrink-0" aria-label="Remove selected file">
+            <i class="ri-delete-bin-line mr-1"></i>Remove
           </button>
         `;
         container.appendChild(indicator);
@@ -5879,6 +5883,7 @@ document.addEventListener('DOMContentLoaded', function() {
         removeBtn.addEventListener('click', function() {
           // Clear the file input
           input.value = '';
+          setDocumentInlineError(input, '');
           
           // Reset container styling
           container.classList.remove('border-green-400', 'border-green-500', 'bg-green-50');
@@ -5891,6 +5896,9 @@ document.addEventListener('DOMContentLoaded', function() {
           // Show file input again
           input.style.display = '';
           input.classList.remove('hidden');
+          const hint = container.querySelector('.ui-document-upload__hint');
+          if (hint) hint.classList.remove('hidden');
+          updateRequiredDocumentsStatus();
           
           // Check if there are any remaining uploaded files
           setTimeout(() => {
@@ -5916,6 +5924,23 @@ document.addEventListener('DOMContentLoaded', function() {
       // Handle file selection
       input.addEventListener('change', function() {
         if (this.files && this.files.length > 0) {
+          const allowedExtensions = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
+          const invalidFile = Array.from(this.files).find(file => {
+            const extension = String(file.name || '').split('.').pop().toLowerCase();
+            return file.size <= 0 || file.size > 5 * 1024 * 1024 || !allowedExtensions.includes(extension);
+          });
+          if (invalidFile) {
+            const extension = String(invalidFile.name || '').split('.').pop().toLowerCase();
+            const message = invalidFile.size > 5 * 1024 * 1024
+              ? 'This file is larger than 5 MB.'
+              : (!allowedExtensions.includes(extension) ? 'Use PDF, DOC, DOCX, JPG, or PNG files only.' : 'The selected file is empty.');
+            this.value = '';
+            setDocumentInlineError(this, message);
+            indicator.classList.add('hidden');
+            updateRequiredDocumentsStatus();
+            return;
+          }
+          setDocumentInlineError(this, '');
           // Show green indicator styling
           container.classList.remove('border-gray-300', 'hover:border-blue-400');
           container.classList.add('border-green-500', 'bg-green-50');
@@ -5924,8 +5949,10 @@ document.addEventListener('DOMContentLoaded', function() {
           const filenameSpan = indicator.querySelector('.filename');
           if (this.files.length > 1) {
             filenameSpan.textContent = `${this.files.length} files selected`;
+            filenameSpan.title = Array.from(this.files).map(file => file.name).join(', ');
           } else {
             filenameSpan.textContent = this.files[0].name;
+            filenameSpan.title = this.files[0].name;
           }
           
           // Show indicator
@@ -5934,6 +5961,9 @@ document.addEventListener('DOMContentLoaded', function() {
           // Hide the file input
           this.style.display = 'none';
           this.classList.add('hidden');
+          const hint = container.querySelector('.ui-document-upload__hint');
+          if (hint) hint.classList.add('hidden');
+          updateRequiredDocumentsStatus();
           
           // Hide the "Load Saved Documents" button when any file is uploaded
           const loadDraftSection = document.getElementById('loadDraftSection');
@@ -5948,6 +5978,8 @@ document.addEventListener('DOMContentLoaded', function() {
   // Initialize file upload indicators when wizard is shown
   setTimeout(() => {
     setupFileUploadIndicators();
+    syncRenewalDocumentVisibility(document.getElementById('rf_application_type')?.value || 'new');
+    updateRequiredDocumentsStatus();
   }, 100);
   
   // Handle psych receipt upload in wizard
@@ -6090,8 +6122,9 @@ document.addEventListener('DOMContentLoaded', function() {
       });
   }
   
-  // Helper function to add file indicators (make it global)
-  window.addFileIndicatorsForApplication = function(app) {
+  // Render submitted requirement files. This function is intentionally
+  // idempotent because several workflow entry points refresh the same data.
+  window.addFileIndicatorsForApplication = function(app, resubmissionDocuments = null) {
     console.log('=== ADDING FILE INDICATORS ===');
     console.log('Application ID:', app.application_id || app.id);
     
@@ -6105,63 +6138,49 @@ document.addEventListener('DOMContentLoaded', function() {
     // Use setTimeout to ensure this runs after any other pending operations
     setTimeout(() => {
       try {
-        const step2 = document.getElementById('step2');
-        if (!step2) {
-          console.error('Step 2 not found!');
+        const requirementsStep = document.getElementById('step1');
+        if (!requirementsStep) {
+          console.error('Requirements step not found!');
           return;
         }
-        
-        console.log('NUCLEAR CLEANUP - DESTROYING ALL CONTAINERS...');
-        
-        // Get all file inputs in step 2
-        const allInputs = step2.querySelectorAll('input[type="file"]');
-        console.log('Found', allInputs.length, 'file inputs to reset');
-        
-        // NUCLEAR OPTION: Save input data, destroy container, rebuild
-        allInputs.forEach((input, index) => {
+
+        // Clear only generated status elements. Rebuilding the containers here
+        // used to remove input IDs/listeners and allowed a second renderer to
+        // append an identical status row.
+        requirementsStep.querySelectorAll('.approved-file, .resubmission-file-notice, .reusable-document-display, .draft-file-display').forEach(element => {
+          element.remove();
+        });
+        requirementsStep.querySelectorAll('.existing-draft-input').forEach(input => input.remove());
+        requirementsStep.querySelectorAll('.file-upload-indicator').forEach(indicator => {
+          indicator.classList.add('hidden');
+        });
+
+        requirementsStep.querySelectorAll('input[type="file"]').forEach(input => {
           const container = input.closest('.border-dashed');
           if (!container) return;
-          
-          console.log(`DESTROYING container ${index + 1} for input: ${input.name}`);
-          
-          // Save input attributes
-          const inputName = input.name;
-          const inputAccept = input.accept;
-          const inputRequired = input.required;
-          
-          // COMPLETELY DESTROY the container content
-          container.innerHTML = '';
-          
-          // Rebuild ONLY the input element
-          const newInput = document.createElement('input');
-          newInput.type = 'file';
-          newInput.name = inputName;
-          newInput.accept = inputAccept;
-          newInput.required = inputRequired;
-          newInput.className = 'w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100';
-          
-          container.appendChild(newInput);
-          
-          // Reset container styling
-          container.className = 'border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-blue-400 transition-colors';
-          container.removeAttribute('style');
-          
-          // Reset parent
-          if (container.parentElement) {
-            container.parentElement.removeAttribute('style');
-          }
-          
-          console.log(`? Container ${index + 1} REBUILT from scratch`);
+          container.classList.remove('border-green-400', 'border-green-500', 'bg-green-50', 'border-orange-400', 'bg-orange-50');
+          container.classList.add('border-gray-300', 'hover:border-blue-400');
+          input.disabled = false;
+          input.required = false;
+          input.style.removeProperty('display');
+          input.style.removeProperty('opacity');
+          input.style.removeProperty('cursor');
+          input.classList.remove('hidden');
+          delete input.dataset.reusableFile;
+          delete input.dataset.reusableSourceApplication;
+          input.closest('.ui-document-card')?.style.removeProperty('display');
         });
-        
-        console.log('? All containers cleared');
-        
+
         // Update the last loaded app ID
         window._lastLoadedAppId = app.application_id || app.id;
+
+        const requestedResubmissions = Array.isArray(resubmissionDocuments)
+          ? resubmissionDocuments
+          : (Array.isArray(window.currentResubmissionDocs) ? window.currentResubmissionDocs : []);
     
     // Helper function to add uploaded file indicator
     const addUploadedIndicator = (inputName, fileName, documentField) => {
-      const input = document.querySelector(`input[name="${inputName}"]`);
+      const input = document.querySelector(`#requirementsForm input[name="${inputName}"]`);
       if (!input) {
         console.warn('Input not found for:', inputName);
         return;
@@ -6172,11 +6191,22 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn('Container not found for input:', inputName);
         return;
       }
-      
+
+      // Upsert this document's generated state rather than appending another
+      // row every time application data is refreshed.
+      container.querySelectorAll('.approved-file, .resubmission-file-notice').forEach(element => {
+        element.remove();
+      });
+      container.querySelector('.file-upload-indicator')?.classList.add('hidden');
+      input.closest('.ui-document-card')?.style.removeProperty('display');
+
       // Check if THIS specific document needs resubmission
-      const needsResubmission = window.globalResubmissionDocs && window.globalResubmissionDocs.includes(documentField);
+      const needsResubmission = requestedResubmissions.includes(documentField);
       
       if (fileName) {
+        const fileDisplay = getDocumentFileDisplay(fileName, documentField === 'seminars_trainings');
+        const safeFileLabel = escapeDocumentHtml(fileDisplay.label);
+        const safeFileTitle = escapeDocumentHtml(fileDisplay.title);
         console.log('Adding indicator for:', inputName, fileName, needsResubmission ? '(needs resubmission)' : '(approved)');
         
         if (needsResubmission) {
@@ -6186,9 +6216,6 @@ document.addEventListener('DOMContentLoaded', function() {
           // Orange border styling
           container.classList.remove('border-gray-300', 'border-green-400', 'bg-green-50', 'hover:border-blue-400');
           container.classList.add('border-orange-400', 'bg-orange-50');
-          container.style.setProperty('border-width', '2px', 'important');
-          container.style.setProperty('border-color', '#fb923c', 'important');
-          container.style.setProperty('background-color', '#fff7ed', 'important');
           
           // Keep file input visible and enabled
           input.disabled = false;
@@ -6198,40 +6225,34 @@ document.addEventListener('DOMContentLoaded', function() {
           
           // Add orange notice showing previous file
           const resubmitNotice = document.createElement('div');
-          resubmitNotice.className = 'mt-2 p-2 bg-orange-100 border border-orange-300 rounded text-xs';
+          resubmitNotice.className = 'resubmission-file-notice mt-2 p-2 bg-orange-100 border border-orange-300 rounded text-xs';
           resubmitNotice.innerHTML = `
             <div class="flex items-start text-orange-800">
               <i class="ri-information-line mr-2 flex-shrink-0"></i>
-              <span class="font-medium break-all">Previous file: ${fileName}</span>
+              <span class="font-medium filename" title="${safeFileTitle}">Previous file: ${safeFileLabel}</span>
             </div>
           `;
           container.appendChild(resubmitNotice);
           
         } else {
-          // Document is approved - show GREEN indicator
+          // Document is approved - show a compact success indicator.
           container.classList.remove('border-gray-300', 'border-orange-400', 'bg-orange-50', 'hover:border-blue-400');
           container.classList.add('border-green-400', 'bg-green-50');
-          container.style.setProperty('border-width', '2px', 'important');
-          container.style.setProperty('border-color', '#4ade80', 'important');
-          container.style.setProperty('opacity', '1', 'important');
-          container.style.setProperty('background-color', '#f0fdf4', 'important');
-          if (container.parentElement) {
-            container.parentElement.style.setProperty('opacity', '1', 'important');
-          }
           
-          // Create green uploaded file indicator
           const indicator = document.createElement('div');
-          indicator.className = 'flex items-start p-2 approved-file';
-          indicator.style.setProperty('opacity', '1', 'important');
+          indicator.className = 'flex items-center approved-file';
           indicator.innerHTML = `
-            <i class="ri-checkbox-circle-fill text-green-600 text-lg mr-2 flex-shrink-0"></i>
-            <span class="text-green-700 text-sm font-medium break-all">Uploaded: ${fileName}</span>
+            <i class="ri-checkbox-circle-fill text-green-600 text-base mr-2 flex-shrink-0"></i>
+            <div class="min-w-0">
+              <strong class="block text-xs text-green-800">Uploaded successfully</strong>
+              <span class="filename text-xs" title="${safeFileTitle}">${safeFileLabel}</span>
+            </div>
           `;
           container.appendChild(indicator);
           
           // Hide the file input (approved, view-only)
           input.disabled = true;
-          input.style.setProperty('display', 'none', 'important');
+          input.style.display = 'none';
           input.classList.add('hidden');
           input.required = false;
         }
@@ -6266,9 +6287,12 @@ document.addEventListener('DOMContentLoaded', function() {
             masteralContainer.style.display = 'none';
             console.log('? Hidden Masteral Certificate (not uploaded)');
           }
+        }
         if (app.certificate_of_grades) addUploadedIndicator('certificate_of_grades', app.certificate_of_grades, 'certificate_of_grades');
         if (app.proof_of_enrollment) addUploadedIndicator('proof_of_enrollment', app.proof_of_enrollment, 'proof_of_enrollment');
-        }
+        if (app.faculty_evaluation) addUploadedIndicator('faculty_evaluation', app.faculty_evaluation, 'faculty_evaluation');
+        syncRenewalDocumentVisibility(app.application_type || 'new');
+        updateRequiredDocumentsStatus();
         
         console.log('? File indicators added successfully');
         
@@ -8682,6 +8706,7 @@ function attachJobEventListeners() {
           // CRITICAL: Set global resubmission docs BEFORE showing wizard
           // This allows applyViewModeRestrictions to skip disabling these inputs
           globalResubmissionDocs = resubmissionDocs;
+          window.globalResubmissionDocs = resubmissionDocs;
           window.currentResubmissionDocs = resubmissionDocs; // Store for form validation
           console.log('Set globalResubmissionDocs:', globalResubmissionDocs);
           console.log('Set window.currentResubmissionDocs:', window.currentResubmissionDocs);
@@ -8710,73 +8735,10 @@ function attachJobEventListeners() {
             document.getElementById('rf_cellphone').value = app.contact_num || '';
             const rf_application_type = document.getElementById('rf_application_type');
             if (rf_application_type) rf_application_type.value = app.application_type || 'new';
+            syncRenewalDocumentVisibility(app.application_type || 'new');
             
             // Display work experience, skills, and education from API data
           }, 300);
-          
-          // NOW add the file indicators after wizard is shown
-          // Show which files were uploaded in Step 2 - inside each upload box
-          
-          // Helper function to add uploaded file indicator
-          const addUploadedIndicator = (inputName, fileName, documentField) => {
-            const input = document.querySelector(`input[name="${inputName}"]`);
-            if (!input) return;
-            
-            const container = input.closest('.border-dashed');
-            if (!container) return;
-            
-            // Check if THIS specific document needs resubmission
-            const needsResubmission = resubmissionDocs.includes(documentField);
-            
-            if (fileName) {
-              if (needsResubmission) {
-                // Document needs resubmission - NO GREEN, show orange styling
-                console.log(`?? ${documentField} needs resubmission - NO GREEN indicator, showing file input`);
-                
-                // Orange border styling
-                container.classList.remove('border-gray-300', 'border-green-400', 'bg-green-50');
-                container.classList.add('border-orange-400', 'bg-orange-50');
-                
-                // Keep original input visible and enabled
-                input.disabled = false;
-                input.required = false;
-                input.style.display = 'block';
-                input.classList.remove('hidden');
-                
-                // Add orange notice showing previous file
-                const resubmitNotice = document.createElement('div');
-                resubmitNotice.className = 'mt-2 p-2 bg-orange-100 border border-orange-300 rounded text-xs';
-                resubmitNotice.innerHTML = `
-                  <div class="flex items-start text-orange-800">
-                    <i class="ri-information-line mr-2 flex-shrink-0"></i>
-                    <span class="font-medium break-all">Previous file: ${fileName}</span>
-                  </div>
-                `;
-                container.appendChild(resubmitNotice);
-                
-              } else {
-                // Document is approved - show GREEN indicator
-                container.classList.remove('border-gray-300', 'border-orange-400', 'bg-orange-50');
-                container.classList.add('border-green-400', 'bg-green-50');
-                
-                // Create green uploaded file indicator
-                const indicator = document.createElement('div');
-                indicator.className = 'mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs approved-file';
-                indicator.innerHTML = `
-                  <div class="flex items-start text-green-700">
-                    <i class="ri-checkbox-circle-fill mr-2 flex-shrink-0"></i>
-                    <span class="font-medium break-all">Uploaded: ${fileName}</span>
-                  </div>
-                `;
-                container.appendChild(indicator);
-                
-                // Hide the file input (approved, view-only)
-                input.disabled = true;
-                input.style.display = 'none';
-                input.classList.add('hidden');
-              }
-            }
-          };
           
           console.log('?????????????????????????????????????????????');
           console.log('?? INDICATOR DECISION POINT');
@@ -8785,19 +8747,14 @@ function attachJobEventListeners() {
           console.log('  Resubmission Docs:', resubmissionDocs);
           console.log('?????????????????????????????????????????????');
           
-          // ALWAYS add indicators to show what was uploaded
-          // The addUploadedIndicator function will handle resubmission mode internally
+          // Use the single idempotent renderer. Previously this view path had
+          // its own append-only renderer, producing two identical status rows.
           console.log('? ADDING indicators for all uploaded files...');
-          if (app.application_letter) addUploadedIndicator('applicationLetter', app.application_letter, 'application_letter');
-          if (app.resume) addUploadedIndicator('resume_file', app.resume, 'resume');
-          if (app.tor) addUploadedIndicator('transcript', app.tor, 'tor');
-          if (app.diploma) addUploadedIndicator('diploma', app.diploma, 'diploma');
-          if (app.professional_license) addUploadedIndicator('license', app.professional_license, 'professional_license');
-          if (app.coe) addUploadedIndicator('coe', app.coe, 'coe');
-          if (app.seminars_trainings) addUploadedIndicator('certificates[]', app.seminars_trainings, 'seminars_trainings');
-          if (app.masteral_cert) addUploadedIndicator('masteral_cert', app.masteral_cert, 'masteral_cert');
-          if (app.certificate_of_grades) addUploadedIndicator('certificate_of_grades', app.certificate_of_grades, 'certificate_of_grades');
-          if (app.proof_of_enrollment) addUploadedIndicator('proof_of_enrollment', app.proof_of_enrollment, 'proof_of_enrollment');
+          if (typeof window.addFileIndicatorsForApplication === 'function') {
+            window.addFileIndicatorsForApplication(app, resubmissionDocs);
+          }
+          syncRenewalDocumentVisibility(app.application_type || 'new');
+          updateRequiredDocumentsStatus();
           
           // If resubmission mode, the indicator function already handles showing file inputs
           if (isResubmissionMode) {
@@ -8874,7 +8831,8 @@ function attachJobEventListeners() {
                   'seminars_trainings': 'Seminars/Training Certificates',
                   'masteral_cert': 'Masteral Certificate',
                   'certificate_of_grades': 'Certificate of Grades',
-                  'proof_of_enrollment': 'Proof of Enrollment'
+                  'proof_of_enrollment': 'Proof of Enrollment',
+                  'faculty_evaluation': 'Faculty Evaluation'
                 };
                 
                 const requestedDocsList = resubmissionDocs.map(doc => 

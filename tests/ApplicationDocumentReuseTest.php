@@ -36,6 +36,11 @@ try {
     $firstLookup = nc_find_reusable_documents($conn, $userId);
     documentCheck(!$firstLookup['is_existing_applicant'] && !$firstLookup['documents'], '1 first-time applicant has no reusable documents');
     documentCheck(count(nc_missing_application_documents([], false)) === 7, '2 first-time applicant is still missing every base required document');
+    $facultyDefinition = nc_application_document_definitions()['faculty_evaluation'] ?? null;
+    documentCheck(
+        $facultyDefinition && !$facultyDefinition['required'] && !empty($facultyDefinition['renewal_only']),
+        '2a Faculty Evaluation is configured as an optional renewal document'
+    );
 
     $firstDocuments = [
         'application_letter' => 'first-application-letter.pdf',
@@ -84,6 +89,7 @@ try {
 
     $secondUploads = array_fill_keys(array_keys(nc_application_document_definitions()), null);
     $secondUploads['certificate_of_grades'] = 'master-grades-second-sem.pdf';
+    $secondUploads['faculty_evaluation'] = 'faculty-evaluation-second-sem.pdf';
     $secondDocuments = nc_merge_reusable_document_values($secondUploads, $renewalLookup['documents']);
     documentCheck($secondDocuments['tor'] === $firstDocuments['tor'] && $secondDocuments['certificate_of_grades'] === 'master-grades-second-sem.pdf', '5 renewal keeps unchanged files and overrides only the selected document');
     documentCheck(!nc_missing_application_documents($secondDocuments, true), '6 renewal passes when existing and updated required documents are complete');
@@ -110,6 +116,10 @@ try {
     $insert->execute();
     $secondApplicationId = (int)$conn->insert_id;
     $insert->close();
+    $facultyUpdate = $conn->prepare('UPDATE job_applicants SET faculty_evaluation = ? WHERE id = ?');
+    $facultyUpdate->bind_param('si', $secondDocuments['faculty_evaluation'], $secondApplicationId);
+    $facultyUpdate->execute();
+    $facultyUpdate->close();
     foreach ($secondDocuments as $field => $fileName) {
         if ($fileName) {
             $sourceId = empty($secondUploads[$field]) ? $firstApplicationId : null;
@@ -139,6 +149,32 @@ try {
 
     $currentLookup = nc_find_reusable_documents($conn, $userId);
     documentCheck(($currentLookup['documents']['masteral_cert']['file_name'] ?? null) === $updatedMaster, '11 the latest update becomes the applicant-level reusable document');
+    documentCheck(
+        ($currentLookup['documents']['faculty_evaluation']['file_name'] ?? null) === $secondUploads['faculty_evaluation'],
+        '11a Faculty Evaluation stores and retrieves through the shared document history'
+    );
+
+    $updatedFacultyEvaluation = 'faculty-evaluation-updated.pdf';
+    $facultyUpdate = $conn->prepare('UPDATE job_applicants SET faculty_evaluation = ? WHERE id = ? AND user_id = ?');
+    $facultyUpdate->bind_param('sii', $updatedFacultyEvaluation, $secondApplicationId, $userId);
+    $facultyUpdate->execute();
+    $facultyUpdate->close();
+    nc_record_application_document_version(
+        $conn,
+        $userId,
+        $secondApplicationId,
+        'faculty_evaluation',
+        $updatedFacultyEvaluation,
+        $updatedFacultyEvaluation
+    );
+    $facultyHistory = $conn->query("SELECT file_name, is_active FROM application_document_versions WHERE application_id = {$secondApplicationId} AND document_type = 'faculty_evaluation' ORDER BY version_number")->fetch_all(MYSQLI_ASSOC);
+    documentCheck(
+        count($facultyHistory) === 2
+            && (int)$facultyHistory[0]['is_active'] === 0
+            && (int)$facultyHistory[1]['is_active'] === 1
+            && $facultyHistory[1]['file_name'] === $updatedFacultyEvaluation,
+        '11b replacing Faculty Evaluation preserves its prior version and activates the replacement'
+    );
 
     $conn->query("UPDATE job_applicants SET resubmission_documents = '[\"tor\"]' WHERE id = {$secondApplicationId}");
     $invalidLookup = nc_find_reusable_documents($conn, $userId);

@@ -60,6 +60,11 @@ async function metrics(label) {
     const content = wizard?.querySelector('.ui-wizard-content');
     const visibleSteps = [...document.querySelectorAll('.wizard-step')].filter(el => getComputedStyle(el).display !== 'none').map(el => el.id);
     const fileNames = [...document.querySelectorAll('#requirementsForm input[type="file"]')].map(el => el.name);
+    const documentStatusCounts = [...document.querySelectorAll('#step1 .ui-document-card')].map(card => ({
+      field: card.dataset.documentField,
+      uploaded: card.querySelectorAll('.approved-file').length,
+      resubmission: card.querySelectorAll('.resubmission-file-notice').length
+    }));
     return {
       label: ${JSON.stringify(label)},
       href: location.href,
@@ -76,6 +81,10 @@ async function metrics(label) {
       stepLabel: document.getElementById('wizardStepLabel')?.textContent?.trim(),
       formPresent: Boolean(document.getElementById('requirementsForm')),
       fileNames,
+      documentStatusCounts,
+      duplicateStatusCards: documentStatusCounts.filter(status => status.uploaded > 1 || status.resubmission > 1),
+      reusableDisplayCount: document.querySelectorAll('#step1 .reusable-document-display').length,
+      draftDisplayCount: document.querySelectorAll('#step1 .draft-file-display').length,
       functions: {
         start: typeof window.startApplicationWizard,
         view: typeof window.viewExistingApplication,
@@ -101,6 +110,17 @@ await delay(2500);
 const desktopExisting = await metrics('desktop-existing-stage');
 await screenshot('C:/xampp/tmp/wizard-desktop-existing.png');
 
+// The UI can receive the same application data from multiple workflow entry
+// points. Rendering it again must update, not duplicate, each document status.
+await evaluate(`window.currentApplicationData && window.addFileIndicatorsForApplication(window.currentApplicationData)`);
+await delay(350);
+const desktopRepeatedRender = await metrics('desktop-repeated-render');
+
+await evaluate(`setStep(1)`);
+await delay(400);
+const desktopRequirementsReview = await metrics('desktop-requirements-review');
+await screenshot('C:/xampp/tmp/wizard-desktop-requirements-review.png');
+
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
 await delay(900);
 const mobileExisting = await metrics('mobile-existing-stage');
@@ -109,6 +129,8 @@ await screenshot('C:/xampp/tmp/wizard-mobile-existing.png');
 const result = {
   desktopStep1,
   desktopExisting,
+  desktopRepeatedRender,
+  desktopRequirementsReview,
   mobileExisting,
   consoleErrors: [...new Set(consoleErrors)],
   requestErrors: [...new Set(requestErrors)]

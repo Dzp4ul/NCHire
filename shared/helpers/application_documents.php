@@ -10,17 +10,27 @@ if (!function_exists('nc_application_document_definitions')) {
     function nc_application_document_definitions(): array
     {
         return [
-            'application_letter' => ['label' => 'Application Letter', 'input' => 'applicationLetter', 'required' => true, 'multiple' => false],
-            'resume' => ['label' => 'Updated and Comprehensive Resume', 'input' => 'resume_file', 'required' => true, 'multiple' => false],
-            'letter_of_intent' => ['label' => 'Letter of Intent', 'input' => 'letter_of_intent', 'required' => true, 'multiple' => false],
-            'tor' => ['label' => 'Transcript of Records (TOR)', 'input' => 'transcript', 'required' => true, 'multiple' => false],
-            'diploma' => ['label' => 'Diploma', 'input' => 'diploma', 'required' => true, 'multiple' => false],
-            'professional_license' => ['label' => 'Professional License', 'input' => 'license', 'required' => false, 'multiple' => false],
-            'coe' => ['label' => 'Certificate of Employment (COE)', 'input' => 'coe', 'required' => true, 'multiple' => false],
-            'seminars_trainings' => ['label' => 'Seminars/Training Certificates', 'input' => 'certificates[]', 'required' => true, 'multiple' => true],
-            'masteral_cert' => ['label' => 'Masteral Certificate', 'input' => 'masteral_cert', 'required' => false, 'multiple' => false],
-            'certificate_of_grades' => ['label' => 'Certificate of Grades', 'input' => 'certificate_of_grades', 'required' => false, 'multiple' => false],
-            'proof_of_enrollment' => ['label' => 'Proof of Enrollment', 'input' => 'proof_of_enrollment', 'required' => false, 'multiple' => false],
+            'application_letter' => ['label' => 'Application Letter', 'input' => 'applicationLetter', 'required' => true, 'multiple' => false, 'category' => 'application'],
+            'resume' => ['label' => 'Updated and Comprehensive Resume', 'input' => 'resume_file', 'required' => true, 'multiple' => false, 'category' => 'application'],
+            'letter_of_intent' => ['label' => 'Letter of Intent', 'input' => 'letter_of_intent', 'required' => true, 'multiple' => false, 'category' => 'application'],
+            'tor' => ['label' => 'Transcript of Records (TOR)', 'input' => 'transcript', 'required' => true, 'multiple' => false, 'category' => 'education'],
+            'diploma' => ['label' => 'Diploma', 'input' => 'diploma', 'required' => true, 'multiple' => false, 'category' => 'education'],
+            'professional_license' => ['label' => 'Professional License', 'input' => 'license', 'required' => false, 'multiple' => false, 'category' => 'professional'],
+            'coe' => ['label' => 'Certificate of Employment (COE)', 'input' => 'coe', 'required' => true, 'multiple' => false, 'category' => 'professional'],
+            'seminars_trainings' => ['label' => 'Seminars/Training Certificates', 'input' => 'certificates[]', 'required' => true, 'multiple' => true, 'category' => 'professional', 'helper_text' => 'Select one or more relevant seminar or training certificates.'],
+            'masteral_cert' => ['label' => 'Masteral Certificate', 'input' => 'masteral_cert', 'required' => false, 'multiple' => false, 'category' => 'optional', 'helper_text' => 'Upload this document if you have completed a master\'s degree.'],
+            'certificate_of_grades' => ['label' => 'Certificate of Grades', 'input' => 'certificate_of_grades', 'required' => false, 'multiple' => false, 'category' => 'optional', 'conditional' => 'Required if your master\'s degree is ongoing.'],
+            'proof_of_enrollment' => ['label' => 'Proof of Enrollment', 'input' => 'proof_of_enrollment', 'required' => false, 'multiple' => false, 'category' => 'optional', 'conditional' => 'Required if your master\'s degree is ongoing.'],
+            'faculty_evaluation' => [
+                'label' => 'Faculty Evaluation',
+                'display_label' => 'Faculty Evaluation (Optional – For Renewal Applicants)',
+                'input' => 'faculty_evaluation',
+                'required' => false,
+                'multiple' => false,
+                'category' => 'optional',
+                'renewal_only' => true,
+                'helper_text' => 'Optional – primarily required for renewal applications.',
+            ],
         ];
     }
 }

@@ -102,6 +102,7 @@ try {
             'masteral_cert' => $row['masteral_cert'] ?? null,
             'certificate_of_grades' => $row['certificate_of_grades'] ?? null,
             'proof_of_enrollment' => $row['proof_of_enrollment'] ?? null,
+            'faculty_evaluation' => $row['faculty_evaluation'] ?? null,
             'letter_of_intent' => $row['letter_of_intent'] ?? null,
             'application_type' => $row['application_type'] ?? 'new',
             'academic_year' => $row['academic_year'] ?? null,

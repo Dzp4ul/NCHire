@@ -27,6 +27,7 @@ $sql = "CREATE TABLE IF NOT EXISTS user_draft_documents (
     coe VARCHAR(255) DEFAULT NULL,
     seminars_trainings TEXT DEFAULT NULL,
     masteral_cert VARCHAR(255) DEFAULT NULL,
+    faculty_evaluation VARCHAR(255) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES applicants(id) ON DELETE CASCADE,

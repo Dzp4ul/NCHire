@@ -22,7 +22,7 @@ if ($conn->connect_error) {
 $user_id = $_SESSION['user_id'];
 
 try {
-    $stmt = $conn->prepare("SELECT application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, certificate_of_grades, proof_of_enrollment, letter_of_intent, updated_at FROM user_draft_documents WHERE user_id = ?");
+    $stmt = $conn->prepare("SELECT application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, certificate_of_grades, proof_of_enrollment, faculty_evaluation, letter_of_intent, updated_at FROM user_draft_documents WHERE user_id = ?");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -46,7 +46,8 @@ try {
     
     $stmt->close();
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    error_log('Unable to load document draft: ' . $e->getMessage());
+    echo json_encode(['success' => false, 'error' => 'Unable to load saved documents. Please try again.']);
 }
 
 $conn->close();

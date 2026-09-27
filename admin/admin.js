@@ -2628,7 +2628,8 @@ async function viewApplicantDetails(applicantId) {
                 { field: 'seminars_trainings', label: 'Seminar/Training Certificates' },
                 { field: 'masteral_cert', label: 'Masteral Certificate' },
                 { field: 'certificate_of_grades', label: 'Certificate of Grades (COG)' },
-                { field: 'proof_of_enrollment', label: 'Proof of Enrollment' }
+                { field: 'proof_of_enrollment', label: 'Proof of Enrollment' },
+                { field: 'faculty_evaluation', label: 'Faculty Evaluation (Optional - Renewal)' }
             ];
             
             console.log('📄 Document files from database:');
@@ -3406,7 +3407,8 @@ function openResubmitModal() {
         { field: 'seminars_trainings', label: 'Seminar/Training Certificates' },
         { field: 'masteral_cert', label: 'Masteral Certificate' },
         { field: 'certificate_of_grades', label: 'Certificate of Grades (COG)' },
-        { field: 'proof_of_enrollment', label: 'Proof of Enrollment' }
+        { field: 'proof_of_enrollment', label: 'Proof of Enrollment' },
+        { field: 'faculty_evaluation', label: 'Faculty Evaluation (Optional - Renewal)' }
     ];
     
     // Clear existing checkboxes
