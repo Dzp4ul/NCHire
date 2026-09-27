@@ -72,9 +72,30 @@ $program = trim($data["program"] ?? "") ?: $department;
 $academic_year = trim($data["academic_year"] ?? "") ?: nc_current_academic_year();
 $semester = nc_normalize_semester($data["semester"] ?? "");
 $teaching_schedule = trim($data["teaching_schedule"] ?? "");
-$teaching_hours = (isset($data["teaching_hours_per_week"]) && $data["teaching_hours_per_week"] !== "") ? (float)$data["teaching_hours_per_week"] : null;
 $load_units = (isset($data["load_units"]) && $data["load_units"] !== "") ? (float)$data["load_units"] : null;
-$required_instructors = max(1, (int)($data["required_instructors"] ?? 1));
+$hasUnitBreakdown = array_key_exists('lecture_units', $data) || array_key_exists('laboratory_units', $data);
+$lecture_units = ($data['lecture_units'] ?? '') !== '' ? filter_var($data['lecture_units'], FILTER_VALIDATE_FLOAT) : null;
+$laboratory_units = ($data['laboratory_units'] ?? '') !== '' ? filter_var($data['laboratory_units'], FILTER_VALIDATE_FLOAT) : null;
+$available_sections = ($data['available_sections'] ?? '') !== '' ? filter_var($data['available_sections'], FILTER_VALIDATE_INT) : null;
+if ($hasUnitBreakdown && ($lecture_units === false || $laboratory_units === false || $lecture_units === null || $laboratory_units === null || $lecture_units < 0 || $laboratory_units < 0)) {
+    http_response_code(422);
+    echo json_encode(['success' => false, 'message' => 'Lecture Units and Laboratory Units must be valid non-negative numbers.']);
+    exit;
+}
+if ($hasUnitBreakdown && ($available_sections === false || $available_sections === null || $available_sections < 0)) {
+    http_response_code(422);
+    echo json_encode(['success' => false, 'message' => 'Available Sections must be a non-negative whole number.']);
+    exit;
+}
+if ($hasUnitBreakdown && ($title === '' || $department === '' || $type === '' || $deadline === '' || $subject_code === '' || $subject_name === '' || $program === '')) {
+    http_response_code(422);
+    echo json_encode(['success' => false, 'message' => 'Complete all required teaching load and subject fields.']);
+    exit;
+}
+$teaching_hours = $hasUnitBreakdown
+    ? nc_calculate_teaching_hours((float)$lecture_units, (float)$laboratory_units)
+    : ((isset($data["teaching_hours_per_week"]) && $data["teaching_hours_per_week"] !== "") ? (float)$data["teaching_hours_per_week"] : null);
+$required_instructors = $hasUnitBreakdown ? (int)$available_sections : max(1, (int)($data["required_instructors"] ?? 1));
 $salary_grade = trim($data["salary_grade"] ?? "");
 if (nc_normalize_employment_type($type) === 'full_time') {
     $salary_grade = nc_resolve_job_salary_grade([
@@ -89,6 +110,7 @@ if ($department === 'Computer Science') {
 }
 
 try {
+    $conn->begin_transaction();
     // Use prepared statements with new fields
     $sql = "INSERT INTO job (job_title, department_role, job_type, locations, salary_range, application_deadline, subject, job_description, job_requirements, education, experience, training, eligibility, competency, minimum_education_level, required_degree_fields, graduate_requirement, minimum_graduate_units, minimum_experience_years, teaching_experience_requirement, required_skills, required_certifications, required_licenses, required_training, preferred_qualifications)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
@@ -102,7 +124,20 @@ try {
     $ok = $stmt->execute();
     if ($ok) {
         $job_id = $conn->insert_id;
-        if (nc_column_exists($conn, 'job', 'teaching_hours_per_week')) {
+        if ($hasUnitBreakdown && nc_column_exists($conn, 'job', 'lecture_units')) {
+            $newStatus = $available_sections > 0 ? 'Active' : 'Closed';
+            $meta_sql = "UPDATE job SET status = ?, subject_code = ?, subject_name = ?, program = ?, academic_year = ?, semester = ?, teaching_schedule = NULL, teaching_hours_per_week = ?, load_units = NULL, lecture_units = ?, laboratory_units = ?, required_instructors = ?, initial_available_sections = ?, available_sections = ?, salary_grade = ? WHERE id = ?";
+            $meta_stmt = $conn->prepare($meta_sql);
+            if ($meta_stmt) {
+                $meta_stmt->bind_param("ssssssdddiiisi", $newStatus, $subject_code, $subject_name, $program, $academic_year, $semester, $teaching_hours, $lecture_units, $laboratory_units, $required_instructors, $available_sections, $available_sections, $salary_grade, $job_id);
+                if (!$meta_stmt->execute()) {
+                    throw new RuntimeException('Unable to save teaching load details: ' . $meta_stmt->error);
+                }
+                $meta_stmt->close();
+            } else {
+                throw new RuntimeException('Unable to prepare teaching load details.');
+            }
+        } elseif (nc_column_exists($conn, 'job', 'teaching_hours_per_week')) {
             $meta_sql = "UPDATE job SET status = 'Active', subject_code = ?, subject_name = ?, program = ?, academic_year = ?, semester = ?, teaching_schedule = ?, teaching_hours_per_week = ?, load_units = ?, required_instructors = ?, salary_grade = ? WHERE id = ?";
             $meta_stmt = $conn->prepare($meta_sql);
             if ($meta_stmt) {
@@ -122,12 +157,14 @@ try {
             $astmt->execute();
             $astmt->close();
         }
-        echo json_encode(["success" => true, "message" => "Teaching load added successfully"]);
+        $conn->commit();
+        echo json_encode(["success" => true, "message" => "Teaching load added successfully", "job_id" => $job_id]);
     } else {
-        echo json_encode(["success" => false, "message" => "Insert failed: " . $stmt->error]);
+        throw new RuntimeException('Insert failed: ' . $stmt->error);
     }
     $stmt->close();
 } catch (Throwable $e) {
+    $conn->rollback();
     // Log the error server-side and return a clean JSON error
     error_log('add_job.php error: ' . $e->getMessage());
     echo json_encode(["success" => false, "message" => "Server error while adding teaching load."]);

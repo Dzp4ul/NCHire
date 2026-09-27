@@ -94,6 +94,7 @@ if (empty($applicant['address']) && $user_id) {
 $education = $user_id ? nc_get_education_rows($conn, (int)$user_id) : [];
 
 $salary_projection = null;
+$job = null;
 if (!empty($applicant['job_id'])) {
     $job_stmt = $conn->prepare("SELECT * FROM job WHERE id = ? LIMIT 1");
     if ($job_stmt) {
@@ -102,7 +103,9 @@ if (!empty($applicant['job_id'])) {
         $job = $job_stmt->get_result()->fetch_assoc();
         $job_stmt->close();
         if ($job) {
-            $salary_projection = nc_calculate_salary_projection_from_education($education, $job);
+            $job['remaining_vacancies'] = nc_remaining_vacancies($conn, $job);
+            $job['teaching_load_title'] = nc_format_teaching_load_title($job);
+            $salary_projection = nc_calculate_salary_projection_from_education($education, $job, null, $conn);
         }
     }
 }
@@ -161,6 +164,7 @@ echo json_encode([
     'experience' => $experience,
     'skills' => $skills_by_category,
     'qualifications' => $qualifications,
+    'job' => $job,
     'salary_projection' => $salary_projection
 ]);
 

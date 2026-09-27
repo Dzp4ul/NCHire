@@ -125,9 +125,9 @@ function initializeRankingRequirementEditors() {
         '#newEditJobForm', '#editSecretaryJobForm'
     ];
     const markup = `
-      <details class="border border-blue-200 bg-blue-50 rounded-lg p-4 ranking-requirements-editor" open>
-        <summary class="font-semibold text-blue-900 cursor-pointer">Structured Candidate Ranking Criteria</summary>
-        <p class="text-xs text-blue-700 mt-2 mb-4">These fields drive the explainable score. Leave a criterion blank only when it is not applicable.</p>
+      <details class="border border-gray-200 bg-gray-50 rounded-lg p-4 ranking-requirements-editor">
+        <summary class="font-semibold text-gray-900 cursor-pointer">Candidate Ranking Criteria</summary>
+        <p class="text-xs text-gray-600 mt-2 mb-4">Open this optional section to define the education, experience, and credential criteria used by applicant ranking.</p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div><label class="block text-sm font-medium text-gray-700 mb-1">Minimum Education</label><select name="minimum_education_level" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"><option value="">Not specified</option><option value="high_school">High School</option><option value="associate">Associate</option><option value="bachelor">Bachelor</option><option value="master">Master's</option><option value="doctorate">Doctorate</option></select></div>
           <div><label class="block text-sm font-medium text-gray-700 mb-1">Required Degree/Course Fields</label><input name="required_degree_fields" type="text" placeholder="Computer Science, Information Technology" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"><p class="text-xs text-gray-500 mt-1">Separate alternatives with commas.</p></div>
@@ -145,6 +145,11 @@ function initializeRankingRequirementEditors() {
     formSelectors.forEach(selector => {
         const form = document.querySelector(selector);
         if (!form || form.querySelector('.ranking-requirements-editor')) return;
+        const editorContainer = form.querySelector('[data-ranking-editor-container]');
+        if (editorContainer) {
+            editorContainer.insertAdjacentHTML('beforeend', markup);
+            return;
+        }
         const submitButton = form.querySelector('button[type="submit"]');
         let actionRow = submitButton?.parentElement || null;
         while (actionRow && actionRow.parentElement !== form) actionRow = actionRow.parentElement;
@@ -230,7 +235,7 @@ function filterJobs() {
         // Calculate status
         const today = new Date();
         const deadline = new Date(job.application_deadline);
-        const jobStatus = today > deadline ? "Closed" : "Active";
+        const jobStatus = job.display_status || ((today > deadline || Number(job.remaining_vacancies) <= 0) ? "Closed" : "Active");
         
         // Search filter (teaching load, subject, academic period, department)
         const searchableText = [
@@ -288,7 +293,13 @@ function displayFilteredJobs() {
         // Compute status
         const today = new Date();
         const deadline = new Date(job.application_deadline);
-        const status = today > deadline ? "Closed" : "Active";
+        const status = job.display_status || ((today > deadline || Number(job.remaining_vacancies) <= 0) ? "Closed" : "Active");
+        const availableSections = Number(job.available_sections ?? job.remaining_vacancies ?? 0);
+        const sectionLabel = `${availableSections} ${availableSections === 1 ? 'section' : 'sections'} available`;
+        const workloadParts = [];
+        if (job.lecture_units !== null && job.lecture_units !== '') workloadParts.push(`${Number(job.lecture_units).toLocaleString()} lecture units`);
+        if (job.laboratory_units !== null && job.laboratory_units !== '') workloadParts.push(`${Number(job.laboratory_units).toLocaleString()} laboratory units`);
+        if (job.teaching_hours_per_week !== null && job.teaching_hours_per_week !== '') workloadParts.push(`${Number(job.teaching_hours_per_week).toLocaleString()} hours/week`);
         
         const row = document.createElement('tr');
         row.className = 'hover:bg-gray-50';
@@ -297,6 +308,8 @@ function displayFilteredJobs() {
                 <div>
                     <div class="font-medium text-gray-900">${job.teaching_load_title || job.job_title}</div>
                     <div class="text-sm text-gray-500">${job.academic_period_label || [job.academic_year, job.semester].filter(Boolean).join(' - ') || job.locations}</div>
+                    <div class="mt-1 text-xs text-gray-500">${workloadParts.join(' · ') || 'Legacy workload details'}</div>
+                    <div class="mt-1 text-xs font-semibold ${availableSections > 0 ? 'text-blue-700' : 'text-gray-500'}">${sectionLabel}</div>
                     <div class="text-sm text-green-600 font-medium">${job.salary_display || job.salary_range || 'Rate to be determined'}<sup>*</sup></div>
                     <div class="text-[10px] leading-3 text-gray-400 max-w-xs">*${job.salary_projection?.disclaimer || 'Guide only; final compensation varies by verified profile.'}</div>
                 </div>
@@ -983,6 +996,18 @@ function closeCreateUserModal() {
 async function createJob(event) {
     event.preventDefault();
     const formData = new FormData(event.target);
+    const usesSectionWorkload = formData.has('lecture_units') || formData.has('laboratory_units');
+    const lectureUnits = Number(formData.get('lecture_units'));
+    const laboratoryUnits = Number(formData.get('laboratory_units'));
+    const availableSections = Number(formData.get('available_sections'));
+    if (usesSectionWorkload && (!Number.isFinite(lectureUnits) || lectureUnits < 0 || !Number.isFinite(laboratoryUnits) || laboratoryUnits < 0)) {
+        showToast('Lecture Units and Laboratory Units must be non-negative numbers.', 'warning');
+        return;
+    }
+    if (usesSectionWorkload && (!Number.isInteger(availableSections) || availableSections < 0)) {
+        showToast('Available Sections must be a non-negative whole number.', 'warning');
+        return;
+    }
     const subjectCode = (formData.get('subject_code') || '').trim();
     const subjectName = (formData.get('subject_name') || '').trim();
     const subjectArea = (formData.get('subject') || '').trim();
@@ -1002,10 +1027,11 @@ async function createJob(event) {
         program: formData.get('program') || formData.get('department') || '',
         academic_year: formData.get('academic_year') || '',
         semester: formData.get('semester') || '',
-        teaching_schedule: formData.get('teaching_schedule') || '',
-        teaching_hours_per_week: formData.get('teaching_hours_per_week') || '',
-        load_units: formData.get('load_units') || '',
-        required_instructors: formData.get('required_instructors') || '1',
+        teaching_hours_per_week: usesSectionWorkload ? lectureUnits + (laboratoryUnits * 3) : (formData.get('teaching_hours_per_week') || ''),
+        lecture_units: usesSectionWorkload ? lectureUnits : undefined,
+        laboratory_units: usesSectionWorkload ? laboratoryUnits : undefined,
+        available_sections: usesSectionWorkload ? availableSections : undefined,
+        required_instructors: usesSectionWorkload ? availableSections : (formData.get('required_instructors') || '1'),
         salary_grade: formData.get('salary_grade') || '',
         job_description: formData.get('description'),
         // New fields from enhanced form
@@ -1018,6 +1044,14 @@ async function createJob(event) {
         job_requirements: formData.get('job_requirements') || '',
         ...getRankingRequirementPayload(formData)
     };
+
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn?.innerHTML || '';
+    if (submitBtn?.disabled) return;
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>Saving...';
+    }
 
     try {
         const response = await fetch('add_job.php', {
@@ -1070,6 +1104,11 @@ async function createJob(event) {
     } catch (error) {
         console.error("Error:", error);
         alert("An error occurred while adding the job: " + error.message);
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
     }
 }
 
@@ -1451,11 +1490,20 @@ function populateGeneralJobModal(job) {
     document.getElementById('editSalary').value = job.salary_range || "";
     document.getElementById('editAcademicYear').value = job.academic_year || '';
     document.getElementById('editSemester').value = job.semester || 'First Semester';
-    document.getElementById('editRequiredInstructors').value = job.required_instructors || 1;
-    document.getElementById('editTeachingHours').value = job.teaching_hours_per_week || '';
-    document.getElementById('editLoadUnits').value = job.load_units || '';
+    document.getElementById('editSubjectCode').value = job.subject_code || '';
+    document.getElementById('editSubjectName').value = job.subject_name || job.subject || '';
+    document.getElementById('editProgram').value = job.program || job.department_role || '';
+    const subjectArea = document.getElementById('editSubjectArea');
+    subjectArea.value = job.subject || '';
+    if (job.subject && !subjectArea.value) {
+        const legacyOption = new Option(job.subject, job.subject, true, true);
+        subjectArea.add(legacyOption);
+    }
+    document.getElementById('editLectureUnits').value = job.lecture_units ?? '';
+    document.getElementById('editLaboratoryUnits').value = job.laboratory_units ?? '';
+    document.getElementById('editAvailableSections').value = job.available_sections ?? job.remaining_vacancies ?? '';
     document.getElementById('editSalaryGrade').value = job.salary_grade || '';
-    document.getElementById('editTeachingSchedule').value = job.teaching_schedule || '';
+    updateTeachingHoursDisplay('editLectureUnits', 'editLaboratoryUnits', 'editTeachingHours', 'editTeachingHoursDisplay');
     
     // Format date for input field
     if (job.application_deadline) {
@@ -1975,6 +2023,7 @@ function openCreateJobModal(jobType) {
         closeJobTypeSelectionModal(); // Close the job type selection modal if it was open
     }
     document.getElementById('createJobModal').classList.remove('hidden'); // Open the job creation modal
+    updateTeachingHoursDisplay('createLectureUnits', 'createLaboratoryUnits', 'createTeachingHours', 'createTeachingHoursDisplay');
 }
 
 function openCreateutilityJobModal(jobuType) {
@@ -1997,7 +2046,36 @@ function closeCreateJobModal() {
     modal.classList.add('hidden');
     const form = modal.querySelector('form');
     if (form) form.reset();
+    updateTeachingHoursDisplay('createLectureUnits', 'createLaboratoryUnits', 'createTeachingHours', 'createTeachingHoursDisplay');
 }
+
+function updateTeachingHoursDisplay(lectureId, laboratoryId, hiddenId, displayId) {
+    const lectureInput = document.getElementById(lectureId);
+    const laboratoryInput = document.getElementById(laboratoryId);
+    const hiddenInput = document.getElementById(hiddenId);
+    const display = document.getElementById(displayId);
+    if (!lectureInput || !laboratoryInput || !hiddenInput || !display) return;
+    const lecture = Math.max(0, Number(lectureInput.value) || 0);
+    const laboratory = Math.max(0, Number(laboratoryInput.value) || 0);
+    const hours = Math.round((lecture + (laboratory * 3)) * 100) / 100;
+    hiddenInput.value = String(hours);
+    display.textContent = `${hours.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${hours === 1 ? 'hour' : 'hours'}/week`;
+}
+
+function bindTeachingHoursCalculator(lectureId, laboratoryId, hiddenId, displayId) {
+    [lectureId, laboratoryId].forEach((id) => {
+        const input = document.getElementById(id);
+        if (!input || input.dataset.hoursCalculatorBound === '1') return;
+        input.addEventListener('input', () => updateTeachingHoursDisplay(lectureId, laboratoryId, hiddenId, displayId));
+        input.dataset.hoursCalculatorBound = '1';
+    });
+    updateTeachingHoursDisplay(lectureId, laboratoryId, hiddenId, displayId);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    bindTeachingHoursCalculator('createLectureUnits', 'createLaboratoryUnits', 'createTeachingHours', 'createTeachingHoursDisplay');
+    bindTeachingHoursCalculator('editLectureUnits', 'editLaboratoryUnits', 'editTeachingHours', 'editTeachingHoursDisplay');
+});
 
 function closeCreateutilityJobModal() {
     const modal = document.getElementById('createutilityJobModal');
@@ -2317,6 +2395,16 @@ async function viewApplicantDetails(applicantId) {
         
         if (data.success) {
             const applicant = data.applicant;
+            const job = data.job || {};
+            const stageLabel = String(applicant.workflow_stage || applicant.status || 'Under Review')
+                .replaceAll('_', ' ')
+                .replace(/\b\w/g, character => character.toUpperCase());
+            const reviewName = document.getElementById('applicantReviewName');
+            const reviewPosition = document.getElementById('applicantReviewPosition');
+            const stageBadge = document.getElementById('actionStageBadge');
+            if (reviewName) reviewName.textContent = applicant.full_name || 'Applicant Review';
+            if (reviewPosition) reviewPosition.textContent = job.teaching_load_title || applicant.position || 'Teaching load application';
+            if (stageBadge) stageBadge.innerHTML = `<span class="ui-status ui-status--neutral">Current stage: ${rankingEscapeHtml(stageLabel)}</span>`;
             
             // Update status badge in Actions section
             const statusBadgeHTML = getStatusBadge(applicant.status);
@@ -2353,6 +2441,22 @@ async function viewApplicantDetails(applicantId) {
                 <div>
                     <label class="block text-sm font-medium text-gray-600">Applied Date</label>
                     <p class="text-gray-900">${formatDate(applicant.applied_date)}</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600">Employment Type</label>
+                    <p class="text-gray-900">${rankingEscapeHtml(job.job_type || 'Not specified')}</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600">Academic Period</label>
+                    <p class="text-gray-900">${rankingEscapeHtml([job.academic_year, job.semester].filter(Boolean).join(' · ') || 'Not specified')}</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600">Workload</label>
+                    <p class="text-gray-900">${job.lecture_units !== null && job.lecture_units !== undefined ? `${Number(job.lecture_units)} lecture + ${Number(job.laboratory_units || 0)} laboratory units` : 'Legacy workload record'}</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600">Teaching Hours / Week</label>
+                    <p class="text-gray-900">${job.teaching_hours_per_week !== null && job.teaching_hours_per_week !== undefined ? `${Number(job.teaching_hours_per_week)} hours/week` : 'Not recorded'}</p>
                 </div>
             `;
 
@@ -2396,16 +2500,34 @@ async function viewApplicantDetails(applicantId) {
             if (data.education && data.education.length > 0) {
                 let educationHTML = '';
                 data.education.forEach(edu => {
+                    const educationLevel = String(edu.education_level || 'other').replaceAll('_', ' ').replace(/\b\w/g, character => character.toUpperCase());
+                    const educationStatus = String(edu.education_status || 'completed').replace(/\b\w/g, character => character.toUpperCase());
+                    const isOngoingMasters = String(edu.education_level || '').toLowerCase() === 'master'
+                        && String(edu.education_status || '').toLowerCase() === 'ongoing';
+                    const educationPeriod = String(edu.education_status || '').toLowerCase() === 'ongoing'
+                        ? `${edu.start_year || 'Not recorded'} - Present`
+                        : `${edu.start_year || 'Not recorded'} - ${edu.year_completed || edu.end_year || 'Not recorded'}`;
+                    const graduateDocuments = [
+                        edu.certificate_of_grades ? `<a class="ui-button ui-button--secondary" href="${getApplicantUploadUrl(edu.certificate_of_grades)}" target="_blank" rel="noopener"><i class="fas fa-file-alt"></i>View Certificate of Grades</a>` : '',
+                        edu.proof_of_enrollment ? `<a class="ui-button ui-button--secondary" href="${getApplicantUploadUrl(edu.proof_of_enrollment)}" target="_blank" rel="noopener"><i class="fas fa-file-alt"></i>View Proof of Enrollment</a>` : ''
+                    ].filter(Boolean).join('');
+                    const ongoingMastersEvidence = isOngoingMasters ? `
+                        <dl class="ui-summary-list mt-3">
+                            <div><dt>Certificate of Grades</dt><dd>${edu.certificate_of_grades ? `<a class="text-blue-700 font-semibold hover:underline" href="${getApplicantUploadUrl(edu.certificate_of_grades)}" target="_blank" rel="noopener">View document</a>` : 'Not provided'}</dd></div>
+                            <div><dt>Proof of Enrollment</dt><dd>${edu.proof_of_enrollment ? `<a class="text-blue-700 font-semibold hover:underline" href="${getApplicantUploadUrl(edu.proof_of_enrollment)}" target="_blank" rel="noopener">View document</a>` : 'Not provided'}</dd></div>
+                        </dl>` : '';
                     educationHTML += `
                         <div class="border border-gray-200 rounded-lg p-4">
                             <div class="flex justify-between items-start mb-2">
                                 <h3 class="font-semibold text-gray-900">${edu.degree}</h3>
-                                <span class="text-sm text-gray-500">${edu.start_year} - ${edu.end_year}</span>
+                                <span class="text-sm text-gray-500">${rankingEscapeHtml(educationPeriod)}</span>
                             </div>
                             <p class="text-gray-700 mb-1">${edu.field_of_study}</p>
                             <p class="text-gray-600 text-sm mb-1">${edu.institution}</p>
-                            <p class="text-gray-600 text-sm">${rankingEscapeHtml((edu.education_level || 'other').replaceAll('_', ' '))} — ${rankingEscapeHtml(edu.education_status || 'completed')}${edu.completed_units ? `, ${Number(edu.completed_units)} completed units` : ''}</p>
+                            <p class="text-gray-600 text-sm">${rankingEscapeHtml(educationLevel)} — ${rankingEscapeHtml(educationStatus)}</p>
+                            ${isOngoingMasters ? `<p class="mt-2 text-sm font-semibold text-gray-900">Completed Master's Units: ${edu.completed_units !== null && edu.completed_units !== '' ? Number(edu.completed_units) : 'Not declared'}</p>` : ''}
                             ${edu.gpa ? `<p class="text-gray-600 text-sm">GPA: ${edu.gpa}</p>` : ''}
+                            ${ongoingMastersEvidence || (graduateDocuments ? `<div class="mt-3 flex flex-wrap gap-2">${graduateDocuments}</div>` : '')}
                         </div>
                     `;
                 });
@@ -2551,6 +2673,10 @@ async function viewApplicantDetails(applicantId) {
                                 <i class="fas ${isImage ? 'fa-image' : isPdf ? 'fa-file-pdf' : 'fa-file-alt'}"></i>
                                 <span class="truncate">${fileName}</span>
                             </div>
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                <span class="ui-status ui-status--success">Submitted</span>
+                                ${String(applicant.resubmission_documents || '').includes(doc.field) ? '<span class="ui-status ui-status--warning">Resubmission requested</span>' : ''}
+                            </div>
                             ${isImage ? `
                                 <div class="mt-3">
                                     <img src="${documentUrl}"
@@ -2621,7 +2747,8 @@ async function viewApplicantDetails(applicantId) {
                 `;
                 interviewInfo.style.display = 'block';
             } else {
-                interviewInfo.style.display = 'none';
+                document.getElementById('interviewDetails').innerHTML = '<p class="text-sm text-gray-500">No interview schedule has been recorded.</p>';
+                interviewInfo.style.display = 'block';
             }
             
             // Update demo teaching information if available
@@ -2671,7 +2798,8 @@ async function viewApplicantDetails(applicantId) {
                 `;
                 demoInfo.style.display = 'block';
             } else {
-                demoInfo.style.display = 'none';
+                document.getElementById('demoDetails').innerHTML = '<p class="text-sm text-gray-500">No demo teaching schedule has been recorded.</p>';
+                demoInfo.style.display = 'block';
             }
             
             // Display psychological exam receipt if uploaded
@@ -2727,8 +2855,29 @@ async function viewApplicantDetails(applicantId) {
                 `;
                 psychReceiptInfo.style.display = 'block';
             } else {
-                psychReceiptInfo.style.display = 'none';
+                psychReceiptDetails.innerHTML = '<p class="text-sm text-gray-500">No psychological exam receipt has been submitted.</p>';
+                psychReceiptInfo.style.display = 'block';
             }
+
+            const initialHiringInfo = document.getElementById('initialHiringInfo');
+            const initialHiringDetails = document.getElementById('initialHiringDetails');
+            const isPassed = ['passed', 'hired', 'permanently_hired'].includes(String(applicant.workflow_stage || '').toLowerCase())
+                || ['Passed', 'Application Passed', 'Hired', 'Permanently Hired'].includes(applicant.status);
+            if (isPassed) {
+                const hiringDateValue = applicant.hired_date || applicant.initially_hired_date || applicant.application_passed_date;
+                const hiringDate = hiringDateValue
+                    ? new Date(hiringDateValue).toLocaleString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                    : 'Date not recorded';
+                const hiringNotes = applicant.hire_notes || applicant.initially_hired_notes || '';
+                initialHiringDetails.innerHTML = `
+                    <div><dt>Status</dt><dd>Application Passed / Teaching Load Assigned</dd></div>
+                    <div><dt>Recorded</dt><dd>${rankingEscapeHtml(hiringDate)}</dd></div>
+                    ${hiringNotes ? `<div><dt>Notes</dt><dd>${rankingEscapeHtml(hiringNotes)}</dd></div>` : ''}
+                `;
+            } else {
+                initialHiringDetails.innerHTML = '<p class="text-sm text-gray-500">No hiring decision has been recorded.</p>';
+            }
+            initialHiringInfo.style.display = 'block';
             
             // Store current applicant ID and data for form submissions
             window.currentApplicantId = applicantId;
@@ -2831,6 +2980,7 @@ function updateActionButtons(status, applicant = null) {
     const permanentHireBtn = document.getElementById('permanentHireBtn');
     const resubmitBtn = document.getElementById('resubmitBtn');
     const rejectBtn = document.getElementById('rejectBtn');
+    const currentRole = typeof CURRENT_ADMIN_ROLE !== 'undefined' ? CURRENT_ADMIN_ROLE : '';
     
     // Use stored applicant data if not provided
     if (!applicant && currentApplicantData) {
@@ -2874,6 +3024,8 @@ function updateActionButtons(status, applicant = null) {
     if (existingRejectedStatus) {
         existingRejectedStatus.remove();
     }
+    const existingPsychWarning = document.querySelector('.psych-warning');
+    if (existingPsychWarning) existingPsychWarning.remove();
     
     // Check if psychological exam receipt has been uploaded
     const hasPsychReceipt = applicant && applicant.psych_exam_receipt;
@@ -2919,7 +3071,6 @@ function updateActionButtons(status, applicant = null) {
                     </p>
                 </div>
             `;
-            actionButtonsContainerRejected.innerHTML = '';
             actionButtonsContainerRejected.appendChild(rejectedDiv);
         }
         return; // Exit - no action buttons for rejected applications
@@ -2927,15 +3078,17 @@ function updateActionButtons(status, applicant = null) {
     
     // SECRETARY ACTIONS: Transfer, Request Resubmission, Reject
     if (workflowStage === 'secretary_review') {
-        if (transferBtn) transferBtn.classList.remove('hidden');
-        if (resubmitBtn) resubmitBtn.classList.remove('hidden');
-        if (rejectBtn) rejectBtn.classList.remove('hidden');
-        return; // Exit early for secretary
+        if (currentRole === 'Secretary') {
+            if (transferBtn) transferBtn.classList.remove('hidden');
+            if (resubmitBtn) resubmitBtn.classList.remove('hidden');
+            if (rejectBtn) rejectBtn.classList.remove('hidden');
+        }
+        return;
     }
     
     // SECRETARY VIEW-ONLY: Application already transferred
     // Secretary can see it but cannot take actions
-    if (typeof CURRENT_ADMIN_ROLE !== 'undefined' && CURRENT_ADMIN_ROLE === 'Secretary') {
+    if (currentRole === 'Secretary') {
         if (workflowStage && (workflowStage.startsWith('department_head') || 
             workflowStage === 'interview_scheduled' || workflowStage === 'interview_completed' ||
             workflowStage === 'demo_scheduled' || workflowStage === 'demo_completed' ||
@@ -2963,6 +3116,12 @@ function updateActionButtons(status, applicant = null) {
             }
             return; // Exit - no action buttons for transferred applications
         }
+        if (!workflowStage && ['Pending', 'Resubmission Required'].includes(status)) {
+            if (transferBtn) transferBtn.classList.remove('hidden');
+            if (resubmitBtn) resubmitBtn.classList.remove('hidden');
+            if (rejectBtn) rejectBtn.classList.remove('hidden');
+        }
+        return;
     }
     
     // DEPARTMENT HEAD ACTIONS: Schedule Interview (NO Request Resubmission)
@@ -3102,7 +3261,6 @@ function updateActionButtons(status, applicant = null) {
                     </p>
                 </div>
             `;
-            actionButtonsContainerHired.innerHTML = '';
             actionButtonsContainerHired.appendChild(hiredDiv);
         }
         return; // No buttons for completed applications
@@ -4940,6 +5098,16 @@ async function submitEditJob(event) {
     const originalText = submitBtn.innerHTML;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Updating...';
     submitBtn.disabled = true;
+
+    const lectureUnits = Number(formData.get('lecture_units'));
+    const laboratoryUnits = Number(formData.get('laboratory_units'));
+    const availableSections = Number(formData.get('available_sections'));
+    if (!Number.isFinite(lectureUnits) || lectureUnits < 0 || !Number.isFinite(laboratoryUnits) || laboratoryUnits < 0 || !Number.isInteger(availableSections) || availableSections < 0) {
+        showToast('Enter valid non-negative units and a whole-number section count.', 'warning');
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+        return;
+    }
     
     // Convert FormData to JSON object
     const jobData = {
@@ -4952,10 +5120,15 @@ async function submitEditJob(event) {
         application_deadline: formData.get('application_deadline'),
         academic_year: formData.get('academic_year') || '',
         semester: formData.get('semester') || '',
-        teaching_schedule: formData.get('teaching_schedule') || '',
-        teaching_hours_per_week: formData.get('teaching_hours_per_week') || '',
-        load_units: formData.get('load_units') || '',
-        required_instructors: formData.get('required_instructors') || '1',
+        subject_code: (formData.get('subject_code') || '').trim(),
+        subject_name: (formData.get('subject_name') || '').trim(),
+        program: (formData.get('program') || '').trim(),
+        subject: formData.get('subject') || '',
+        teaching_hours_per_week: lectureUnits + (laboratoryUnits * 3),
+        lecture_units: lectureUnits,
+        laboratory_units: laboratoryUnits,
+        available_sections: availableSections,
+        required_instructors: availableSections,
         salary_grade: formData.get('salary_grade') || '',
         job_description: formData.get('job_description'),
         job_requirements: formData.get('job_requirements'),

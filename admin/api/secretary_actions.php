@@ -11,15 +11,19 @@ header('Content-Type: application/json');
 ini_set('display_errors', 0);
 error_reporting(0);
 
-// Check if user is logged in
-if (!isset($_SESSION['admin_logged_in'])) {
+// This endpoint changes workflow state, so require an authenticated Secretary.
+if (empty($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Not logged in']);
     exit();
 }
 
-// For now, allow both Secretary and Department Head for testing
-// In production, you can restrict to only Secretary
 $admin_role = $_SESSION['admin_role'] ?? '';
+if ($admin_role !== 'Secretary') {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Only the Secretary can perform this action.']);
+    exit();
+}
 
 // Try to connect to database
 try {
@@ -60,12 +64,20 @@ if (!$email_helper_loaded) {
 }
 
 $action = $_POST['action'] ?? '';
-$application_id = $_POST['application_id'] ?? 0;
-$secretary_id = $_SESSION['admin_id'] ?? 1; // Default to 1 if not set
+$application_id = filter_var($_POST['application_id'] ?? null, FILTER_VALIDATE_INT, [
+    'options' => ['min_range' => 1],
+]);
+$secretary_id = (int)($_SESSION['admin_id'] ?? 0);
 $secretary_name = $_SESSION['admin_name'] ?? 'Admin';
 
-if (!$application_id) {
+if ($application_id === false || $application_id === null) {
+    http_response_code(422);
     echo json_encode(['success' => false, 'message' => 'Application ID is required']);
+    exit();
+}
+if ($secretary_id <= 0) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Your administrator session is incomplete. Please sign in again.']);
     exit();
 }
 
@@ -86,12 +98,22 @@ try {
     $stmt->close();
 
     if (!$application) {
+        http_response_code(404);
         echo json_encode(['success' => false, 'message' => 'Application not found']);
         exit();
     }
 } catch (Exception $e) {
     error_log('Secretary action application lookup failed: ' . $e->getMessage());
     echo json_encode(['success' => false, 'message' => 'Unable to load the application. Please try again.']);
+    exit();
+}
+
+if (($application['workflow_stage'] ?? '') !== 'secretary_review') {
+    http_response_code(409);
+    echo json_encode([
+        'success' => false,
+        'message' => 'This action is available only while the application is under Secretary review.',
+    ]);
     exit();
 }
 
@@ -150,7 +172,7 @@ function handleTransferToDeptHead($conn, $application_id, $application, $secreta
                                    secretary_notes = ?,
                                    assigned_to_department = ?,
                                    transferred_to_dept_head_date = NOW()
-                               WHERE id = ?");
+                               WHERE id = ? AND workflow_stage = 'secretary_review'");
         
         if (!$stmt) {
             throw new Exception("Prepare failed: " . $conn->error);
@@ -160,6 +182,11 @@ function handleTransferToDeptHead($conn, $application_id, $application, $secreta
         
         if (!$stmt->execute()) {
             throw new Exception("Execute failed: " . $stmt->error);
+        }
+
+        if ($stmt->affected_rows !== 1) {
+            http_response_code(409);
+            throw new Exception('The application stage changed before the transfer could be completed.');
         }
         
         $stmt->close();
@@ -374,10 +401,10 @@ function handleRequestResubmission($conn, $application_id, $application, $secret
                                    secretary_id = ?,
                                    secretary_review_date = NOW(),
                                    secretary_notes = ?
-                           WHERE id = ?");
+                           WHERE id = ? AND workflow_stage = 'secretary_review'");
     $stmt->bind_param("ssisi", $documents_json, $reason, $secretary_id, $reason, $application_id);
     
-    if ($stmt->execute()) {
+    if ($stmt->execute() && $stmt->affected_rows === 1) {
         $stmt->close();
         
         // Log workflow history
@@ -409,6 +436,7 @@ function handleRequestResubmission($conn, $application_id, $application, $secret
             'message' => 'Resubmission request sent successfully'
         ]);
     } else {
+        http_response_code(409);
         echo json_encode(['success' => false, 'message' => 'Failed to request resubmission']);
     }
 }
@@ -431,10 +459,10 @@ function handleReject($conn, $application_id, $application, $secretary_id, $secr
                                secretary_id = ?,
                                secretary_review_date = NOW(),
                                secretary_notes = ?
-                           WHERE id = ?");
+                           WHERE id = ? AND workflow_stage = 'secretary_review'");
     $stmt->bind_param("sisi", $reason, $secretary_id, $reason, $application_id);
     
-    if ($stmt->execute()) {
+    if ($stmt->execute() && $stmt->affected_rows === 1) {
         $stmt->close();
         
         // Update applicant's ban status if user_id exists
@@ -493,6 +521,7 @@ function handleReject($conn, $application_id, $application, $secretary_id, $secr
             'message' => 'Application rejected successfully. Applicant banned from applying for 4 months.'
         ]);
     } else {
+        http_response_code(409);
         echo json_encode(['success' => false, 'message' => 'Failed to reject application']);
     }
 }

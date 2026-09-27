@@ -510,6 +510,21 @@ if (empty($experience_data)) {
 }
 if (empty($skills_data)) $ranking_profile_missing[] = 'skills';
 if (empty($qualifications_data)) $ranking_profile_missing[] = 'certifications, licenses, or training (when applicable)';
+
+$profile_display_name = trim(($applicant['applicant_fname'] ?? '') . ' ' . ($applicant['applicant_lname'] ?? ''));
+$profile_initials = '';
+if (!empty($applicant['applicant_fname'])) $profile_initials .= strtoupper(substr($applicant['applicant_fname'], 0, 1));
+if (!empty($applicant['applicant_lname'])) $profile_initials .= strtoupper(substr($applicant['applicant_lname'], 0, 1));
+$profile_review_target = 'education';
+foreach ($ranking_profile_missing as $missing_item) {
+    if (stripos($missing_item, 'work') !== false) { $profile_review_target = 'experience'; break; }
+    if (stripos($missing_item, 'skill') !== false) { $profile_review_target = 'skills'; break; }
+    if (stripos($missing_item, 'certification') !== false || stripos($missing_item, 'license') !== false) { $profile_review_target = 'qualifications'; break; }
+}
+$profile_readiness_label = empty($ranking_profile_missing)
+    ? 'Ready for review'
+    : count($ranking_profile_missing) . ' ' . (count($ranking_profile_missing) === 1 ? 'area' : 'areas') . ' to review';
+$account_status_label = !empty($applicant['is_verified']) ? 'Verified' : 'Verification pending';
 ?>
 <html lang="en">
 <head><script src="https://static.readdy.ai/static/e.js"></script>
@@ -788,11 +803,11 @@ function confirmSave() {
   }
   
   // Copy values from visible inputs to hidden form
-  document.getElementById('form_fname').value = document.querySelector('input[name="applicant_fname"]').value;
-  document.getElementById('form_lname').value = document.querySelector('input[name="applicant_lname"]').value;
-  document.getElementById('form_email').value = document.querySelector('input[name="applicant_email"]').value;
+  document.getElementById('form_fname').value = document.querySelector('#personalInfo input[name="applicant_fname"]').value;
+  document.getElementById('form_lname').value = document.querySelector('#personalInfo input[name="applicant_lname"]').value;
+  document.getElementById('form_email').value = document.querySelector('#personalInfo input[name="applicant_email"]').value;
   document.getElementById('form_phone').value = document.querySelector('input[name="applicant_num"]').value;
-  document.getElementById('form_address').value = document.querySelector('textarea[name="applicant_address"]').value;
+  document.getElementById('form_address').value = document.querySelector('#personalInfo textarea[name="applicant_address"]').value;
   
   // Submit the form
   document.getElementById('personalInfoForm').submit();
@@ -804,13 +819,15 @@ document.addEventListener('DOMContentLoaded', function() {
   const saveBtn = document.getElementById('savePersonalBtn');
   const cancelBtn = document.getElementById('cancelPersonalBtn');
   const personalActions = document.getElementById('personalActions');
+  const personalView = document.getElementById('personalInfoView');
+  const personalEdit = document.getElementById('personalInfoEdit');
   
   // Get all personal info inputs
-  const firstNameInput = document.querySelector('input[name="applicant_fname"]');
-  const lastNameInput = document.querySelector('input[name="applicant_lname"]');
-  const emailInput = document.querySelector('input[name="applicant_email"]');
+  const firstNameInput = document.querySelector('#personalInfo input[name="applicant_fname"]');
+  const lastNameInput = document.querySelector('#personalInfo input[name="applicant_lname"]');
+  const emailInput = document.querySelector('#personalInfo input[name="applicant_email"]');
   const phoneInput = document.querySelector('#profileMainContent input[name="applicant_num"]');
-  const addressInput = document.querySelector('textarea[name="applicant_address"]');
+  const addressInput = document.querySelector('#personalInfo textarea[name="applicant_address"]');
   
   // Store original values for cancel functionality
   let originalValues = {};
@@ -875,6 +892,8 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // Show Save/Cancel buttons, hide Edit button
       if (personalActions) personalActions.classList.remove('hidden');
+      if (personalView) personalView.classList.add('hidden');
+      if (personalEdit) personalEdit.classList.remove('hidden');
       editBtn.style.display = 'none';
     });
   }
@@ -900,6 +919,8 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // Hide Save/Cancel buttons, show Edit button
       if (personalActions) personalActions.classList.add('hidden');
+      if (personalView) personalView.classList.remove('hidden');
+      if (personalEdit) personalEdit.classList.add('hidden');
       if (editBtn) editBtn.style.display = 'block';
     });
   }
@@ -925,400 +946,7 @@ document.addEventListener('DOMContentLoaded', function() {
   <input type="hidden" name="applicant_address" id="form_address">
 </form>
 
-<div id="profileMainContent">
-<main class="max-w-7xl mx-auto px-6 py-8">
-<div class="ui-page-stack">
-<header class="ui-page-header">
-  <div class="ui-page-header__main">
-    <p class="ui-eyebrow">Applicant account</p>
-    <h1 class="ui-page-title">My Profile</h1>
-    <p class="ui-page-description">Maintain the personal and professional information used in teaching-load applications.</p>
-  </div>
-</header>
-
-<section class="ui-profile-hero">
-<div class="ui-profile-identity">
-<div class="relative inline-block">
-<div class="w-32 h-32 bg-gradient-to-br from-primary to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 overflow-hidden" id="profilePictureContainer">
-<?php if (!empty($applicant['profile_picture']) && file_exists('uploads/profile_pictures/' . $applicant['profile_picture'])): ?>
-    <img src="uploads/profile_pictures/<?php echo htmlspecialchars($applicant['profile_picture']); ?>" alt="Profile Picture" class="w-full h-full object-cover" id="profileImage">
-<?php else: ?>
-    <?php
-    // Show initials from first and last name
-    $initials = '';
-    if (!empty($applicant['applicant_fname'])) {
-        $initials .= strtoupper($applicant['applicant_fname'][0]);
-    }
-    if (!empty($applicant['applicant_lname'])) {
-        $initials .= strtoupper($applicant['applicant_lname'][0]);
-    }
-    echo '<span class="text-white font-bold text-4xl" id="profileInitials">' . htmlspecialchars($initials) . '</span>';
-    ?>
-<?php endif; ?>
-</div>
-<button class="absolute bottom-0 right-0 w-10 h-10 bg-secondary rounded-full flex items-center justify-center text-white hover:bg-yellow-600 transition-colors !rounded-button" id="uploadPhotoBtn">
-<i class="ri-camera-line text-lg"></i>
-</button>
-</div>
-<div>
-<p class="ui-eyebrow">Candidate profile</p>
-<h2><?php echo htmlspecialchars($applicant['applicant_fname'] . ' ' . $applicant['applicant_lname']); ?></h2>
-<p><?php echo htmlspecialchars($applicant['applicant_email']); ?></p>
-<span>Profile photo: JPG, PNG or GIF &middot; maximum 5MB</span>
-</div>
-<input type="file" id="photoUpload" accept="image/*" class="hidden">
-</div>
-
-<div class="ui-profile-details" id="personalInfo">
-<div class="ui-section-header ui-profile-details__header">
-<div><p class="ui-eyebrow">Contact and identity</p><h2>Personal Information</h2></div>
-<button class="ui-button ui-button--secondary" id="editPersonalBtn" type="button"><i class="ri-edit-line"></i>Edit details</button>
-</div>
-<div class="ui-form-grid">
-<div>
-<label class="block text-sm font-medium text-gray-700 mb-2">First Name</label>
-<input type="text" name="applicant_fname" value="<?php echo htmlspecialchars($applicant['applicant_fname']); ?>" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm" pattern="[A-Za-z\s\-']+" title="Please enter only letters, spaces, hyphens, and apostrophes" disabled>
-</div>
-<div>
-<label class="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
-<input type="text" name="applicant_lname" value="<?php echo htmlspecialchars($applicant['applicant_lname']); ?>" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm" pattern="[A-Za-z\s\-']+" title="Please enter only letters, spaces, hyphens, and apostrophes" disabled>
-</div>
-<div>
-<label class="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
-<input type="email" name="applicant_email" value="<?php echo htmlspecialchars($applicant['applicant_email']); ?>" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm" disabled>
-</div>
-<div>
-<label class="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-<input type="tel" name="applicant_num" value="<?php echo htmlspecialchars($applicant['applicant_num']); ?>" 
-       pattern="09[0-9]{9}" 
-       maxlength="11" 
-       placeholder="09XXXXXXXXX"
-       title="Please enter a valid Philippine mobile number (e.g., 09123456789)"
-       oninput="this.value = this.value.replace(/[^0-9]/g, '')"
-       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm" disabled>
-</div>
-<div class="md:col-span-2">
-<label class="block text-sm font-medium text-gray-700 mb-2">Address</label>
-<textarea name="applicant_address" rows="3" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm resize-none" disabled placeholder="Enter your complete address"><?php echo htmlspecialchars($applicant['applicant_address']); ?></textarea>
-</div>
-</div>
-<div class="hidden ui-form-actions" id="personalActions">
-<button class="ui-button ui-button--secondary" id="cancelPersonalBtn" type="button">Cancel</button>
-<button class="ui-button ui-button--primary" id="savePersonalBtn" type="button">Save Changes</button>
-</div>
-</div>
-</section>
-
-<?php if (!empty($ranking_profile_missing)): ?>
-<div class="mb-6 border border-amber-200 bg-amber-50 rounded-xl p-4">
-<div class="flex items-start gap-3">
-<i class="ri-information-line text-amber-600 text-xl mt-0.5"></i>
-<div>
-<h3 class="font-semibold text-amber-900">Additional profile information improves job-specific matching</h3>
-<p class="text-sm text-amber-800 mt-1">Additional ranking information needed: <?php echo htmlspecialchars(implode(', ', $ranking_profile_missing)); ?>. Only information saved in your NCHire profile is considered; missing details are never assumed.</p>
-</div>
-</div>
-</div>
-<?php endif; ?>
-
-<div class="ui-profile-workspace">
-<div class="ui-profile-tabs">
-<nav class="flex space-x-8 overflow-x-auto" aria-label="Profile sections">
-<button class="py-4 px-1 border-b-2 border-primary text-primary font-medium text-sm whitespace-nowrap tab-btn" data-tab="education">Education</button>
-<button class="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium text-sm whitespace-nowrap tab-btn" data-tab="experience">Work Experience</button>
-<button class="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium text-sm whitespace-nowrap tab-btn" data-tab="skills">Skills</button>
-<button class="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium text-sm whitespace-nowrap tab-btn" data-tab="qualifications">Certifications & Licenses</button>
-<button class="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium text-sm whitespace-nowrap tab-btn" data-tab="settings">Account Settings</button>
-</nav>
-</div>
-
-<div class="ui-profile-workspace__content">
-<div id="education" class="tab-content">
-<div class="flex items-center justify-between mb-6">
-<h3 class="text-xl font-semibold text-gray-900">Education Background</h3>
-<button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors text-sm !rounded-button" id="addEducationBtn">Add Education</button>
-</div>
-<div class="space-y-3" id="educationList">
-<?php if (!empty($education_data)): ?>
-<?php foreach ($education_data as $education): ?>
-<?php
-$level = $education['education_level'] ?? nc_classify_education_level($education);
-$status = strtolower(trim((string)($education['education_status'] ?? 'completed'))) ?: 'completed';
-$level_label = profileEducationLevelLabel($level);
-$status_label = $status === 'ongoing' ? 'Ongoing' : 'Completed';
-$year_display = $status === 'ongoing'
-    ? htmlspecialchars(($education['start_year'] ?? '') . ' - Present')
-    : htmlspecialchars(($education['start_year'] ?? '') . ' - ' . (($education['year_completed'] ?? '') ?: ($education['end_year'] ?? '')));
-?>
-<div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
-<div class="flex items-start justify-between gap-4">
-<div class="flex-1 min-w-0">
-<div class="flex flex-wrap items-center gap-2 mb-2">
-<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200"><?php echo htmlspecialchars($level_label); ?></span>
-<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium <?php echo $status === 'ongoing' ? 'bg-blue-100 text-blue-800 border border-blue-200' : 'bg-green-100 text-green-800 border border-green-200'; ?>"><?php echo htmlspecialchars($status_label); ?></span>
-</div>
-<h4 class="font-semibold text-gray-900 text-base"><?php echo htmlspecialchars($education['degree']); ?></h4>
-<?php if (!empty($education['field_of_study'])): ?>
-<p class="text-gray-600 mt-1 text-sm"><?php echo htmlspecialchars($education['field_of_study']); ?></p>
-<?php endif; ?>
-<p class="text-gray-600 mt-1 text-sm"><?php echo htmlspecialchars($education['institution']); ?></p>
-<p class="text-gray-500 text-sm mt-1">
-<?php echo $year_display; ?>
-<?php if (!empty($education['gpa'])): ?>
- | GPA: <?php echo htmlspecialchars($education['gpa']); ?>
-<?php endif; ?>
-<?php if (!empty($education['completed_units'])): ?>
- | Completed Units: <?php echo htmlspecialchars((string)$education['completed_units']); ?>
-<?php endif; ?>
-</p>
-<?php if (!empty($education['certificate_of_grades']) || !empty($education['proof_of_enrollment'])): ?>
-<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-<?php if (!empty($education['certificate_of_grades'])): ?>
-<div class="p-3 bg-emerald-50 border border-emerald-300 rounded-lg">
-<div class="text-xs font-bold uppercase tracking-wide text-emerald-700">Current / Active</div>
-<a href="<?php echo htmlspecialchars($education['certificate_of_grades']); ?>" target="_blank" rel="noopener" class="block text-sm text-emerald-800 hover:underline break-all mt-1"><i class="ri-file-list-3-line mr-1"></i><?php echo htmlspecialchars(basename($education['certificate_of_grades'])); ?></a>
-<div class="text-xs text-gray-500 mt-1">Certificate of Grades</div>
-<button type="button" onclick="editEducation(<?php echo (int)$education['id']; ?>)" class="mt-2 text-xs font-semibold text-blue-700 hover:underline">Update / Replace</button>
-</div>
-<?php endif; ?>
-<?php if (!empty($education['proof_of_enrollment'])): ?>
-<div class="p-3 bg-emerald-50 border border-emerald-300 rounded-lg">
-<div class="text-xs font-bold uppercase tracking-wide text-emerald-700">Current / Active</div>
-<a href="<?php echo htmlspecialchars($education['proof_of_enrollment']); ?>" target="_blank" rel="noopener" class="block text-sm text-emerald-800 hover:underline break-all mt-1"><i class="ri-file-user-line mr-1"></i><?php echo htmlspecialchars(basename($education['proof_of_enrollment'])); ?></a>
-<div class="text-xs text-gray-500 mt-1">Proof of Enrollment</div>
-<button type="button" onclick="editEducation(<?php echo (int)$education['id']; ?>)" class="mt-2 text-xs font-semibold text-blue-700 hover:underline">Update / Replace</button>
-</div>
-<?php endif; ?>
-</div>
-<?php endif; ?>
-</div>
-<div class="flex space-x-1 ml-4">
-<button onclick="editEducation(<?php echo $education['id']; ?>)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
-<i class="ri-edit-line text-sm"></i>
-</button>
-<button onclick="deleteEducation(<?php echo $education['id']; ?>)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors" title="Delete">
-<i class="ri-delete-bin-line text-sm"></i>
-</button>
-</div>
-</div>
-</div>
-<?php endforeach; ?>
-<?php else: ?>
-<div class="text-center py-12 text-gray-500">
-<i class="ri-graduation-cap-line text-4xl mb-4 text-gray-300"></i>
-<p class="text-gray-600">No education records found.</p>
-<p class="text-sm text-gray-500 mt-1">Click "Add Education" to get started.</p>
-</div>
-<?php endif; ?>
-</div>
-<div class="mt-6 border border-blue-100 bg-blue-50 rounded-lg p-4">
-<div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-<div>
-<h4 class="font-semibold text-gray-900 text-base">Qualification and Salary Projection</h4>
-<p class="text-sm text-gray-700 mt-1"><?php echo htmlspecialchars($qualification_summary['title']); ?></p>
-<p class="text-xs text-gray-500 mt-1"><?php echo htmlspecialchars($qualification_summary['note']); ?></p>
-</div>
-<div class="md:text-right">
-<p class="text-sm font-semibold text-blue-900"><?php echo htmlspecialchars($qualification_summary['rate']); ?><sup>*</sup></p>
-<p class="text-xs text-gray-500 mt-1">*<?php echo htmlspecialchars($qualification_projection['disclaimer']); ?></p>
-</div>
-</div>
-</div>
-</div>
-
-<div id="experience" class="tab-content hidden">
-<div class="flex items-center justify-between mb-6">
-<h3 class="text-xl font-semibold text-gray-900">Work Experience</h3>
-<button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors text-sm !rounded-button" id="addExperienceBtn">Add Experience</button>
-</div>
-<div class="space-y-3" id="experienceList">
-<?php if (!empty($experience_data)): ?>
-<?php foreach ($experience_data as $experience): ?>
-<div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
-<div class="flex items-start justify-between">
-<div class="flex-1">
-<h4 class="font-semibold text-gray-900 text-base"><?php echo htmlspecialchars($experience['job_title']); ?></h4>
-<span class="inline-block mt-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs"><?php echo htmlspecialchars(ucfirst($experience['experience_type'] ?? 'other')); ?></span>
-<p class="text-gray-600 mt-1 text-sm"><?php echo htmlspecialchars($experience['company']); ?></p>
-<p class="text-gray-500 text-sm mt-1"><?php
-// Format dates nicely
-$startDate = date('M Y', strtotime($experience['start_date']));
-$endDate = $experience['end_date'] ? date('M Y', strtotime($experience['end_date'])) : 'Present';
-echo $startDate . ' - ' . $endDate;
-if (!empty($experience['location'])) {
-    echo ' | ' . htmlspecialchars($experience['location']);
-}
-?></p>
-<?php if (!empty($experience['description'])): ?><p class="text-gray-600 text-sm mt-2"><?php echo nl2br(htmlspecialchars($experience['description'])); ?></p><?php endif; ?>
-</div>
-<div class="flex space-x-1 ml-4">
-<button onclick="editExperience(<?php echo $experience['id']; ?>)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
-<i class="ri-edit-line text-sm"></i>
-</button>
-<button onclick="deleteExperience(<?php echo $experience['id']; ?>)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors" title="Delete">
-<i class="ri-delete-bin-line text-sm"></i>
-</button>
-</div>
-</div>
-</div>
-<?php endforeach; ?>
-<?php else: ?>
-<div class="text-center py-12 text-gray-500">
-<i class="ri-briefcase-line text-4xl mb-4 text-gray-300"></i>
-<p class="text-gray-600">No work experience records found.</p>
-<p class="text-sm text-gray-500 mt-1">Click "Add Experience" to get started.</p>
-</div>
-<?php endif; ?>
-</div>
-</div>
-
-<div id="skills" class="tab-content hidden">
-<div class="flex items-center justify-between mb-6">
-<h3 class="text-xl font-semibold text-gray-900">Skills & Expertise</h3>
-<button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors text-sm !rounded-button" id="addSkillBtn">Add Skill</button>
-</div>
-<div class="space-y-3" id="skillsList">
-<?php if (!empty($skills_data)): ?>
-<?php foreach ($skills_data as $skill): ?>
-<div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
-<div class="flex items-start justify-between">
-<div class="flex-1">
-<h4 class="font-semibold text-gray-900 text-base"><?php echo htmlspecialchars($skill['skill_name']); ?></h4>
-<div class="flex items-center mt-2">
-<?php for ($i = 1; $i <= 5; $i++): ?>
-<div class="w-2.5 h-2.5 rounded-full mr-1 <?php echo $i <= $skill['skill_level'] ? 'bg-blue-500' : 'bg-gray-200'; ?>"></div>
-<?php endfor; ?>
-<span class="text-sm text-gray-500 ml-2">
-<?php 
-$levels = ['', 'Beginner', 'Novice', 'Intermediate', 'Advanced', 'Expert'];
-echo $levels[$skill['skill_level']];
-?>
-</span>
-</div>
-</div>
-<div class="flex space-x-1 ml-4">
-<button onclick="editSkill(<?php echo $skill['id']; ?>)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
-<i class="ri-edit-line text-sm"></i>
-</button>
-<button onclick="deleteSkill(<?php echo $skill['id']; ?>)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors" title="Delete">
-<i class="ri-delete-bin-line text-sm"></i>
-</button>
-</div>
-</div>
-</div>
-<?php endforeach; ?>
-<?php else: ?>
-<div class="text-center py-12 text-gray-500">
-<i class="ri-tools-line text-4xl mb-4 text-gray-300"></i>
-<p class="text-gray-600">No skills records found.</p>
-<p class="text-sm text-gray-500 mt-1">Click "Add Skill" to get started.</p>
-</div>
-<?php endif; ?>
-</div>
-</div>
-</div>
-
-<div id="qualifications" class="tab-content hidden">
-<div class="flex items-center justify-between mb-6 gap-4">
-<div>
-<h3 class="text-xl font-semibold text-gray-900">Certifications, Licenses & Training</h3>
-<p class="text-sm text-gray-500 mt-1">Add structured qualification titles for accurate matching. Uploaded proof remains unverified until reviewed.</p>
-</div>
-<button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors text-sm whitespace-nowrap !rounded-button" id="addQualificationBtn">Add Qualification</button>
-</div>
-<div class="space-y-3" id="qualificationsList">
-<?php if (!empty($qualifications_data)): ?>
-<?php foreach ($qualifications_data as $qualification): ?>
-<div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow" data-qualification-id="<?php echo (int)$qualification['id']; ?>">
-<div class="flex items-start justify-between gap-4">
-<div class="flex-1">
-<div class="flex flex-wrap items-center gap-2">
-<h4 class="font-semibold text-gray-900 text-base"><?php echo htmlspecialchars($qualification['title']); ?></h4>
-<span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-medium"><?php echo htmlspecialchars(ucfirst($qualification['qualification_type'])); ?></span>
-<span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs"><?php echo htmlspecialchars(ucfirst($qualification['verification_status'])); ?></span>
-</div>
-<?php if (!empty($qualification['issuing_organization'])): ?><p class="text-gray-600 mt-1 text-sm"><?php echo htmlspecialchars($qualification['issuing_organization']); ?></p><?php endif; ?>
-<p class="text-gray-500 text-sm mt-1"><?php echo $qualification['issued_date'] ? 'Issued ' . htmlspecialchars(date('M Y', strtotime($qualification['issued_date']))) : 'Issue date not provided'; ?><?php echo $qualification['expiry_date'] ? ' | Expires ' . htmlspecialchars(date('M Y', strtotime($qualification['expiry_date']))) : ''; ?></p>
-<?php if (!empty($qualification['proof_document'])): ?><a href="<?php echo htmlspecialchars($qualification['proof_document']); ?>" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-primary hover:underline text-xs mt-2"><i class="ri-file-text-line"></i>View proof on file</a><?php endif; ?>
-</div>
-<div class="flex space-x-1">
-<button type="button" onclick="editQualification(<?php echo (int)$qualification['id']; ?>)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600" title="Edit"><i class="ri-edit-line"></i></button>
-<button type="button" onclick="deleteQualification(<?php echo (int)$qualification['id']; ?>)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500" title="Delete"><i class="ri-delete-bin-line"></i></button>
-</div>
-</div>
-</div>
-<?php endforeach; ?>
-<?php else: ?>
-<div class="text-center py-12 text-gray-500">
-<i class="ri-award-line text-4xl mb-4 text-gray-300"></i>
-<p class="text-gray-600">No structured qualifications found.</p>
-<p class="text-sm text-gray-500 mt-1">Add only certifications, licenses, or training you actually hold.</p>
-</div>
-<?php endif; ?>
-</div>
-</div>
-
-<div id="settings" class="tab-content hidden">
-<div class="px-4 -mt-2">
-<h3 class="text-xl font-semibold text-gray-900 mb-3">Account Settings</h3>
-<div class="space-y-6">
-<div class="border border-gray-200 rounded-lg p-8">
-<h4 class="font-medium text-gray-900 mb-3">Change Password</h4>
-<p class="text-sm text-gray-600 mb-6">Update your account password to keep your account secure.</p>
-<div class="space-y-5">
-<div>
-<label class="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
-<div class="relative">
-<input type="password" id="currentPassword" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly');" class="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm" placeholder="Enter your current password" required>
-<button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none" onclick="togglePasswordVisibility('currentPassword', this)">
-<i class="ri-eye-line text-lg"></i>
-</button>
-</div>
-</div>
-<div>
-<label class="block text-sm font-medium text-gray-700 mb-2">New Password</label>
-<div class="relative">
-<input type="password" id="newPassword" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly');" class="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm" placeholder="Enter new password (min. 8 characters)" required>
-<button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none" onclick="togglePasswordVisibility('newPassword', this)">
-<i class="ri-eye-line text-lg"></i>
-</button>
-</div>
-</div>
-<div>
-<label class="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
-<div class="relative">
-<input type="password" id="confirmPassword" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly');" class="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm" placeholder="Re-enter new password" required>
-<button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none" onclick="togglePasswordVisibility('confirmPassword', this)">
-<i class="ri-eye-line text-lg"></i>
-</button>
-</div>
-</div>
-<div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-<p class="text-xs text-amber-800">
-<i class="ri-shield-check-line mr-1"></i>
-<strong>Password Requirements:</strong><br>
-• At least 8 characters long<br>
-• Must contain at least one number<br>
-• Must contain at least one symbol (!@#$%^&*)
-</p>
-</div>
-<div class="flex items-center gap-3 pt-2">
-<button type="button" id="updatePasswordBtn" class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium !rounded-button">
-<i class="ri-lock-password-line mr-2"></i>Update Password
-</button>
-<button type="button" id="cancelPasswordBtn" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium !rounded-button">
-Cancel
-</button>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</main>
-</div>
+<?php require __DIR__ . '/components/profile_workspace.php'; ?>
 
 <script id="headerInteractions">
 document.addEventListener('DOMContentLoaded', function() {
@@ -1354,90 +982,6 @@ document.addEventListener('click', function(e) {
 });
 });
 </script>
-
-<script id="tabNavigation">
-document.addEventListener('DOMContentLoaded', function() {
-  // Wait a bit to ensure all elements are loaded
-  setTimeout(function() {
-    const tabButtons = document.querySelectorAll('.tab-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
-
-    // Function to switch tabs
-    function switchTab(targetTabId, clickedButton) {
-      // Hide all tab contents
-      tabContents.forEach(content => {
-        content.classList.add('hidden');
-      });
-
-      // Remove active state from all tab buttons
-      tabButtons.forEach(btn => {
-        btn.classList.remove('border-primary', 'text-primary');
-        btn.classList.add('border-transparent', 'text-gray-500');
-      });
-
-      // Show target content
-      const targetContent = document.getElementById(targetTabId);
-      if (targetContent) {
-        targetContent.classList.remove('hidden');
-      }
-
-      // Add active state to clicked button
-      if (clickedButton) {
-        clickedButton.classList.remove('border-transparent', 'text-gray-500');
-        clickedButton.classList.add('border-primary', 'text-primary');
-      }
-      
-      // Clear password fields when switching to Account Settings tab
-      if (targetTabId === 'settings') {
-        const currentPassword = document.getElementById('currentPassword');
-        const newPassword = document.getElementById('newPassword');
-        const confirmPassword = document.getElementById('confirmPassword');
-        
-        if (currentPassword) {
-          currentPassword.value = '';
-          currentPassword.setAttribute('readonly', 'readonly');
-        }
-        if (newPassword) {
-          newPassword.value = '';
-          newPassword.setAttribute('readonly', 'readonly');
-        }
-        if (confirmPassword) {
-          confirmPassword.value = '';
-          confirmPassword.setAttribute('readonly', 'readonly');
-        }
-      }
-    }
-
-    // Add click event listeners to tab buttons
-    tabButtons.forEach(button => {
-      button.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        const targetTab = this.getAttribute('data-tab');
-        if (targetTab) {
-          switchTab(targetTab, this);
-        }
-      });
-    });
-
-    // Initialize - restore last active tab from localStorage or default to education
-    if (tabButtons.length > 0) {
-      const lastActiveTab = localStorage.getItem('activeProfileTab');
-      const defaultTab = lastActiveTab || 'education';
-      
-      const tabButton = document.querySelector(`[data-tab="${defaultTab}"]`);
-      if (tabButton) {
-        switchTab(defaultTab, tabButton);
-      }
-      
-      // Clear the stored tab so it doesn't persist on next normal visit
-      localStorage.removeItem('activeProfileTab');
-    }
-  }, 100);
-});
-</script>
-
 
 <script id="profilePictureUtils">
 // Universal function to update all profile pictures on the page
@@ -1609,44 +1153,44 @@ if (document.getElementById('profileMainContent')) {
     const status = String(edu.education_status || 'completed').toLowerCase();
     const statusLabel = status === 'ongoing' ? 'Ongoing' : 'Completed';
     const yearDisplay = status === 'ongoing'
-      ? `${edu.start_year || ''} - Present`
-      : `${edu.start_year || ''} - ${edu.year_completed || edu.end_year || ''}`;
-    const units = edu.completed_units ? ` | Completed Units: ${escapeHtml(String(edu.completed_units))}` : '';
-    const gpa = edu.gpa ? ` | GPA: ${escapeHtml(edu.gpa)}` : '';
-    const documentCard = (path, label, icon) => path ? `
-      <div class="p-3 bg-emerald-50 border border-emerald-300 rounded-lg">
-        <div class="text-xs font-bold uppercase tracking-wide text-emerald-700">Current / Active</div>
-        <a href="${escapeHtml(path)}" target="_blank" rel="noopener" class="block text-sm text-emerald-800 hover:underline break-all mt-1"><i class="${icon} mr-1"></i>${escapeHtml(String(path).split('/').pop())}</a>
-        <div class="text-xs text-gray-500 mt-1">${label}</div>
-        <button type="button" onclick="editEducation(${Number(edu.id)})" class="mt-2 text-xs font-semibold text-blue-700 hover:underline">Update / Replace</button>
+      ? `${edu.start_year || ''} – Present`
+      : `${edu.start_year || ''} – ${edu.year_completed || edu.end_year || ''}`;
+    const hasCompletedMastersUnits = level === 'master'
+      && status === 'ongoing'
+      && edu.completed_units !== null
+      && edu.completed_units !== undefined
+      && edu.completed_units !== '';
+    const documentRow = (path, label, icon) => path ? `
+      <div class="ui-profile-document-row">
+        <i class="${icon}" aria-hidden="true"></i>
+        <div><strong>${label}</strong><span>${escapeHtml(String(path).split('/').pop())}</span></div>
+        <span class="ui-document-status">Current</span>
+        <div class="ui-profile-document-row__actions"><a href="${escapeHtml(path)}" target="_blank" rel="noopener">View</a><button type="button" onclick="editEducation(${Number(edu.id)})">Replace</button></div>
       </div>` : '';
     const docs = [
-      documentCard(edu.certificate_of_grades, 'Certificate of Grades', 'ri-file-list-3-line'),
-      documentCard(edu.proof_of_enrollment, 'Proof of Enrollment', 'ri-file-user-line')
+      documentRow(edu.certificate_of_grades, 'Certificate of Grades', 'ri-file-list-3-line'),
+      documentRow(edu.proof_of_enrollment, 'Proof of Enrollment', 'ri-file-user-line')
     ].filter(Boolean).join('');
 
     return `
-      <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow ${animate ? 'animate-fade-in' : ''}">
-        <div class="flex items-start justify-between gap-4">
-          <div class="flex-1 min-w-0">
-            <div class="flex flex-wrap items-center gap-2 mb-2">
-              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">${escapeHtml(educationLevelLabel(level))}</span>
-              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${status === 'ongoing' ? 'bg-blue-100 text-blue-800 border border-blue-200' : 'bg-green-100 text-green-800 border border-green-200'}">${statusLabel}</span>
+      <div class="ui-profile-record ${animate ? 'animate-fade-in' : ''}">
+        <div class="ui-profile-record__body">
+          <div class="ui-profile-record__title-row">
+            <div>
+              <h3>${escapeHtml(edu.degree || educationLevelLabel(level))}</h3>
+              <p>${escapeHtml(educationLevelLabel(level))} <span aria-hidden="true">•</span> ${statusLabel}</p>
             </div>
-            <h4 class="font-semibold text-gray-900 text-base">${escapeHtml(edu.degree || 'Degree')}</h4>
-            ${edu.field_of_study ? `<p class="text-gray-600 mt-1 text-sm">${escapeHtml(edu.field_of_study)}</p>` : ''}
-            <p class="text-gray-600 mt-1 text-sm">${escapeHtml(edu.institution || '')}</p>
-            <p class="text-gray-500 text-sm mt-1">${escapeHtml(yearDisplay)}${gpa}${units}</p>
-            ${docs ? `<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">${docs}</div>` : ''}
+            <div class="ui-profile-record__actions">
+              <button type="button" onclick="editEducation(${Number(edu.id)})" class="ui-link-action"><i class="ri-edit-line"></i>Edit</button>
+              <button type="button" onclick="deleteEducation(${Number(edu.id)})" class="ui-link-action ui-link-action--danger"><i class="ri-delete-bin-line"></i>Delete</button>
+            </div>
           </div>
-          <div class="flex space-x-1 ml-4">
-            <button onclick="editEducation(${edu.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
-              <i class="ri-edit-line text-sm"></i>
-            </button>
-            <button onclick="deleteEducation(${edu.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors" title="Delete">
-              <i class="ri-delete-bin-line text-sm"></i>
-            </button>
+          <div class="ui-profile-record__meta">
+            <p><strong>${escapeHtml(edu.institution || 'Institution not provided')}</strong>${edu.field_of_study ? `<span>${escapeHtml(edu.field_of_study)}</span>` : ''}</p>
+            <p><i class="ri-calendar-line"></i>${escapeHtml(yearDisplay)}${edu.gpa ? `<span>GPA ${escapeHtml(edu.gpa)}</span>` : ''}</p>
           </div>
+          ${hasCompletedMastersUnits ? `<div class="ui-profile-inline-fact"><span>Completed Master's Units</span><strong>${escapeHtml(String(edu.completed_units))} units</strong></div>` : ''}
+          ${docs ? `<div class="ui-profile-documents"><h4>Supporting Documents</h4>${docs}</div>` : ''}
         </div>
       </div>
     `;
@@ -1662,6 +1206,7 @@ if (document.getElementById('profileMainContent')) {
     console.log('Education data received:', result);
     if (result.success) {
       const educationList = document.getElementById('educationList');
+      window.profileEducationItems = Array.isArray(result.data) ? result.data : [];
       console.log('Education list element found:', educationList);
       if (!educationList) {
         console.error('Education list element not found!');
@@ -1675,13 +1220,7 @@ if (document.getElementById('profileMainContent')) {
         console.log('Education list updated successfully!');
       } else {
         console.log('No education data, showing empty state');
-        educationList.innerHTML = `
-          <div class="text-center py-12 text-gray-500">
-            <i class="ri-graduation-cap-line text-4xl mb-4 text-gray-300"></i>
-            <p class="text-gray-600">No education records found.</p>
-            <p class="text-sm text-gray-500 mt-1">Click "Add Education" to get started.</p>
-          </div>
-        `;
+        educationList.innerHTML = `<div class="ui-profile-empty"><i class="ri-graduation-cap-line"></i><div><strong>No education added yet</strong><p>Add your academic background so NCHire can assess teaching-load qualifications.</p></div><button type="button" onclick="document.getElementById('addEducationBtn').click()">Add Education</button></div>`;
       }
     }
   } catch (error) {
@@ -1700,6 +1239,7 @@ if (document.getElementById('profileMainContent')) {
     console.log('Experience data received:', result);
     if (result.success) {
       const experienceList = document.getElementById('experienceList');
+      window.profileExperienceItems = Array.isArray(result.data) ? result.data : [];
       console.log('Experience list element found:', experienceList);
       if (!experienceList) {
         console.error('Experience list element not found!');
@@ -1711,24 +1251,17 @@ if (document.getElementById('profileMainContent')) {
           const startDate = new Date(exp.start_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
           const endDate = exp.end_date ? new Date(exp.end_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Present';
           return `
-            <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
-              <div class="flex items-start justify-between">
-                <div class="flex-1">
-                  <h4 class="font-semibold text-gray-900 text-base">${escapeHtml(exp.job_title)}</h4>
-                  <p class="text-gray-600 mt-1 text-sm">${escapeHtml(exp.company)}</p>
-                  <p class="text-gray-500 text-sm mt-1">
-                    ${startDate} - ${endDate}
-                    ${exp.location ? ' | ' + escapeHtml(exp.location) : ''}
-                  </p>
+            <div class="ui-profile-record">
+              <div class="ui-profile-record__body">
+                <div class="ui-profile-record__title-row">
+                  <div><h3>${escapeHtml(exp.job_title)}</h3><p>${escapeHtml(String(exp.experience_type || 'other').replace(/^./, value => value.toUpperCase()))} experience</p></div>
+                  <div class="ui-profile-record__actions">
+                    <button type="button" onclick="editExperience(${Number(exp.id)})" class="ui-link-action"><i class="ri-edit-line"></i>Edit</button>
+                    <button type="button" onclick="deleteExperience(${Number(exp.id)})" class="ui-link-action ui-link-action--danger"><i class="ri-delete-bin-line"></i>Delete</button>
+                  </div>
                 </div>
-                <div class="flex space-x-1 ml-4">
-                  <button onclick="editExperience(${exp.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
-                    <i class="ri-edit-line text-sm"></i>
-                  </button>
-                  <button onclick="deleteExperience(${exp.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors" title="Delete">
-                    <i class="ri-delete-bin-line text-sm"></i>
-                  </button>
-                </div>
+                <div class="ui-profile-record__meta"><p><strong>${escapeHtml(exp.company)}</strong>${exp.location ? `<span>${escapeHtml(exp.location)}</span>` : ''}</p><p><i class="ri-calendar-line"></i>${startDate} – ${endDate}</p></div>
+                ${exp.description ? `<div class="ui-profile-record__description"><span>Responsibilities</span><p>${escapeHtml(exp.description).replace(/\n/g, '<br>')}</p></div>` : ''}
               </div>
             </div>
           `;
@@ -1738,13 +1271,7 @@ if (document.getElementById('profileMainContent')) {
         console.log('Experience list updated successfully!');
       } else {
         console.log('No experience data, showing empty state');
-        experienceList.innerHTML = `
-          <div class="text-center py-12 text-gray-500">
-            <i class="ri-briefcase-line text-4xl mb-4 text-gray-300"></i>
-            <p class="text-gray-600">No work experience records found.</p>
-            <p class="text-sm text-gray-500 mt-1">Click "Add Experience" to get started.</p>
-          </div>
-        `;
+        experienceList.innerHTML = `<div class="ui-profile-empty"><i class="ri-briefcase-line"></i><div><strong>No work experience added yet</strong><p>Add previous employment or professional experience to complete your profile.</p></div><button type="button" onclick="document.getElementById('addExperienceBtn').click()">Add Work Experience</button></div>`;
       }
     }
   } catch (error) {
@@ -1763,6 +1290,7 @@ if (document.getElementById('profileMainContent')) {
     console.log('Skills data received:', result);
     if (result.success) {
       const skillsList = document.getElementById('skillsList');
+      window.profileSkillItems = Array.isArray(result.data) ? result.data : [];
       console.log('Skills list element found:', skillsList);
       if (!skillsList) {
         console.error('Skills list element not found!');
@@ -1771,44 +1299,13 @@ if (document.getElementById('profileMainContent')) {
       if (result.data && result.data.length > 0) {
         console.log('Updating skills list with', result.data.length, 'items');
         const levels = ['', 'Beginner', 'Novice', 'Intermediate', 'Advanced', 'Expert'];
-        const html = result.data.map(skill => {
-          const dots = Array.from({length: 5}, (_, i) => 
-            `<div class="w-2.5 h-2.5 rounded-full mr-1 ${i < skill.skill_level ? 'bg-blue-500' : 'bg-gray-200'}"></div>`
-          ).join('');
-          return `
-            <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
-              <div class="flex items-start justify-between">
-                <div class="flex-1">
-                  <h4 class="font-semibold text-gray-900 text-base">${escapeHtml(skill.skill_name)}</h4>
-                  <div class="flex items-center mt-2">
-                    ${dots}
-                    <span class="text-sm text-gray-500 ml-2">${levels[skill.skill_level]}</span>
-                  </div>
-                </div>
-                <div class="flex space-x-1 ml-4">
-                  <button onclick="editSkill(${skill.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors" title="Edit">
-                    <i class="ri-edit-line text-sm"></i>
-                  </button>
-                  <button onclick="deleteSkill(${skill.id})" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 rounded transition-colors" title="Delete">
-                    <i class="ri-delete-bin-line text-sm"></i>
-                  </button>
-                </div>
-              </div>
-            </div>
-          `;
-        }).join('');
+        const html = result.data.map(skill => `<div class="ui-skill-item"><div><strong>${escapeHtml(skill.skill_name)}</strong><span>${levels[skill.skill_level] || 'Not rated'}</span></div><div><button type="button" onclick="editSkill(${Number(skill.id)})" aria-label="Edit ${escapeHtml(skill.skill_name)}"><i class="ri-edit-line"></i></button><button type="button" onclick="deleteSkill(${Number(skill.id)})" class="is-danger" aria-label="Delete ${escapeHtml(skill.skill_name)}"><i class="ri-delete-bin-line"></i></button></div></div>`).join('');
         console.log('Generated HTML length:', html.length);
         skillsList.innerHTML = html;
         console.log('Skills list updated successfully!');
       } else {
         console.log('No skills data, showing empty state');
-        skillsList.innerHTML = `
-          <div class="text-center py-12 text-gray-500">
-            <i class="ri-tools-line text-4xl mb-4 text-gray-300"></i>
-            <p class="text-gray-600">No skills records found.</p>
-            <p class="text-sm text-gray-500 mt-1">Click "Add Skill" to get started.</p>
-          </div>
-        `;
+        skillsList.innerHTML = `<div class="ui-profile-empty ui-profile-empty--wide"><i class="ri-tools-line"></i><div><strong>No skills added yet</strong><p>Add technical, teaching, or professional skills relevant to your applications.</p></div><button type="button" onclick="document.getElementById('addSkillBtn').click()">Add Skill</button></div>`;
       }
     }
   } catch (error) {
@@ -1820,7 +1317,8 @@ if (document.getElementById('profileMainContent')) {
 </script>
 
 <script id="modalHandlers">
-document.addEventListener('DOMContentLoaded', function() {
+(function() {
+function initializeProfileModalHandlers() {
   // Modal elements
   const educationModal = document.getElementById('educationModal');
   const experienceModal = document.getElementById('experienceModal');
@@ -1889,6 +1387,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const graduateDocumentsGroup = document.getElementById('graduateDocumentsGroup');
     const endYearInput = document.getElementById('ed_ey');
     const yearCompletedInput = document.getElementById('year_completed');
+    const completedUnitsInput = document.getElementById('completed_units');
     const certificateInput = document.getElementById('certificate_of_grades');
     const proofInput = document.getElementById('proof_of_enrollment');
 
@@ -1901,6 +1400,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (yearCompletedInput) {
       yearCompletedInput.disabled = status === 'ongoing';
       if (status === 'ongoing') yearCompletedInput.value = '';
+    }
+    if (completedUnitsInput) {
+      completedUnitsInput.required = isGraduateOngoing;
+      completedUnitsInput.disabled = !isGraduateOngoing;
+      if (!isGraduateOngoing) completedUnitsInput.value = '';
     }
     if (certificateInput) certificateInput.required = isGraduateOngoing && !document.getElementById('edit_education_id')?.value;
     if (proofInput) proofInput.required = isGraduateOngoing && !document.getElementById('edit_education_id')?.value;
@@ -2148,8 +1652,8 @@ document.addEventListener('DOMContentLoaded', function() {
           document.getElementById('saveEducationBtn').textContent = 'Add Education';
           updateEducationGraduateFields();
           closeModal(educationModal);
-          if (typeof reloadEducationList === 'function') {
-            reloadEducationList();
+          if (typeof window.reloadEducationList === 'function') {
+            window.reloadEducationList();
           }
         } else {
           showToast(data.message || 'Error saving education.', 'error');
@@ -2270,6 +1774,9 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Reset the form
             experienceForm.reset();
+            if (typeof window.reloadExperienceList === 'function') {
+              window.reloadExperienceList();
+            }
           } else {
             if (typeof showNotification === 'function') {
               showNotification(data.message || 'Error saving experience', 'error');
@@ -2386,6 +1893,9 @@ document.addEventListener('DOMContentLoaded', function() {
               btn.classList.remove('bg-primary');
               btn.classList.add('bg-gray-300');
             });
+            if (typeof window.reloadSkillsList === 'function') {
+              window.reloadSkillsList();
+            }
           } else {
             if (typeof showNotification === 'function') {
               showNotification(data.message || 'Error saving skill', 'error');
@@ -2406,7 +1916,14 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     });
   }
-});
+}
+
+if (document.readyState === 'loading' && !document.getElementById('educationModal')) {
+  document.addEventListener('DOMContentLoaded', initializeProfileModalHandlers, { once: true });
+} else {
+  initializeProfileModalHandlers();
+}
+})();
 
 </script>
 
@@ -2523,20 +2040,21 @@ window.showNotification = showNotification;
 
 <!-- Education Modal -->
 <div id="educationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-  <div class="bg-white rounded-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-    <form method="POST" action="" enctype="multipart/form-data" class="p-6 space-y-4" id="educationForm">
+  <div class="ui-profile-modal ui-profile-modal--education bg-white rounded-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <form method="POST" action="" enctype="multipart/form-data" class="ui-profile-modal__form" id="educationForm">
       <input type="hidden" name="saveEducation" value="1">
       <input type="hidden" name="edit_id" id="edit_education_id" value="">
-      <div class="border-b border-gray-200 flex justify-between items-center pb-4">
-        <h3 class="text-lg font-semibold text-gray-900" id="educationModalTitle">Add Education</h3>
+      <div class="ui-profile-modal__header">
+        <div><p class="ui-eyebrow">Academic profile</p><h3 id="educationModalTitle">Add Education</h3><span>Record a completed degree or ongoing graduate study.</span></div>
         <button type="button" id="closeEducationModal" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600">
           <i class="ri-close-line text-xl"></i>
         </button>
       </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="ui-profile-modal__section-title"><span>Academic Information</span></div>
+      <div class="ui-profile-modal__grid ui-profile-modal__wide">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2" for="education_level">Education Level</label>
-          <select name="education_level" id="education_level" required onchange="var showGraduateDocs=this.value==='master' && document.getElementById('education_status').value==='ongoing'; document.getElementById('graduateDocumentsGroup').classList.toggle('hidden', !showGraduateDocs);" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
+          <select name="education_level" id="education_level" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
             <option value="high_school">High School</option>
             <option value="associate">Associate</option>
             <option value="bachelor">Bachelor</option>
@@ -2547,7 +2065,7 @@ window.showNotification = showNotification;
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2" for="education_status">Status</label>
-          <select name="education_status" id="education_status" required onchange="var showGraduateDocs=document.getElementById('education_level').value==='master' && this.value==='ongoing'; document.getElementById('graduateDocumentsGroup').classList.toggle('hidden', !showGraduateDocs);" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
+          <select name="education_status" id="education_status" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
             <option value="completed">Completed</option>
             <option value="ongoing">Ongoing</option>
           </select>
@@ -2561,11 +2079,11 @@ window.showNotification = showNotification;
         <label class="block text-sm font-medium text-gray-700 mb-2" for="ed_fs">Field of Study</label>
         <input type="text" name="ed_fs" id="ed_fs" placeholder="e.g., Computer Science" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
       </div>
-      <div>
+      <div class="ui-profile-modal__wide">
         <label class="block text-sm font-medium text-gray-700 mb-2" for="ed_ins">Institution</label>
         <input type="text" name="ed_ins" id="ed_ins" placeholder="University name" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
       </div>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="ui-profile-modal__grid ui-profile-modal__grid--study-period ui-profile-modal__wide">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2" for="ed_sy">Start Year</label>
           <input type="number" name="ed_sy" id="ed_sy" placeholder="2020" required min="1900" max="2100" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
@@ -2574,7 +2092,7 @@ window.showNotification = showNotification;
           <label class="block text-sm font-medium text-gray-700 mb-2" for="ed_ey">End Year</label>
           <input type="number" name="ed_ey" id="ed_ey" placeholder="2024" min="1900" max="2100" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
         </div>
-        <div id="yearCompletedGroup">
+        <div id="yearCompletedGroup" class="hidden" aria-hidden="true">
           <label class="block text-sm font-medium text-gray-700 mb-2" for="year_completed">Year Completed</label>
           <input type="number" name="year_completed" id="year_completed" placeholder="2024" min="1900" max="2100" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
         </div>
@@ -2583,8 +2101,14 @@ window.showNotification = showNotification;
         <label class="block text-sm font-medium text-gray-700 mb-2" for="ed_gpa">GPA (Optional)</label>
         <input type="text" name="ed_gpa" id="ed_gpa" placeholder="3.8/4.0" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
       </div>
-      <div id="graduateDocumentsGroup" class="hidden border border-blue-100 bg-blue-50 rounded-lg p-4">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div id="graduateDocumentsGroup" class="hidden ui-profile-modal__supporting ui-profile-modal__wide">
+        <div class="ui-profile-modal__section-title"><span>Supporting Documents</span></div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-2" for="completed_units">Completed Master's Units</label>
+          <input type="number" name="completed_units" id="completed_units" min="0" step="1" inputmode="numeric" placeholder="e.g., 24" class="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
+          <p class="text-xs text-gray-500 mt-2">Enter the completed units shown in your Certificate of Grades.</p>
+        </div>
+        <div class="ui-profile-modal__grid">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2" for="certificate_of_grades">Certificate of Grades</label>
             <input type="file" name="certificate_of_grades" id="certificate_of_grades" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" class="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
@@ -2594,9 +2118,9 @@ window.showNotification = showNotification;
             <input type="file" name="proof_of_enrollment" id="proof_of_enrollment" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" class="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
           </div>
         </div>
-        <p class="text-xs text-gray-500 mt-3">Required for ongoing graduate education. Accepted formats: PDF, DOC, DOCX, JPG, PNG. Maximum size: 5MB per file.</p>
+        <p class="text-xs text-gray-500 mt-3">Completed units, Certificate of Grades, and Proof of Enrollment are required for ongoing Master's education. Accepted formats: PDF, DOC, DOCX, JPG, PNG. Maximum size: 5MB per file.</p>
       </div>
-      <div class="flex justify-end space-x-4 pt-4">
+      <div class="ui-profile-modal__footer ui-profile-modal__wide">
         <button type="button" id="cancelEducationBtn" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors !rounded-button">Cancel</button>
         <button type="submit" name="saveEducation" id="saveEducationBtn" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors text-sm !rounded-button">Add Education</button>
       </div>
@@ -2652,6 +2176,7 @@ window.showNotification = showNotification;
         <textarea name="work_descript" id="work_descript" rows="3" maxlength="2000" placeholder="Describe duties directly relevant to jobs you may apply for" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"></textarea>
       </div>
 
+      <div class="flex justify-end space-x-4 pt-4">
         <button type="button" id="cancelExperienceBtn" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors !rounded-button">Cancel</button>
         <button type="submit" name="saveExperience" id="saveExperienceBtn" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors text-sm !rounded-button">Add Experience</button>
       </div>
@@ -2752,17 +2277,16 @@ window.showNotification = showNotification;
     if (!result.success || !container) return;
     qualificationData.splice(0, qualificationData.length, ...result.data);
     if (!result.data.length) {
-      container.innerHTML = '<div class="text-center py-12 text-gray-500"><i class="ri-award-line text-4xl mb-4 text-gray-300"></i><p>No structured qualifications found.</p></div>';
+      container.innerHTML = '<div class="ui-profile-empty"><i class="ri-award-line"></i><div><strong>No certifications or licenses added yet</strong><p>Add only credentials and training that you currently hold.</p></div><button type="button" onclick="document.getElementById(\'addQualificationBtn\').click()">Add Qualification</button></div>';
       return;
     }
     container.innerHTML = result.data.map(item => `
-      <div class="bg-white border border-gray-200 rounded-lg p-4" data-qualification-id="${Number(item.id)}">
-        <div class="flex items-start justify-between gap-4"><div class="flex-1">
-          <div class="flex flex-wrap items-center gap-2"><h4 class="font-semibold text-gray-900">${escapeValue(item.title)}</h4><span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs">${escapeValue(item.qualification_type)}</span><span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs">${escapeValue(item.verification_status || 'unverified')}</span></div>
-          ${item.issuing_organization ? `<p class="text-gray-600 mt-1 text-sm">${escapeValue(item.issuing_organization)}</p>` : ''}
-          <p class="text-gray-500 text-sm mt-1">${item.issued_date ? 'Issued ' + escapeValue(item.issued_date) : 'Issue date not provided'}${item.expiry_date ? ' | Expires ' + escapeValue(item.expiry_date) : ''}</p>
-          ${item.proof_document ? `<a href="${escapeValue(item.proof_document)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-primary hover:underline text-xs mt-2">View proof on file</a>` : ''}
-        </div><div class="flex space-x-1"><button type="button" onclick="editQualification(${Number(item.id)})" class="w-8 h-8 text-gray-500" title="Edit"><i class="ri-edit-line"></i></button><button type="button" onclick="deleteQualification(${Number(item.id)})" class="w-8 h-8 text-red-500" title="Delete"><i class="ri-delete-bin-line"></i></button></div></div>
+      <div class="ui-profile-record ui-profile-record--credential" data-qualification-id="${Number(item.id)}">
+        <div class="ui-profile-record__body">
+          <div class="ui-profile-record__title-row"><div><h3>${escapeValue(item.title)}</h3><p>${escapeValue(item.qualification_type)} <span aria-hidden="true">•</span> ${escapeValue(item.verification_status || 'unverified')}</p></div><div class="ui-profile-record__actions"><button type="button" onclick="editQualification(${Number(item.id)})" class="ui-link-action"><i class="ri-edit-line"></i>Edit</button><button type="button" onclick="deleteQualification(${Number(item.id)})" class="ui-link-action ui-link-action--danger"><i class="ri-delete-bin-line"></i>Delete</button></div></div>
+          <div class="ui-profile-credential-grid"><div><span>Issued by</span><strong>${escapeValue(item.issuing_organization || 'Not provided')}</strong></div><div><span>Issued</span><strong>${item.issued_date ? escapeValue(item.issued_date) : 'Not provided'}</strong></div>${item.expiry_date ? `<div><span>Expires</span><strong>${escapeValue(item.expiry_date)}</strong></div>` : ''}</div>
+          ${item.proof_document ? `<div class="ui-profile-document-row ui-profile-document-row--standalone"><i class="ri-file-text-line" aria-hidden="true"></i><div><strong>Proof document</strong><span>${escapeValue(String(item.proof_document).split('/').pop())}</span></div><span class="ui-document-status">${escapeValue(item.verification_status || 'unverified')}</span><div class="ui-profile-document-row__actions"><a href="${escapeValue(item.proof_document)}" target="_blank" rel="noopener">View</a></div></div>` : ''}
+        </div>
       </div>`).join('');
   };
 
@@ -2828,10 +2352,13 @@ window.showNotification = showNotification;
 </script>
 
 <script id="editDeleteFunctions">
+window.profileEducationItems = <?php echo json_encode($education_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+window.profileExperienceItems = <?php echo json_encode($experience_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+window.profileSkillItems = <?php echo json_encode($skills_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+
 // Education Edit/Delete Functions
 function editEducation(id) {
-  // Fetch education data from the page
-  const educationItems = <?php echo json_encode($education_data); ?>;
+  const educationItems = window.profileEducationItems || [];
   const education = educationItems.find(item => item.id == id);
   
   if (!education) {
@@ -2849,6 +2376,7 @@ function editEducation(id) {
   document.getElementById('ed_gpa').value = education.gpa || '';
   document.getElementById('education_level').value = education.education_level || 'other';
   document.getElementById('education_status').value = education.education_status || 'completed';
+  document.getElementById('completed_units').value = education.completed_units ?? '';
   document.getElementById('year_completed').value = education.year_completed || education.end_year || '';
   const certificateInput = document.getElementById('certificate_of_grades');
   const proofInput = document.getElementById('proof_of_enrollment');
@@ -2902,7 +2430,7 @@ function deleteEducation(id) {
 
 // Experience Edit/Delete Functions
 function editExperience(id) {
-  const experienceItems = <?php echo json_encode($experience_data); ?>;
+  const experienceItems = window.profileExperienceItems || [];
   const experience = experienceItems.find(item => item.id == id);
   
   if (!experience) {
@@ -2975,7 +2503,7 @@ function deleteExperience(id) {
 
 // Skill Edit/Delete Functions
 function editSkill(id) {
-  const skillItems = <?php echo json_encode($skills_data); ?>;
+  const skillItems = window.profileSkillItems || [];
   const skill = skillItems.find(item => item.id == id);
   
   if (!skill) {
@@ -3089,7 +2617,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <script id="deleteConfirmModal">
 // Custom delete confirmation modal functionality
-let deleteCallback = null;
+window.profileDeleteCallback = window.profileDeleteCallback || null;
 
 function showDeleteConfirm(message, callback) {
   console.log('🚨 showDeleteConfirm called');
@@ -3104,7 +2632,7 @@ function showDeleteConfirm(message, callback) {
   
   if (modal && messageElement) {
     messageElement.textContent = message;
-    deleteCallback = callback;
+    window.profileDeleteCallback = callback;
     
     // Use both class and inline style for maximum compatibility
     modal.classList.remove('hidden');
@@ -3128,7 +2656,7 @@ function hideDeleteConfirm() {
     modal.classList.remove('flex');
     modal.style.display = 'none';
     document.body.style.overflow = 'auto';
-    deleteCallback = null;
+    window.profileDeleteCallback = null;
     console.log('✅ Modal hidden');
   } else {
     console.error('❌ Modal not found in hideDeleteConfirm');
@@ -3164,9 +2692,9 @@ document.addEventListener('DOMContentLoaded', function() {
       console.log('✅ Confirm button clicked');
       e.preventDefault();
       e.stopPropagation();
-      if (deleteCallback && typeof deleteCallback === 'function') {
+      if (window.profileDeleteCallback && typeof window.profileDeleteCallback === 'function') {
         console.log('🗑️ Executing delete callback...');
-        deleteCallback();
+        window.profileDeleteCallback();
       } else {
         console.error('❌ No delete callback function!');
       }
@@ -3210,9 +2738,9 @@ window.handleConfirmDelete = function(event) {
     event.stopPropagation();
   }
   
-  if (deleteCallback && typeof deleteCallback === 'function') {
+  if (window.profileDeleteCallback && typeof window.profileDeleteCallback === 'function') {
     console.log('🗑️ Executing delete callback...');
-    deleteCallback();
+    window.profileDeleteCallback();
   } else {
     console.error('❌ No delete callback function!');
   }
@@ -3352,6 +2880,8 @@ function togglePasswordVisibility(inputId, button) {
           currentPassword.setAttribute('readonly', 'readonly');
           newPassword.setAttribute('readonly', 'readonly');
           confirmPassword.setAttribute('readonly', 'readonly');
+          document.getElementById('passwordChangeForm')?.classList.add('hidden');
+          document.getElementById('changePasswordBtn')?.classList.remove('hidden');
         } else {
           showToast(data.message || 'Error updating password', 'error');
         }

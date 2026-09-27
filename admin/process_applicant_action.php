@@ -20,6 +20,12 @@ if ($conn->connect_error) {
     exit;
 }
 
+if (empty($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+    exit;
+}
+
 // Get admin info from session
 $admin_name = $_SESSION['admin_name'] ?? 'Unknown Admin';
 $admin_id = $_SESSION['admin_id'] ?? null;
@@ -29,6 +35,76 @@ $applicant_id = $_POST['applicant_id'] ?? '';
 
 if (empty($action) || empty($applicant_id)) {
     echo json_encode(['success' => false, 'error' => 'Missing required parameters']);
+    exit;
+}
+
+$adminRole = $_SESSION['admin_role'] ?? '';
+$roleActions = [
+    'Secretary' => ['request_resubmission', 'reject_application'],
+    'Department Head' => ['schedule_interview', 'schedule_demo', 'approve_interview', 'approve_demo', 'schedule_psych', 'schedule_psych_exam', 'mark_initially_hired', 'mark_permanently_hired', 'hire_applicant', 'reschedule_interview', 'reschedule_demo', 'reject_application'],
+    // Preserve the existing management roles where their current UI exposes Dean actions.
+    'HR Manager' => ['schedule_interview', 'schedule_demo', 'approve_interview', 'approve_demo', 'schedule_psych', 'schedule_psych_exam', 'mark_initially_hired', 'mark_permanently_hired', 'hire_applicant', 'reschedule_interview', 'reschedule_demo', 'reject_application'],
+    'Recruiter' => ['schedule_interview', 'schedule_demo', 'approve_interview', 'approve_demo', 'schedule_psych', 'schedule_psych_exam', 'mark_initially_hired', 'mark_permanently_hired', 'hire_applicant', 'reschedule_interview', 'reschedule_demo', 'reject_application'],
+];
+if (!in_array($action, $roleActions[$adminRole] ?? [], true)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'You are not authorized to perform this action.']);
+    exit;
+}
+
+$scopeStmt = $conn->prepare('SELECT workflow_stage, status, assigned_to_department, psych_exam_receipt FROM job_applicants WHERE id = ? LIMIT 1');
+$scopeStmt->bind_param('i', $applicant_id);
+$scopeStmt->execute();
+$scopeApplication = $scopeStmt->get_result()->fetch_assoc();
+$scopeStmt->close();
+if (!$scopeApplication) {
+    http_response_code(404);
+    echo json_encode(['success' => false, 'error' => 'Application not found.']);
+    exit;
+}
+if ($adminRole === 'Department Head') {
+    $department = $_SESSION['admin_department'] ?? '';
+    $departmentAlias = $department === 'Computing Studies' ? 'Computer Science' : ($department === 'Computer Science' ? 'Computing Studies' : $department);
+    if (!in_array($scopeApplication['assigned_to_department'], [$department, $departmentAlias], true)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'This application is outside your department.']);
+        exit;
+    }
+}
+
+$allowedStages = [
+    'request_resubmission' => ['secretary_review'],
+    'schedule_interview' => ['waiting_interview_schedule', 'department_head_review'],
+    'approve_interview' => ['interview_scheduled'],
+    'reschedule_interview' => ['interview_scheduled'],
+    'schedule_demo' => ['interview_completed'],
+    'approve_demo' => ['demo_scheduled'],
+    'reschedule_demo' => ['demo_scheduled'],
+    'schedule_psych' => ['demo_completed'],
+    'schedule_psych_exam' => ['demo_completed'],
+    'mark_initially_hired' => ['demo_completed', 'psych_scheduled', 'psych_completed', 'initially_hired'],
+    'mark_permanently_hired' => ['initially_hired', 'demo_completed', 'psych_scheduled', 'psych_completed'],
+    'hire_applicant' => ['demo_completed', 'psych_scheduled', 'psych_completed', 'initially_hired'],
+];
+if (isset($allowedStages[$action]) && !in_array($scopeApplication['workflow_stage'], $allowedStages[$action], true)) {
+    http_response_code(409);
+    echo json_encode(['success' => false, 'error' => 'This action is not available at the application\'s current stage.']);
+    exit;
+}
+$terminalStages = ['passed', 'hired', 'permanently_hired', 'rejected', 'cancelled'];
+if ($action === 'reject_application' && in_array(strtolower((string)$scopeApplication['workflow_stage']), $terminalStages, true)) {
+    http_response_code(409);
+    echo json_encode(['success' => false, 'error' => 'A completed application can no longer be rejected.']);
+    exit;
+}
+if ($adminRole === 'Secretary' && $action === 'reject_application' && $scopeApplication['workflow_stage'] !== 'secretary_review') {
+    http_response_code(409);
+    echo json_encode(['success' => false, 'error' => 'The Secretary can reject an application only during Secretary review.']);
+    exit;
+}
+if (in_array($action, ['mark_initially_hired', 'mark_permanently_hired', 'hire_applicant'], true) && empty($scopeApplication['psych_exam_receipt'])) {
+    http_response_code(422);
+    echo json_encode(['success' => false, 'error' => 'A psychological exam receipt is required before final assignment.']);
     exit;
 }
 
@@ -574,17 +650,13 @@ try {
             
         case 'mark_initially_hired':
             $initially_hired_notes = $_POST['initially_hired_notes'] ?? '';
-            
-            // Update applicant record - mark as passed, not final approval yet.
-            $stmt = $conn->prepare("UPDATE job_applicants SET 
-                                    status = 'Passed',
-                                    workflow_stage = 'passed',
-                                    initially_hired_date = NOW(),
-                                    initially_hired_notes = ?
-                                    WHERE id = ?");
-            $stmt->bind_param("si", $initially_hired_notes, $applicant_id);
-            
-            if ($stmt->execute()) {
+
+            $assignmentResult = nc_finalize_teaching_assignment($conn, (int)$applicant_id, $admin_id ? (int)$admin_id : null, $initially_hired_notes);
+            if ($assignmentResult['success']) {
+                $initialDateStmt = $conn->prepare('UPDATE job_applicants SET initially_hired_date=COALESCE(initially_hired_date, NOW()), initially_hired_notes=? WHERE id=?');
+                $initialDateStmt->bind_param('si', $initially_hired_notes, $applicant_id);
+                $initialDateStmt->execute();
+                $initialDateStmt->close();
                 // Get applicant info
                 $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name, position FROM job_applicants WHERE id = ?");
                 $applicant_stmt->bind_param("i", $applicant_id);
@@ -620,23 +692,16 @@ try {
                 
                 echo json_encode(['success' => true, 'message' => 'Application marked as passed successfully']);
             } else {
-                echo json_encode(['success' => false, 'error' => 'Failed to mark applicant as passed']);
+                http_response_code(409);
+                echo json_encode(['success' => false, 'error' => $assignmentResult['error'] ?? 'Failed to assign the teaching load']);
             }
             break;
             
         case 'mark_permanently_hired':
             $hired_notes = $_POST['hired_notes'] ?? '';
-            
-            // Update applicant record to final Passed status
-            $stmt = $conn->prepare("UPDATE job_applicants SET 
-                                    status = 'Passed',
-                                    workflow_stage = 'passed',
-                                    hired_date = NOW(),
-                                    hired_notes = ?
-                                    WHERE id = ?");
-            $stmt->bind_param("si", $hired_notes, $applicant_id);
-            
-            if ($stmt->execute()) {
+
+            $assignmentResult = nc_finalize_teaching_assignment($conn, (int)$applicant_id, $admin_id ? (int)$admin_id : null, $hired_notes);
+            if ($assignmentResult['success']) {
                 // Create notification
                 $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name, position FROM job_applicants WHERE id = ?");
                 $applicant_stmt->bind_param("i", $applicant_id);
@@ -670,23 +735,16 @@ try {
                 
                 echo json_encode(['success' => true, 'message' => 'Application marked as passed successfully']);
             } else {
-                echo json_encode(['success' => false, 'error' => 'Failed to mark application as passed']);
+                http_response_code(409);
+                echo json_encode(['success' => false, 'error' => $assignmentResult['error'] ?? 'Failed to assign the teaching load']);
             }
             break;
             
         case 'hire_applicant':
             $hire_notes = $_POST['hire_notes'] ?? '';
-            
-            // Update applicant record
-            $stmt = $conn->prepare("UPDATE job_applicants SET 
-                                    status = 'Passed',
-                                    workflow_stage = 'passed',
-                                    hired_date = NOW(),
-                                    hire_notes = ?
-                                    WHERE id = ?");
-            $stmt->bind_param("si", $hire_notes, $applicant_id);
-            
-            if ($stmt->execute()) {
+
+            $assignmentResult = nc_finalize_teaching_assignment($conn, (int)$applicant_id, $admin_id ? (int)$admin_id : null, $hire_notes);
+            if ($assignmentResult['success']) {
                 // Simple notification system using email matching
                 $applicant_stmt = $conn->prepare("SELECT applicant_email, full_name FROM job_applicants WHERE id = ?");
                 $applicant_stmt->bind_param("i", $applicant_id);
@@ -722,7 +780,8 @@ try {
                 
                 echo json_encode(['success' => true, 'message' => 'Application marked as passed successfully']);
             } else {
-                echo json_encode(['success' => false, 'error' => 'Failed to mark application as passed']);
+                http_response_code(409);
+                echo json_encode(['success' => false, 'error' => $assignmentResult['error'] ?? 'Failed to assign the teaching load']);
             }
             break;
             

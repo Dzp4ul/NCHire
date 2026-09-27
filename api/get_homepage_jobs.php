@@ -29,7 +29,9 @@ try {
               )
         GROUP BY job_id
     ";
-    $vacancyExpr = "GREATEST(COALESCE(j.required_instructors, 1) - COALESCE(a.assigned_count, 0), 0)";
+    $vacancyExpr = nc_column_exists($conn, 'job', 'available_sections')
+        ? "GREATEST(COALESCE(j.available_sections, 0), 0)"
+        : "GREATEST(COALESCE(j.required_instructors, 1) - COALESCE(a.assigned_count, 0), 0)";
     $query = "
         SELECT j.*, COALESCE(a.assigned_count, 0) AS assigned_instructors,
                {$vacancyExpr} AS remaining_vacancies
@@ -58,7 +60,7 @@ try {
             $description = substr($description, 0, 150) . '...';
         }
 
-        $salaryProjection = nc_calculate_salary_projection_from_education($educationRows, $row);
+        $salaryProjection = nc_calculate_salary_projection_from_education($educationRows, $row, null, $conn);
 
         $jobs[] = [
             'id' => (int)$row['id'],
@@ -73,8 +75,11 @@ try {
             'academic_year' => $row['academic_year'] ?: nc_current_academic_year(),
             'semester' => $row['semester'] ?: nc_current_semester(),
             'academic_period_label' => nc_format_academic_period($row),
-            'teaching_schedule' => $row['teaching_schedule'] ?? '',
+            'lecture_units' => $row['lecture_units'] !== null ? (float)$row['lecture_units'] : null,
+            'laboratory_units' => $row['laboratory_units'] !== null ? (float)$row['laboratory_units'] : null,
+            'teaching_hours_per_week' => $row['teaching_hours_per_week'] !== null ? (float)$row['teaching_hours_per_week'] : null,
             'remaining_vacancies' => (int)$row['remaining_vacancies'],
+            'available_sections' => (int)$row['remaining_vacancies'],
             'required_instructors' => (int)($row['required_instructors'] ?? 1),
         ];
     }

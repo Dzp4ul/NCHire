@@ -48,10 +48,10 @@ try {
     $types = '';
 
     if ($search !== '') {
-        $whereConditions[] = "(j.job_title LIKE ? OR j.department_role LIKE ? OR j.program LIKE ? OR j.subject LIKE ? OR j.subject_code LIKE ? OR j.subject_name LIKE ? OR j.job_description LIKE ? OR j.teaching_schedule LIKE ?)";
+        $whereConditions[] = "(j.job_title LIKE ? OR j.department_role LIKE ? OR j.program LIKE ? OR j.subject LIKE ? OR j.subject_code LIKE ? OR j.subject_name LIKE ? OR j.job_description LIKE ?)";
         $term = "%{$search}%";
-        array_push($params, $term, $term, $term, $term, $term, $term, $term, $term);
-        $types .= 'ssssssss';
+        array_push($params, $term, $term, $term, $term, $term, $term, $term);
+        $types .= 'sssssss';
     }
 
     if ($department !== '') {
@@ -79,7 +79,7 @@ try {
     }
 
     $whereClause = 'WHERE ' . implode(' AND ', $whereConditions);
-    $vacancyExpr = "GREATEST(COALESCE(j.required_instructors, 1) - COALESCE(a.assigned_count, 0), 0)";
+    $vacancyExpr = "COALESCE(j.available_sections, GREATEST(COALESCE(j.required_instructors, 1) - COALESCE(a.assigned_count, 0), 0))";
 
     $orderClause = "ORDER BY ";
     switch ($sort) {
@@ -143,7 +143,7 @@ try {
     $educationRows = $currentUserId > 0 ? nc_get_education_rows($conn, $currentUserId) : [];
     while ($row = $result->fetch_assoc()) {
         $title = nc_format_teaching_load_title($row);
-        $salaryProjection = nc_calculate_salary_projection_from_education($educationRows, $row);
+        $salaryProjection = nc_calculate_salary_projection_from_education($educationRows, $row, null, $conn);
 
         $jobs[] = [
             'id' => (int)$row['id'],
@@ -161,10 +161,13 @@ try {
             'academic_period_label' => nc_format_academic_period($row),
             'teaching_schedule' => $row['teaching_schedule'] ?? '',
             'teaching_hours_per_week' => $row['teaching_hours_per_week'] !== null ? (float)$row['teaching_hours_per_week'] : null,
+            'lecture_units' => $row['lecture_units'] !== null ? (float)$row['lecture_units'] : null,
+            'laboratory_units' => $row['laboratory_units'] !== null ? (float)$row['laboratory_units'] : null,
             'load_units' => $row['load_units'] !== null ? (float)$row['load_units'] : null,
             'required_instructors' => (int)($row['required_instructors'] ?? 1),
             'assigned_instructors' => (int)$row['assigned_instructors'],
             'remaining_vacancies' => (int)$row['remaining_vacancies'],
+            'available_sections' => (int)$row['remaining_vacancies'],
             'salary_grade' => $row['salary_grade'] ?? null,
             'salary_display' => $salaryProjection['salary_display'],
             'salary_range' => $salaryProjection['salary_display'],

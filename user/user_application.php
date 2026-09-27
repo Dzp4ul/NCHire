@@ -14,15 +14,9 @@ session_start();
 </header>
 <section class="ui-data-region">
   <div class="ui-data-region__header">
-    <div><p class="ui-eyebrow">Application history</p><h2>Submitted Applications</h2></div>
+    <div><p class="ui-eyebrow">Application history</p><h2>Submitted Applications</h2><p>Open an application to review its current stage or maintain its documents.</p></div>
   </div>
-  <div class="ui-application-table-head grid grid-cols-[1fr,auto,auto,auto] gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-600">
-    <div>Position</div>
-    <div>Status</div>
-    <div>Applied Date</div>
-    <div>Actions</div>
-  </div>
-  <div id="applicationsContainer" class="divide-y divide-gray-200">
+  <div id="applicationsContainer" class="ui-application-list">
     <?php
       // Immediate server-side rendering for zero perceived loading
       $host = "127.0.0.1";
@@ -65,25 +59,12 @@ session_start();
                       // Check if cancel button should be shown
                       $show_cancel_btn = !(strpos($status_l, 'cancel') !== false || strpos($status_l, 'hired') !== false);
                       
-                      echo '<div class="grid grid-cols-[1fr,auto,auto,auto] gap-4 p-4 items-center" data-id="'.$id.'">'
-                        .'<div>'
-                        .'<h3 class="font-semibold text-gray-900">'.$position.'</h3>'
-                        .'<p class="text-sm text-gray-600">Application #'.$id.'</p>'
-                        .'</div>'
-                        .'<div>'
-                        .'<span class="'.$status_class.' px-3 py-1 rounded-full text-sm">'.htmlspecialchars($status).'</span>'
-                        .'</div>'
-                        .'<div class="text-sm text-gray-600">'.htmlspecialchars($applied_pretty).'</div>'
-                        .'<div class="flex items-center space-x-2">'
-                        .'<button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-primary rounded-lg hover:bg-gray-100 !rounded-button" data-action="view">'
-                        .'<i class="ri-eye-line"></i>'
-                        .'</button>'
-                        .'<button class="h-8 px-3 flex items-center justify-center gap-1 text-sm font-medium text-emerald-700 rounded-lg hover:bg-emerald-50 !rounded-button whitespace-nowrap" data-action="attachments" title="Add/Update Attachments" aria-label="Add or update attachments">'
-                        .'<i class="ri-attachment-2"></i><span>Update Attachments</span>'
-                        .'</button>'
-                        .($show_cancel_btn ? '<button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-orange-600 rounded-lg hover:bg-gray-100 !rounded-button" data-action="cancel"><i class="ri-close-circle-line"></i></button>' : '')
-                        .'</div>'
-                        .'</div>';
+                      echo '<article class="ui-application-item" data-id="'.$id.'">'
+                        .'<div class="ui-application-item__main"><div class="ui-application-item__title"><span>Application #'.$id.'</span><h3>'.$position.'</h3></div>'
+                        .'<div class="ui-application-item__meta"><span class="ui-application-status '.$status_class.'">'.htmlspecialchars($status).'</span><span><i class="ri-calendar-line"></i>Applied '.htmlspecialchars($applied_pretty).'</span></div></div>'
+                        .'<div class="ui-application-item__actions"><button class="ui-link-action" data-action="view"><i class="ri-eye-line"></i>View progress</button><button class="ui-link-action" data-action="attachments"><i class="ri-attachment-2"></i>Attachments</button>'
+                        .($show_cancel_btn ? '<details class="ui-action-menu"><summary aria-label="More application actions"><i class="ri-more-2-fill"></i></summary><div class="ui-action-menu__items"><button class="ui-action-menu__danger" data-action="cancel"><i class="ri-close-circle-line"></i>Cancel application</button></div></details>' : '')
+                        .'</div></article>';
                   }
               } else {
                   echo '<div class="p-8 text-center text-gray-500">'
@@ -333,29 +314,24 @@ session_start();
       const showCancelBtn = !(status.includes('cancel') || status.includes('hired'));
       
       return `
-      <div class="grid grid-cols-[1fr,auto,auto,auto] gap-4 p-4 items-center" data-id="${app.id}">
-        <div>
-          <h3 class="font-semibold text-gray-900">${escapeHtml(app.position || 'Unknown Position')}</h3>
-          <p class="text-sm text-gray-600">Application #${app.id}</p>
-          <p class="text-sm text-blue-800 mt-1">${escapeHtml(app.salary_projection_details?.salary_display || 'Rate to be determined')}<sup>*</sup></p>
-          <p class="text-[10px] leading-3 text-gray-500 mt-1">*${escapeHtml(app.salary_projection_details?.disclaimer || 'Guide only; final compensation is subject to profile and credential verification.')}</p>
+      <article class="ui-application-item" data-id="${app.id}">
+        <div class="ui-application-item__main">
+          <div class="ui-application-item__title">
+            <span>Application #${app.id}</span>
+            <h3>${escapeHtml(app.position || 'Unknown Position')}</h3>
+          </div>
+          <div class="ui-application-item__meta">
+            <span class="ui-application-status ${statusToClasses(app.status)}">${escapeHtml(app.status || 'Pending')}</span>
+            <span><i class="ri-calendar-line"></i>Applied ${escapeHtml(app.applied_date_pretty || (app.applied_date ? new Date(app.applied_date).toLocaleDateString('en-US', {month: '2-digit', day: '2-digit', year: 'numeric'}).replace(/\//g, '/') : ''))}</span>
+            <span><i class="ri-money-dollar-circle-line"></i>${escapeHtml(app.salary_projection_details?.salary_display || 'Rate to be determined')}<sup>*</sup></span>
+          </div>
         </div>
-        <div>
-          <span class="${statusToClasses(app.status)} px-3 py-1 rounded-full text-sm">${escapeHtml(app.status || 'Pending')}</span>
+        <div class="ui-application-item__actions">
+          <button class="ui-link-action" data-action="view"><i class="ri-eye-line"></i>View progress</button>
+          <button class="ui-link-action" data-action="attachments"><i class="ri-attachment-2"></i>Attachments</button>
+          ${showCancelBtn ? `<details class="ui-action-menu"><summary aria-label="More application actions"><i class="ri-more-2-fill"></i></summary><div class="ui-action-menu__items"><button class="ui-action-menu__danger" data-action="cancel"><i class="ri-close-circle-line"></i>Cancel application</button></div></details>` : ''}
         </div>
-        <div class="text-sm text-gray-600">${escapeHtml(app.applied_date_pretty || (app.applied_date ? new Date(app.applied_date).toLocaleDateString('en-US', {month: '2-digit', day: '2-digit', year: 'numeric'}).replace(/\//g, '/') : ''))}</div>
-        <div class="flex items-center space-x-2">
-          <button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-primary rounded-lg hover:bg-gray-100 !rounded-button" data-action="view">
-            <i class="ri-eye-line"></i>
-          </button>
-          <button class="h-8 px-3 flex items-center justify-center gap-1 text-sm font-medium text-emerald-700 rounded-lg hover:bg-emerald-50 !rounded-button whitespace-nowrap" data-action="attachments" title="Add/Update Attachments" aria-label="Add or update attachments">
-            <i class="ri-attachment-2"></i><span>Update Attachments</span>
-          </button>
-          ${showCancelBtn ? `<button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-orange-600 rounded-lg hover:bg-gray-100 !rounded-button" data-action="cancel">
-            <i class="ri-close-circle-line"></i>
-          </button>` : ''}
-        </div>
-      </div>
+      </article>
     `;
     }).join('');
   }

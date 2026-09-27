@@ -140,11 +140,58 @@ if (!function_exists('nc_get_assigned_instructor_count')) {
 if (!function_exists('nc_remaining_vacancies')) {
     function nc_remaining_vacancies(mysqli $conn, array $job): int
     {
+        if (array_key_exists('available_sections', $job) && $job['available_sections'] !== null && $job['available_sections'] !== '') {
+            return max(0, (int)$job['available_sections']);
+        }
         $required = max(1, (int)($job['required_instructors'] ?? 1));
         $assigned = array_key_exists('assigned_instructors', $job)
             ? (int)$job['assigned_instructors']
             : nc_get_assigned_instructor_count($conn, (int)$job['id']);
         return max(0, $required - $assigned);
+    }
+}
+
+if (!function_exists('nc_calculate_teaching_hours')) {
+    function nc_calculate_teaching_hours(float $lectureUnits, float $laboratoryUnits): float
+    {
+        return round($lectureUnits + ($laboratoryUnits * 3), 2);
+    }
+}
+
+if (!function_exists('nc_format_number')) {
+    function nc_format_number($value, int $precision = 2): string
+    {
+        if ($value === null || $value === '' || !is_numeric($value)) {
+            return '';
+        }
+        return rtrim(rtrim(number_format((float)$value, $precision, '.', ''), '0'), '.');
+    }
+}
+
+if (!function_exists('nc_find_graduate_unit_rate_rule')) {
+    function nc_find_graduate_unit_rate_rule(mysqli $conn, string $qualificationKey, int $completedUnits): ?array
+    {
+        if (!nc_table_exists($conn, 'graduate_unit_rate_rules')) {
+            return null;
+        }
+        $stmt = $conn->prepare("
+            SELECT id, qualification_key, minimum_units, maximum_units, hourly_rate
+            FROM graduate_unit_rate_rules
+            WHERE qualification_key = ?
+              AND is_active = 1
+              AND minimum_units <= ?
+              AND (maximum_units IS NULL OR maximum_units >= ?)
+            ORDER BY minimum_units DESC, COALESCE(maximum_units, 2147483647) ASC
+            LIMIT 1
+        ");
+        if (!$stmt) {
+            return null;
+        }
+        $stmt->bind_param('sii', $qualificationKey, $completedUnits, $completedUnits);
+        $stmt->execute();
+        $rule = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return $rule ?: null;
     }
 }
 
@@ -342,7 +389,7 @@ if (!function_exists('nc_format_money')) {
 }
 
 if (!function_exists('nc_calculate_salary_projection_from_education')) {
-    function nc_calculate_salary_projection_from_education(array $educationRows, array $job, ?array $configuration = null): array
+    function nc_calculate_salary_projection_from_education(array $educationRows, array $job, ?array $configuration = null, ?mysqli $conn = null): array
     {
         $configuration = nc_salary_configuration($configuration);
         $currencySymbol = (string)($configuration['currency_symbol'] ?? '₱');
@@ -364,6 +411,7 @@ if (!function_exists('nc_calculate_salary_projection_from_education')) {
             'qualification' => 'No applicable graduate qualification recorded',
             'master_status' => null,
             'completed_master_units' => null,
+            'graduate_unit_rate_rule_id' => null,
             'applicable_hourly_rate' => null,
             'teaching_hours_per_week' => $hours,
             'projected_salary' => null,
@@ -425,6 +473,17 @@ if (!function_exists('nc_calculate_salary_projection_from_education')) {
         }
 
         $rateConfiguration = $configuration['part_time_rates'][$qualificationKey] ?? null;
+        $unitRateRule = null;
+        if ($qualificationKey === 'master_ongoing' && $ongoingMasterUnits !== null && $conn instanceof mysqli) {
+            $unitRateRule = nc_find_graduate_unit_rate_rule($conn, $qualificationKey, $ongoingMasterUnits);
+            if ($unitRateRule) {
+                $rateConfiguration = [
+                    'label' => "Master's - Ongoing",
+                    'hourly_rate' => $unitRateRule['hourly_rate'],
+                ];
+                $result['graduate_unit_rate_rule_id'] = (int)$unitRateRule['id'];
+            }
+        }
         $rate = is_array($rateConfiguration) ? ($rateConfiguration['hourly_rate'] ?? null) : $rateConfiguration;
         if (!is_numeric($rate) || (float)$rate <= 0) {
             $result['qualification_key'] = $qualificationKey;
@@ -476,7 +535,168 @@ if (!function_exists('nc_calculate_salary_projection_from_education')) {
 if (!function_exists('nc_calculate_salary_projection')) {
     function nc_calculate_salary_projection(mysqli $conn, int $userId, array $job): array
     {
-        return nc_calculate_salary_projection_from_education(nc_get_education_rows($conn, $userId), $job);
+        return nc_calculate_salary_projection_from_education(nc_get_education_rows($conn, $userId), $job, null, $conn);
+    }
+}
+
+if (!function_exists('nc_finalize_teaching_assignment')) {
+    /**
+     * Atomically finalizes one application, snapshots compensation/workload,
+     * and consumes one available section. Repeated calls are idempotent.
+     */
+    function nc_finalize_teaching_assignment(mysqli $conn, int $applicationId, ?int $assignedBy, string $notes = ''): array
+    {
+        if (!nc_table_exists($conn, 'teaching_assignments') || !nc_column_exists($conn, 'job', 'available_sections')) {
+            return ['success' => false, 'error' => 'Teaching assignment storage has not been migrated yet.'];
+        }
+
+        $conn->begin_transaction();
+        try {
+            $applicationStmt = $conn->prepare('SELECT * FROM job_applicants WHERE id = ? FOR UPDATE');
+            if (!$applicationStmt) {
+                throw new RuntimeException('Unable to lock the application.');
+            }
+            $applicationStmt->bind_param('i', $applicationId);
+            $applicationStmt->execute();
+            $application = $applicationStmt->get_result()->fetch_assoc();
+            $applicationStmt->close();
+            if (!$application || empty($application['user_id']) || empty($application['job_id'])) {
+                throw new RuntimeException('The application is not linked to a valid applicant and teaching load.');
+            }
+
+            $existingStmt = $conn->prepare('SELECT id FROM teaching_assignments WHERE application_id = ? LIMIT 1');
+            $existingStmt->bind_param('i', $applicationId);
+            $existingStmt->execute();
+            $existing = $existingStmt->get_result()->fetch_assoc();
+            $existingStmt->close();
+            if ($existing) {
+                $statusStmt = $conn->prepare("UPDATE job_applicants SET status='Passed', workflow_stage='passed', hired_date=COALESCE(hired_date, NOW()), hire_notes=COALESCE(NULLIF(?, ''), hire_notes) WHERE id=?");
+                $statusStmt->bind_param('si', $notes, $applicationId);
+                $statusStmt->execute();
+                $statusStmt->close();
+                $conn->commit();
+                return ['success' => true, 'assignment_id' => (int)$existing['id'], 'already_assigned' => true];
+            }
+
+            $jobId = (int)$application['job_id'];
+            $jobStmt = $conn->prepare('SELECT * FROM job WHERE id = ? FOR UPDATE');
+            $jobStmt->bind_param('i', $jobId);
+            $jobStmt->execute();
+            $job = $jobStmt->get_result()->fetch_assoc();
+            $jobStmt->close();
+            if (!$job) {
+                throw new RuntimeException('The teaching load no longer exists.');
+            }
+            if ((int)($job['available_sections'] ?? 0) < 1) {
+                throw new RuntimeException('No available section remains for this teaching load.');
+            }
+
+            $userId = (int)$application['user_id'];
+            $projection = nc_calculate_salary_projection($conn, $userId, $job);
+            $subjectName = trim((string)($job['subject_name'] ?? '')) ?: (trim((string)($job['subject'] ?? '')) ?: (string)$job['job_title']);
+            $program = trim((string)($job['program'] ?? '')) ?: (string)($job['department_role'] ?? '');
+            $academicYear = trim((string)($application['academic_year'] ?? '')) ?: (trim((string)($job['academic_year'] ?? '')) ?: nc_current_academic_year());
+            $semester = trim((string)($application['semester'] ?? '')) ?: nc_normalize_semester($job['semester'] ?? '');
+            $lectureUnits = $job['lecture_units'] !== null ? (float)$job['lecture_units'] : null;
+            $laboratoryUnits = $job['laboratory_units'] !== null ? (float)$job['laboratory_units'] : null;
+            $teachingHours = $job['teaching_hours_per_week'] !== null ? (float)$job['teaching_hours_per_week'] : null;
+            $hourlyRate = $projection['applicable_hourly_rate'] !== null ? (float)$projection['applicable_hourly_rate'] : null;
+            $weeklyCompensation = $projection['projected_salary'] !== null ? (float)$projection['projected_salary'] : null;
+            $assignedByValue = $assignedBy ?: null;
+            $insertStmt = $conn->prepare("
+                INSERT INTO teaching_assignments (
+                    application_id, user_id, job_id, subject_code, subject_name, program,
+                    academic_year, semester, assigned_sections, lecture_units,
+                    laboratory_units, teaching_hours_per_week, employment_type,
+                    salary_grade, projected_hourly_rate, projected_weekly_compensation,
+                    compensation_basis, assignment_status, assigned_at, assigned_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, 'active', NOW(), ?)
+            ");
+            if (!$insertStmt) {
+                throw new RuntimeException('Unable to create the teaching assignment.');
+            }
+            $insertStmt->bind_param(
+                'iiisssssdddssddsi',
+                $applicationId,
+                $userId,
+                $jobId,
+                $job['subject_code'],
+                $subjectName,
+                $program,
+                $academicYear,
+                $semester,
+                $lectureUnits,
+                $laboratoryUnits,
+                $teachingHours,
+                $job['job_type'],
+                $job['salary_grade'],
+                $hourlyRate,
+                $weeklyCompensation,
+                $projection['projection_basis'],
+                $assignedByValue
+            );
+            if (!$insertStmt->execute()) {
+                throw new RuntimeException('Unable to save the teaching assignment: ' . $insertStmt->error);
+            }
+            $assignmentId = (int)$insertStmt->insert_id;
+            $insertStmt->close();
+
+            $capacityStmt = $conn->prepare("
+                UPDATE job
+                SET available_sections = available_sections - 1,
+                    status = CASE WHEN available_sections - 1 <= 0 THEN 'Closed' ELSE 'Active' END
+                WHERE id = ? AND available_sections >= 1
+            ");
+            $capacityStmt->bind_param('i', $jobId);
+            $capacityStmt->execute();
+            if ($capacityStmt->affected_rows !== 1) {
+                throw new RuntimeException('The last available section was assigned by another request.');
+            }
+            $capacityStmt->close();
+
+            $statusStmt = $conn->prepare("
+                UPDATE job_applicants
+                SET status='Passed', workflow_stage='passed', hired_date=COALESCE(hired_date, NOW()),
+                    application_passed_date=COALESCE(application_passed_date, NOW()),
+                    application_passed_by=COALESCE(application_passed_by, ?), hire_notes=?
+                WHERE id=?
+            ");
+            $statusStmt->bind_param('isi', $assignedByValue, $notes, $applicationId);
+            if (!$statusStmt->execute()) {
+                throw new RuntimeException('Unable to finalize the application.');
+            }
+            $statusStmt->close();
+
+            $conn->commit();
+            return ['success' => true, 'assignment_id' => $assignmentId, 'already_assigned' => false];
+        } catch (Throwable $e) {
+            $conn->rollback();
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+}
+
+if (!function_exists('nc_get_user_teaching_assignments')) {
+    function nc_get_user_teaching_assignments(mysqli $conn, int $userId): array
+    {
+        $result = ['current' => [], 'previous' => []];
+        if (!nc_table_exists($conn, 'teaching_assignments')) {
+            return $result;
+        }
+        $stmt = $conn->prepare('SELECT * FROM teaching_assignments WHERE user_id = ? AND assignment_status != \'cancelled\' ORDER BY assigned_at DESC, id DESC');
+        $stmt->bind_param('i', $userId);
+        $stmt->execute();
+        $rows = $stmt->get_result();
+        $currentAcademicYear = nc_current_academic_year();
+        $currentSemester = nc_current_semester();
+        while ($row = $rows->fetch_assoc()) {
+            $isCurrent = $row['assignment_status'] === 'active'
+                && $row['academic_year'] === $currentAcademicYear
+                && nc_normalize_semester($row['semester']) === $currentSemester;
+            $result[$isCurrent ? 'current' : 'previous'][] = $row;
+        }
+        $stmt->close();
+        return $result;
     }
 }
 

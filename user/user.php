@@ -162,6 +162,28 @@ if (isset($_SESSION['user_id'])) {
     // if (!$is_ajax_request) echo "<!-- Debug: No user_id in session -->";
 }
 
+$user_teaching_assignments = isset($_SESSION['user_id'])
+    ? nc_get_user_teaching_assignments($conn, (int)$_SESSION['user_id'])
+    : ['current' => [], 'previous' => []];
+$has_teaching_assignments = !empty($user_teaching_assignments['current']) || !empty($user_teaching_assignments['previous']);
+$current_load_summary = [
+    'subjects' => count($user_teaching_assignments['current']),
+    'lecture_units' => 0.0,
+    'laboratory_units' => 0.0,
+    'hours' => 0.0,
+    'weekly_compensation' => 0.0,
+    'has_weekly_compensation' => false,
+];
+foreach ($user_teaching_assignments['current'] as $assignment) {
+    $current_load_summary['lecture_units'] += (float)($assignment['lecture_units'] ?? 0);
+    $current_load_summary['laboratory_units'] += (float)($assignment['laboratory_units'] ?? 0);
+    $current_load_summary['hours'] += (float)($assignment['teaching_hours_per_week'] ?? 0);
+    if ($assignment['projected_weekly_compensation'] !== null) {
+        $current_load_summary['weekly_compensation'] += (float)$assignment['projected_weekly_compensation'];
+        $current_load_summary['has_weekly_compensation'] = true;
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])) {
     
     // Start output buffering for AJAX requests to ensure clean JSON
@@ -1650,6 +1672,12 @@ function closeRejectionModal() {
   My Applications
   <span class="nav-indicator absolute bottom-0 left-0 w-full h-0.5 bg-secondary transform scale-x-0 transition-transform duration-200"></span>
 </a>
+<?php if ($has_teaching_assignments): ?>
+<a href="#" class="nav-link hover:text-secondary transition-colors relative" id="teachingLoadLink" data-section="teaching-load">
+  My Teaching Load
+  <span class="nav-indicator absolute bottom-0 left-0 w-full h-0.5 bg-secondary transform scale-x-0 transition-transform duration-200"></span>
+</a>
+<?php endif; ?>
 <a href="user_profile.php" class="nav-link hover:text-secondary transition-colors relative" id="profileLink" data-section="profile">
   Profile
   <span class="nav-indicator absolute bottom-0 left-0 w-full h-0.5 bg-secondary transform scale-x-0 transition-transform duration-200"></span>
@@ -1736,6 +1764,12 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                     <i class="ri-file-list-3-line text-xl text-primary"></i>
                     <span class="text-gray-900 font-medium">My Applications</span>
                 </a>
+                <?php if ($has_teaching_assignments): ?>
+                <a href="#" class="mobile-nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 transition-colors" data-section="teaching-load">
+                    <i class="ri-book-open-line text-xl text-primary"></i>
+                    <span class="text-gray-900 font-medium">My Teaching Load</span>
+                </a>
+                <?php endif; ?>
                 <a href="user_profile.php" class="mobile-nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 transition-colors">
                     <i class="ri-user-line text-xl text-primary"></i>
                     <span class="text-gray-900 font-medium">Profile</span>
@@ -1750,7 +1784,26 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
     </div>
 </div>
 
-<main id="mainContent" class="max-w-[1400px] mx-auto px-12 py-8">
+<main id="mainContent" class="ui-user-workspace">
+<?php if (!empty($user_teaching_assignments['current'])): ?>
+<section class="ui-current-load-overview" aria-labelledby="currentTeachingLoadSummaryTitle">
+  <div class="ui-current-load-overview__header">
+    <div>
+      <p class="ui-eyebrow">Instructor overview</p>
+      <h2 id="currentTeachingLoadSummaryTitle" class="text-xl font-semibold text-gray-900">Current Teaching Load</h2>
+      <p class="mt-1 text-sm text-gray-500"><?php echo htmlspecialchars(nc_current_academic_year() . ' · ' . nc_current_semester()); ?></p>
+    </div>
+    <button id="dashboardTeachingLoadButton" type="button" class="ui-button ui-button--primary">View My Teaching Load</button>
+  </div>
+  <dl class="ui-current-load-overview__metrics">
+    <div><dt>Assigned Subjects</dt><dd><?php echo (int)$current_load_summary['subjects']; ?></dd></div>
+    <div><dt>Teaching Hours / Week</dt><dd><?php echo htmlspecialchars(nc_format_number($current_load_summary['hours'])); ?></dd></div>
+    <div><dt>Lecture Units</dt><dd><?php echo htmlspecialchars(nc_format_number($current_load_summary['lecture_units'])); ?></dd></div>
+    <div><dt>Laboratory Units</dt><dd><?php echo htmlspecialchars(nc_format_number($current_load_summary['laboratory_units'])); ?></dd></div>
+    <?php if ($current_load_summary['has_weekly_compensation']): ?><div><dt>Projected Weekly Compensation</dt><dd><?php echo htmlspecialchars('₱' . number_format($current_load_summary['weekly_compensation'], 2)); ?></dd></div><?php endif; ?>
+  </dl>
+</section>
+<?php endif; ?>
 <header id="jobHeader" class="ui-page-header">
   <div class="ui-page-header__main">
     <p class="ui-eyebrow">Norzagaray College recruitment</p>
@@ -1768,7 +1821,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
         <div class="absolute left-3 top-1/2 transform -translate-y-1/2">
           <i class="ri-search-line text-gray-400 text-lg"></i>
         </div>
-        <input type="text" id="searchInput" placeholder="Search subject, program, department, or schedule..."
+        <input type="text" id="searchInput" placeholder="Search subject, program, or department..."
                class="w-full pl-10 pr-4 py-3.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-base">
       </div>
     </div>
@@ -1813,7 +1866,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
     </div>
     
     <!-- Active Filters Display -->
-    <div id="activeFilters" class="ui-active-filters">
+    <div id="activeFilters" class="ui-active-filters hidden">
       <!-- Active filter tags will appear here -->
     </div>
   </div>
@@ -1984,6 +2037,10 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                             <div><dt>Department</dt><dd id="highlightDepartment">Loading...</dd></div>
                             <div><dt>Subject area</dt><dd id="highlightSubject">Loading...</dd></div>
                             <div><dt>Location</dt><dd id="highlightLocation">Loading...</dd></div>
+                            <div><dt>Lecture units</dt><dd id="highlightLectureUnits">Loading...</dd></div>
+                            <div><dt>Laboratory units</dt><dd id="highlightLaboratoryUnits">Loading...</dd></div>
+                            <div><dt>Teaching hours / week</dt><dd id="highlightTeachingHours">Loading...</dd></div>
+                            <div><dt>Available sections</dt><dd id="highlightAvailableSections">Loading...</dd></div>
                         </dl>
                     </section>
 
@@ -2009,47 +2066,57 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                 <button id="backFromWizard" class="ui-back-link" type="button">
                     <i class="ri-arrow-left-line text-lg mr-2"></i>Back to Job Opportunities
                 </button>
-                <div id="wizardJobTitle">Application for <span>-</span></div>
-            </div>
-            <!-- Progress Steps -->
-            <div class="ui-wizard-progress">
-                <div class="ui-wizard-progress__track" aria-label="Application progress">
-                    <!-- Step 1 -->
-                    <div class="ui-wizard-progress__step">
-                        <div class="step-dot" data-step="1">1</div>
-                        <div class="step-line" data-after="1"></div>
-                    </div>
-                    <!-- Step 2 -->
-                    <div class="ui-wizard-progress__step">
-                        <div class="step-dot" data-step="2">2</div>
-                        <div class="step-line" data-after="2"></div>
-                    </div>
-                    <!-- Step 3 -->
-                    <div class="ui-wizard-progress__step">
-                        <div class="step-dot" data-step="3">3</div>
-                        <div class="step-line" data-after="3"></div>
-                    </div>
-                    <!-- Step 4 -->
-                    <div class="ui-wizard-progress__step">
-                        <div class="step-dot" data-step="4">4</div>
-                        <div class="step-line" data-after="4"></div>
-                    </div>
-                    <!-- Step 5 -->
-                    <div class="ui-wizard-progress__step">
-                        <div class="step-dot" data-step="5">5</div>
-                    </div>
-                </div>
-                <div id="wizardStepLabel">Step 1 of 5: Submit Requirements</div>
+                <div id="wizardJobTitle"><small>Application for</small><span>-</span></div>
             </div>
         </header>
 
         <!-- Wizard Body -->
         <div class="ui-wizard-body">
-            <div class="ui-wizard-content">
+            <aside class="ui-wizard-sidebar" aria-label="Application progress">
+                <p class="ui-eyebrow">Application progress</p>
+                <div class="ui-wizard-progress">
+                <div class="ui-wizard-progress__track" aria-label="Application progress">
+                    <!-- Step 1 -->
+                    <div class="ui-wizard-progress__step">
+                        <div class="step-dot" data-step="1">1</div>
+                        <div class="ui-wizard-progress__copy"><strong>Requirements</strong><span>Submit application files</span></div>
+                        <div class="step-line" data-after="1"></div>
+                    </div>
+                    <!-- Step 2 -->
+                    <div class="ui-wizard-progress__step">
+                        <div class="step-dot" data-step="2">2</div>
+                        <div class="ui-wizard-progress__copy"><strong>Interview</strong><span>Schedule and evaluation</span></div>
+                        <div class="step-line" data-after="2"></div>
+                    </div>
+                    <!-- Step 3 -->
+                    <div class="ui-wizard-progress__step">
+                        <div class="step-dot" data-step="3">3</div>
+                        <div class="ui-wizard-progress__copy"><strong>Demo Teaching</strong><span>Teaching demonstration</span></div>
+                        <div class="step-line" data-after="3"></div>
+                    </div>
+                    <!-- Step 4 -->
+                    <div class="ui-wizard-progress__step">
+                        <div class="step-dot" data-step="4">4</div>
+                        <div class="ui-wizard-progress__copy"><strong>Psychological Exam</strong><span>Submit completion proof</span></div>
+                        <div class="step-line" data-after="4"></div>
+                    </div>
+                    <!-- Step 5 -->
+                    <div class="ui-wizard-progress__step">
+                        <div class="step-dot" data-step="5">5</div>
+                        <div class="ui-wizard-progress__copy"><strong>Initial Hiring</strong><span>Application outcome</span></div>
+                    </div>
+                </div>
+                <div id="wizardStepLabel">Step 1 of 5: Submit Requirements</div>
+                </div>
+            </aside>
+            <div class="ui-wizard-content" role="main">
                 <!-- Step 1: Submit Requirements -->
                 <section id="step1" class="wizard-step">
-                    <h2 class="text-lg font-bold text-gray-900 mb-2">Submit Requirements</h2>
-                    <p class="text-gray-600 mb-4">Upload your required documents. Accepted formats: PDF, DOC, DOCX, JPG, PNG. Maximum size: 5MB per file.</p>
+                    <header class="ui-wizard-step-header">
+                        <p class="ui-eyebrow">Application documents</p>
+                        <h2 class="text-lg font-bold text-gray-900 mb-2">Submit Requirements</h2>
+                        <p class="text-gray-600 mb-4">Upload your required documents. Accepted formats: PDF, DOC, DOCX, JPG, PNG. Maximum size: 5MB per file.</p>
+                    </header>
                     
                     <form id="requirementsForm" class="space-y-4" method="POST" enctype="multipart/form-data" novalidate>
                         <input type="hidden" name="submit_application" value="1">
@@ -2060,7 +2127,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                         <input type="hidden" name="email" id="rf_email">
                         <input type="hidden" name="cellphone" id="rf_cellphone">
 
-                        <div class="bg-white rounded-lg border border-gray-200 p-4">
+                        <div class="ui-wizard-applicant-context bg-white rounded-lg border border-gray-200 p-4">
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Applicant Category</label>
                             <input type="hidden" name="application_type" id="rf_application_type" value="new">
                             <div id="applicantCategoryDisplay" class="flex items-center gap-2 text-sm text-gray-700">
@@ -2072,7 +2139,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                         <div id="existingDocumentNotice" class="hidden bg-emerald-50 border border-emerald-200 rounded-lg p-4"></div>
 
                         <!-- Load Draft Button -->
-                        <div id="loadDraftSection" class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-lg p-4 mb-4">
+                        <div id="loadDraftSection" class="ui-wizard-draft-panel bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-lg p-4 mb-4">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-3">
                                     <i class="ri-file-list-3-line text-blue-600 text-2xl"></i>
@@ -2089,7 +2156,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                         </div>
 
                         <!-- Document Requirements -->
-                        <div class="bg-white rounded-lg border border-gray-200 shadow-sm">
+                        <section class="ui-wizard-documents bg-white rounded-lg border border-gray-200 shadow-sm">
                             <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 rounded-t-lg">
                                 <div class="flex items-center">
                                     <i class="ri-file-text-line text-lg mr-2"></i>
@@ -2249,10 +2316,10 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </section>
 
                         <!-- Form Actions -->
-                        <div class="flex justify-between items-center pt-6 border-t">
+                        <div class="ui-wizard-actions flex justify-between items-center pt-6 border-t">
                             <div class="flex gap-3">
                                 <button type="button" id="saveDraftBtn" class="flex items-center px-6 py-3 border-2 border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors font-semibold">
                                     <i class="ri-save-line mr-2"></i>Save Draft
@@ -2270,10 +2337,13 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                 
                 <!-- Step 2: Interview -->
                 <section id="step2" class="wizard-step hidden">
-                  <h2 id="interview_step_title" class="text-xl font-semibold text-gray-900 mb-2">Waiting for Interview Schedule</h2>
-                  <p id="interview_step_subtitle" class="text-gray-600 mb-6">Waiting for the dean to schedule your interview.</p>
+                  <header class="ui-wizard-step-header">
+                    <p class="ui-eyebrow">Recruitment stage</p>
+                    <h2 id="interview_step_title" class="text-xl font-semibold text-gray-900 mb-2">Waiting for Interview Schedule</h2>
+                    <p id="interview_step_subtitle" class="text-gray-600 mb-6">Waiting for the dean to schedule your interview.</p>
+                  </header>
                     
-                    <div class="bg-white rounded-lg border border-gray-200 p-6">
+                    <div class="ui-workflow-stage bg-white rounded-lg border border-gray-200 p-6">
                         <div id="interview_status_container" class="text-center py-8">
                             <i class="ri-calendar-line text-6xl text-blue-500 mb-4"></i>
                             <h3 id="interview_status_title" class="text-lg font-semibold text-gray-900 mb-2">Waiting for Interview Schedule</h3>
@@ -2287,7 +2357,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                         </div>
                     </div>
                     
-                    <div class="flex justify-between items-center pt-6">
+                    <div class="ui-wizard-actions flex justify-between items-center pt-6">
                         <button type="button" id="step2_back_btn" onclick="setStep(1)" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
                             <i class="ri-arrow-left-line mr-2"></i>Back
                         </button>
@@ -2299,10 +2369,13 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                 
                 <!-- Step 3: Demo Teaching -->
                 <section id="step3" class="wizard-step hidden">
-                  <h2 id="demo_step_title" class="text-xl font-semibold text-gray-900 mb-2">Waiting for Demo Teaching Schedule</h2>
-                  <p id="demo_step_subtitle" class="text-gray-600 mb-6">Waiting for the dean to schedule your demo teaching.</p>
+                  <header class="ui-wizard-step-header">
+                    <p class="ui-eyebrow">Recruitment stage</p>
+                    <h2 id="demo_step_title" class="text-xl font-semibold text-gray-900 mb-2">Waiting for Demo Teaching Schedule</h2>
+                    <p id="demo_step_subtitle" class="text-gray-600 mb-6">Waiting for the dean to schedule your demo teaching.</p>
+                  </header>
                     
-                    <div class="bg-white rounded-lg border border-gray-200 p-6">
+                    <div class="ui-workflow-stage bg-white rounded-lg border border-gray-200 p-6">
                         <div id="demo_status_container" class="text-center py-8">
                             <i class="ri-presentation-line text-6xl text-indigo-500 mb-4"></i>
                             <h3 id="demo_status_title" class="text-lg font-semibold text-gray-900 mb-2">Waiting for Demo Teaching Schedule</h3>
@@ -2316,7 +2389,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                         </div>
                     </div>
                     
-                    <div class="flex justify-between items-center pt-6">
+                    <div class="ui-wizard-actions flex justify-between items-center pt-6">
                         <button type="button" onclick="setStep(2)" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
                             <i class="ri-arrow-left-line mr-2"></i>Back
                         </button>
@@ -2328,10 +2401,13 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                 
                 <!-- Step 4: Psychological Exam -->
                 <section id="step4" class="wizard-step hidden">
-                    <h2 class="text-xl font-semibold text-gray-900 mb-2">Psychological Examination</h2>
-                    <p class="text-gray-600 mb-6">Upload your psychological exam receipt or proof of completion. After submission, please wait for the dean to review and mark you as hired.</p>
+                    <header class="ui-wizard-step-header">
+                        <p class="ui-eyebrow">Pre-employment requirement</p>
+                        <h2 class="text-xl font-semibold text-gray-900 mb-2">Psychological Examination</h2>
+                        <p class="text-gray-600 mb-6">Upload your psychological exam receipt or proof of completion. After submission, please wait for the dean to review and mark you as hired.</p>
+                    </header>
                     
-                    <div class="bg-white rounded-lg border border-gray-200 p-6">
+                    <div class="ui-workflow-stage bg-white rounded-lg border border-gray-200 p-6">
                         <div id="psych_status_container" class="py-8">
                             <div class="text-center mb-6">
                                 <i class="ri-brain-line text-6xl text-purple-500 mb-4"></i>
@@ -2369,7 +2445,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                         </div>
                     </div>
                     
-                    <div class="flex justify-between items-center pt-6">
+                    <div class="ui-wizard-actions flex justify-between items-center pt-6">
                         <button type="button" onclick="setStep(3)" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
                             <i class="ri-arrow-left-line mr-2"></i>Back
                         </button>
@@ -2381,10 +2457,13 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                 
                 <!-- Step 5: Initially Hired -->
                 <section id="step5" class="wizard-step hidden">
-                    <h2 class="text-xl font-semibold text-gray-900 mb-2">Initially Hired</h2>
-                    <p class="text-gray-600 mb-6">Congratulations! You have been marked as initially hired</p>
+                    <header class="ui-wizard-step-header">
+                        <p class="ui-eyebrow">Application outcome</p>
+                        <h2 class="text-xl font-semibold text-gray-900 mb-2">Initially Hired</h2>
+                        <p class="text-gray-600 mb-6">Congratulations! You have been marked as initially hired</p>
+                    </header>
                     
-                    <div class="bg-white rounded-lg border border-gray-200 p-6">
+                    <div class="ui-workflow-stage ui-workflow-stage--success bg-white rounded-lg border border-gray-200 p-6">
                         <div id="hired_status_container" class="text-center py-8">
                             <i class="ri-user-star-line text-6xl text-green-500 mb-4"></i>
                             <h3 class="text-2xl font-bold text-gray-900 mb-2">Congratulations!</h3>
@@ -2396,7 +2475,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                         </div>
                     </div>
                     
-                    <div class="flex justify-between items-center pt-6">
+                    <div class="ui-wizard-actions flex justify-between items-center pt-6">
                         <button type="button" onclick="setStep(4)" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
                             <i class="ri-arrow-left-line mr-2"></i>Back
                         </button>
@@ -3534,17 +3613,25 @@ document.addEventListener('DOMContentLoaded', function() {
     stepDots.forEach(dot => {
       const s = Number(dot.getAttribute('data-step'));
       if (s < progressStep) {
-        // Completed steps - green
-        dot.style.background = '#10b981';
-        dot.style.color = '#fff';
+        // Completed steps use a quiet success treatment.
+        dot.style.background = '#ecfdf5';
+        dot.style.color = '#166534';
+        dot.style.borderColor = '#86efac';
       } else if (s === progressStep) {
-        // Current progress step - yellow (stays here even when viewing other steps)
-        dot.style.background = '#f59e0b';
-        dot.style.color = '#1e40af';
-      } else {
-        // Future steps - gray
-        dot.style.background = 'rgba(255,255,255,0.3)';
+        // The active workflow stage remains the single strongest marker.
+        dot.style.background = '#1e3a8a';
         dot.style.color = '#fff';
+        dot.style.borderColor = '#1e3a8a';
+      } else {
+        // Future steps stay visible against the light progress rail.
+        dot.style.background = '#fff';
+        dot.style.color = '#64748b';
+        dot.style.borderColor = '#cbd5e1';
+      }
+      const progressItem = dot.closest('.ui-wizard-progress__step');
+      if (progressItem) {
+        if (s === progressStep) progressItem.setAttribute('aria-current', 'step');
+        else progressItem.removeAttribute('aria-current');
       }
     });
     
@@ -3552,9 +3639,9 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.step-line').forEach((line, idx) => {
       const lineAfterStep = idx + 1;
       if (lineAfterStep < progressStep) {
-        line.style.backgroundColor = '#10b981';
+        line.style.backgroundColor = '#86efac';
       } else {
-        line.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+        line.style.backgroundColor = '#e2e8f0';
       }
     });
     
@@ -3685,6 +3772,12 @@ document.addEventListener('DOMContentLoaded', function() {
       window.currentApplicationId = applicationId;
       window.currentApplicationData = app;
       window.currentWorkflowStep = workflowStep;
+
+      // Keep the persistent wizard header synchronized with the application
+      // being viewed so it cannot retain another job title or the placeholder.
+      context.jobId = app.job_id;
+      context.jobTitle = app.position || '';
+      if (wizardJobTitle) wizardJobTitle.textContent = context.jobTitle || '-';
       
       // Populate wizard with data
       if (app.interview_date && workflowStep >= 2) {
@@ -3941,7 +4034,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Show wizard with multiple methods to ensure visibility
     console.log('Making wizard visible...');
     wizard.classList.remove('hidden');
-    wizard.style.display = 'block !important';
+    wizard.style.setProperty('display', 'block', 'important');
     wizard.style.visibility = 'visible';
     wizard.style.opacity = '1';
     wizard.style.zIndex = '9999';
@@ -3960,14 +4053,14 @@ document.addEventListener('DOMContentLoaded', function() {
     if (pagination) pagination.style.display = 'none';
     
     // Ensure wizard body is visible
-    const wizardBody = wizard.querySelector('.p-6');
+    const wizardBody = wizard.querySelector('.ui-wizard-body');
     if (wizardBody) {
       console.log('Making wizard body visible...');
-      wizardBody.style.display = 'block !important';
-      wizardBody.style.visibility = 'visible !important';
+      wizardBody.style.removeProperty('display');
+      wizardBody.style.visibility = 'visible';
       wizardBody.style.opacity = '1';
     } else {
-      console.error('Wizard body (.p-6) not found!');
+      console.error('Wizard body (.ui-wizard-body) not found!');
     }
     
     // Set body overflow
@@ -3999,11 +4092,6 @@ document.addEventListener('DOMContentLoaded', function() {
       if (step1Element) {
         console.log('Step1 display:', window.getComputedStyle(step1Element).display);
         console.log('Step1 visibility:', window.getComputedStyle(step1Element).visibility);
-        
-        // Force step1 visibility as final backup
-        step1Element.style.display = 'block !important';
-        step1Element.style.visibility = 'visible !important';
-        step1Element.classList.remove('hidden');
       }
       
       // If still not visible, show alert
@@ -6787,6 +6875,7 @@ document.getElementById('modalApplyBtn')?.addEventListener('click', function() {
 document.addEventListener('DOMContentLoaded', function () {
   const profileLink = document.getElementById('profileLink');
   const applicationsLink = document.getElementById('applicationsLink');
+  const teachingLoadLink = document.getElementById('teachingLoadLink');
   const dashboardLink = document.getElementById('dashboardLink');
   const mainContent = document.getElementById('mainContent');
 
@@ -6864,11 +6953,26 @@ document.addEventListener('DOMContentLoaded', function () {
     loadContent('user_application.php');
   }
 
+  function loadTeachingLoadPage() {
+    loadContent('my_teaching_load.php');
+  }
+
   // Load My Applications content
   applicationsLink.addEventListener('click', function (e) {
     e.preventDefault();
     updateActiveNavigation('applications');
     loadApplicationsPage(); // Event listeners are built into user_application.php
+  });
+
+  if (teachingLoadLink) {
+    teachingLoadLink.addEventListener('click', function (e) {
+      e.preventDefault();
+      updateActiveNavigation('teaching-load');
+      loadTeachingLoadPage();
+    });
+  }
+  document.getElementById('dashboardTeachingLoadButton')?.addEventListener('click', function () {
+    teachingLoadLink?.click();
   });
 
   // Load Profile content
@@ -6899,6 +7003,8 @@ document.addEventListener('DOMContentLoaded', function () {
     } else if (initialSection === 'applications') {
       // Restore My Applications if it was the last viewed section
       loadContent('user_application.php');
+    } else if (initialSection === 'teaching-load' && teachingLoadLink) {
+      loadTeachingLoadPage();
     } else if (initialSection === 'profile') {
       // Restore Profile if it was the last viewed section
       loadContent('user_profile.php', initializeProfileListeners);
@@ -7188,58 +7294,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Reinitialize event listeners for Profile
   function initializeProfileListeners() {
-    // Tab Navigation
-    setTimeout(function() {
-      const tabButtons = document.querySelectorAll('.tab-btn');
-      const tabContents = document.querySelectorAll('.tab-content');
-
-      // Function to switch tabs
-      function switchTab(targetTabId, clickedButton) {
-        // Hide all tab contents
-        tabContents.forEach(content => {
-          content.classList.add('hidden');
-        });
-
-        // Remove active state from all tab buttons
-        tabButtons.forEach(btn => {
-          btn.classList.remove('border-primary', 'text-primary');
-          btn.classList.add('border-transparent', 'text-gray-500');
-        });
-
-        // Show target content
-        const targetContent = document.getElementById(targetTabId);
-        if (targetContent) {
-          targetContent.classList.remove('hidden');
-        }
-
-        // Add active state to clicked button
-        if (clickedButton) {
-          clickedButton.classList.remove('border-transparent', 'text-gray-500');
-          clickedButton.classList.add('border-primary', 'text-primary');
-        }
-      }
-
-      // Add click event listeners to tab buttons
-      tabButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-          e.preventDefault();
-          e.stopPropagation();
-          
-          const targetTab = this.getAttribute('data-tab');
-          if (targetTab) {
-            switchTab(targetTab, this);
-          }
-        });
-      });
-
-      // Initialize - make sure education tab is active by default
-      if (tabButtons.length > 0) {
-        const educationTab = document.querySelector('[data-tab="education"]');
-        if (educationTab) {
-          switchTab('education', educationTab);
-        }
-      }
-    }, 100);
+    // Profile sections are intentionally presented as one continuous page.
 
     // Modal Handlers
     const educationModal = document.getElementById('educationModal');
@@ -7695,8 +7750,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const cancelPersonalBtn = document.getElementById('cancelPersonalBtn');
     const savePersonalBtn = document.getElementById('savePersonalBtn');
     const personalActions = document.getElementById('personalActions');
+    const personalView = document.getElementById('personalInfoView');
+    const personalEdit = document.getElementById('personalInfoEdit');
     const personalInputs = document.querySelectorAll('#personalInfo input[name]');
-    const addressTextarea = document.querySelector('textarea[name="applicant_address"]');
+    const addressTextarea = document.querySelector('#personalInfo textarea[name="applicant_address"]');
 
     let originalValues = {};
 
@@ -7750,6 +7807,8 @@ document.addEventListener('DOMContentLoaded', function () {
         
         personalActions.classList.remove('hidden');
         personalActions.classList.add('flex');
+        personalView?.classList.add('hidden');
+        personalEdit?.classList.remove('hidden');
         this.style.display = 'none';
       });
     }
@@ -7770,6 +7829,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         personalActions.classList.add('hidden');
         personalActions.classList.remove('flex');
+        personalView?.classList.remove('hidden');
+        personalEdit?.classList.add('hidden');
         editPersonalBtn.style.display = 'block';
       });
     }
@@ -7827,6 +7888,8 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             personalActions.classList.add('hidden');
             personalActions.classList.remove('flex');
+            personalView?.classList.remove('hidden');
+            personalEdit?.classList.add('hidden');
             editPersonalBtn.style.display = 'block';
             showToast('Personal information updated successfully!', 'success');
             // Reload the profile content to show updated data
@@ -8084,15 +8147,20 @@ function displayJobs(jobs) {
   
   jobs.forEach(job => {
     const title = job.teaching_load_title || job.subject_name || job.subject || job.job_title || 'Teaching Load';
-    const schedule = job.teaching_schedule || 'Schedule to be announced';
-    const hours = job.teaching_hours_per_week ? `${Number(job.teaching_hours_per_week).toFixed(2).replace(/\.00$/, '')} hrs/week` : 'Hours not configured';
-    const units = job.load_units ? `${Number(job.load_units).toFixed(2).replace(/\.00$/, '')} units` : '';
+    const hours = job.teaching_hours_per_week !== null ? `${Number(job.teaching_hours_per_week).toLocaleString()} hours/week` : 'Legacy workload';
+    const lectureUnits = job.lecture_units !== null ? Number(job.lecture_units).toLocaleString() : 'Not recorded';
+    const laboratoryUnits = job.laboratory_units !== null ? Number(job.laboratory_units).toLocaleString() : 'Not recorded';
     const remaining = Number(job.remaining_vacancies || 0);
-    const required = Number(job.required_instructors || 1);
-    const slotsText = `${remaining} of ${required} instructor slot${required === 1 ? '' : 's'} available`;
+    const slotsText = `${remaining} ${remaining === 1 ? 'section' : 'sections'} available`;
     const subjectLine = [job.subject_code, job.subject_name || job.subject].filter(Boolean).join(' - ');
     const description = truncateText(job.job_description || '', 360);
     const applyDisabled = remaining <= 0;
+    const deadlineDate = job.application_deadline
+      ? new Date(`${job.application_deadline}T00:00:00`)
+      : null;
+    const deadlineText = deadlineDate && !Number.isNaN(deadlineDate.getTime())
+      ? deadlineDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : 'Not set';
 
     const jobCard = document.createElement('article');
     jobCard.className = 'job-card ui-opportunity-row';
@@ -8118,15 +8186,16 @@ function displayJobs(jobs) {
         ${description ? `<p class="ui-opportunity-row__description">${escapeHtml(description)}</p>` : ''}
 
         <dl class="ui-opportunity-facts">
-          <div><dt>Schedule</dt><dd>${escapeHtml(schedule)}</dd></div>
-          <div><dt>Load</dt><dd>${escapeHtml(hours)}${units ? ` · ${escapeHtml(units)}` : ''}</dd></div>
+          <div><dt>Lecture Units</dt><dd>${escapeHtml(lectureUnits)}</dd></div>
+          <div><dt>Laboratory Units</dt><dd>${escapeHtml(laboratoryUnits)}</dd></div>
+          <div><dt>Teaching Hours</dt><dd>${escapeHtml(hours)}</dd></div>
           <div><dt>Compensation</dt><dd>${escapeHtml(job.salary_display || job.salary_range || 'Rate to be determined')}<sup>*</sup></dd></div>
         </dl>
       </div>
 
       <aside class="ui-opportunity-row__aside">
-        <div class="ui-opportunity-row__vacancy"><span>Vacancy</span><strong>${escapeHtml(slotsText)}</strong></div>
-        <div class="ui-opportunity-row__deadline"><span>Apply by</span><strong>${escapeHtml(job.application_deadline || 'Not set')}</strong></div>
+        <div class="ui-opportunity-row__vacancy"><span>Availability</span><strong>${escapeHtml(slotsText)}</strong></div>
+        <div class="ui-opportunity-row__deadline"><span>Apply by</span><strong>${escapeHtml(deadlineText)}</strong></div>
         <div class="ui-opportunity-row__actions">
           <button class="ui-button ui-button--secondary ui-button--block view-details-btn" data-job-id="${job.id}">View details</button>
           <button class="ui-button ui-button--primary ui-button--block apply-btn ${applyDisabled ? 'opacity-50 cursor-not-allowed' : ''}" data-job-id="${job.id}" data-job-title="${escapeHtml(title)}" data-job-type="${escapeHtml(job.job_type || '')}" ${applyDisabled ? 'disabled' : ''}>Apply now</button>
@@ -9009,6 +9078,17 @@ function populateJobDetails(job) {
   document.getElementById('highlightLocation').textContent = job.locations || 'Not specified';
   document.getElementById('highlightDepartment').textContent = job.department_role || 'Not specified';
   document.getElementById('highlightSubject').textContent = job.subject || 'Not specified';
+  document.getElementById('highlightLectureUnits').textContent = job.lecture_units !== null
+    ? Number(job.lecture_units).toLocaleString()
+    : 'Not recorded';
+  document.getElementById('highlightLaboratoryUnits').textContent = job.laboratory_units !== null
+    ? Number(job.laboratory_units).toLocaleString()
+    : 'Not recorded';
+  document.getElementById('highlightTeachingHours').textContent = job.teaching_hours_per_week !== null
+    ? Number(job.teaching_hours_per_week).toLocaleString()
+    : 'Not recorded';
+  const availableSections = Number(job.available_sections ?? job.remaining_vacancies ?? 0);
+  document.getElementById('highlightAvailableSections').textContent = `${availableSections} ${availableSections === 1 ? 'section' : 'sections'}`;
   
   // Update Job Description (Position Overview)
   const descriptionContainer = document.getElementById('detailJobDescription');
@@ -9064,6 +9144,7 @@ function populateJobDetails(job) {
   const applyBtn = document.getElementById('detailApplyBtn');
   applyBtn.setAttribute('data-job-id', job.id);
   applyBtn.setAttribute('data-job-type', job.job_type || '');
+  applyBtn.disabled = false;
   
   // Check if user has already applied
   if (job.application_id) {
@@ -9148,6 +9229,11 @@ function populateJobDetails(job) {
         showToast('Application ID not found', 'error');
       }
     };
+  } else if (!job.is_available) {
+    applyBtn.textContent = 'No sections available';
+    applyBtn.className = 'ui-button ui-button--block opacity-60 cursor-not-allowed';
+    applyBtn.disabled = true;
+    applyBtn.onclick = null;
   } else {
     // User hasn't applied - show "Apply Now" button
     applyBtn.textContent = 'Apply Now';
@@ -9441,15 +9527,7 @@ function updateActiveFilters() {
     }
   });
   
-  // Show "All Departments" label when no department filter is active
-  if (!currentFilters.department && !currentFilters.search && !currentFilters.job_type) {
-    const allDeptLabel = document.createElement('span');
-    allDeptLabel.className = 'inline-flex items-center px-3 py-1 text-sm font-medium text-gray-600';
-    allDeptLabel.innerHTML = `
-      <i class="ri-building-line mr-2"></i>All Departments
-    `;
-    activeFiltersContainer.appendChild(allDeptLabel);
-  }
+  activeFiltersContainer.classList.toggle('hidden', activeFiltersContainer.childElementCount === 0);
 }
 
 function removeFilter(filterKey) {
@@ -9803,28 +9881,15 @@ document.addEventListener('DOMContentLoaded', function() {
 #applicationWizard {
   display: none !important;
   position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
+  inset: 0 !important;
   z-index: 9999 !important;
-  background-color: #f9fafb !important;
+  background-color: #f8fafc !important;
   overflow-y: auto !important;
 }
 
 /* Fix sticky header scroll issue */
 #applicationWizard .wizard-step {
-  scroll-margin-top: 120px !important;
-}
-
-/* Compact wizard design */
-#applicationWizard h2 {
-  font-size: 1.125rem !important;
-  margin-bottom: 0.5rem !important;
-}
-
-#applicationWizard p {
-  margin-bottom: 1rem !important;
+  scroll-margin-top: 100px !important;
 }
 
 #applicationWizard:not(.hidden) {
@@ -9848,21 +9913,9 @@ document.addEventListener('DOMContentLoaded', function() {
   display: none !important;
 }
 
-/* Ensure wizard body is always visible */
-#applicationWizard .p-6 {
+.wizard-step:not(.hidden) {
   display: block !important;
   visibility: visible !important;
-  opacity: 1 !important;
-  min-height: 400px !important;
-  background: white !important;
-}
-
-/* Ensure wizard content container is visible */
-#applicationWizard .max-w-4xl {
-  display: block !important;
-  visibility: visible !important;
-  position: relative !important;
-  z-index: 1 !important;
 }
 
 /* Override any Tailwind hidden class */
@@ -10121,6 +10174,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else if (section === 'applications') {
                     loadMyApplications();
                     updateActiveNavigation('applications');
+                } else if (section === 'teaching-load') {
+                    document.getElementById('teachingLoadLink')?.click();
                 }
             }
         });

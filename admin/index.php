@@ -270,7 +270,7 @@ $assigned_teaching_load_sql = "
           )
     GROUP BY job_id
 ";
-$vacancy_expr = "GREATEST(COALESCE(j.required_instructors, 1) - COALESCE(a.assigned_count, 0), 0)";
+$vacancy_expr = "COALESCE(j.available_sections, GREATEST(COALESCE(j.required_instructors, 1) - COALESCE(a.assigned_count, 0), 0))";
 $vacancy_stats = [
     'subject_count' => 0,
     'slot_count' => 0,
@@ -817,8 +817,8 @@ $recent_activity = $conn->query($recent_activity_query);
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Program</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Schedule</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vacancy</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Workload</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Available Sections</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200">
@@ -830,8 +830,15 @@ $recent_activity = $conn->query($recent_activity_query);
                                                 <div class="text-sm text-gray-500"><?php echo htmlspecialchars($load['academic_year'] . ' - ' . $load['semester']); ?></div>
                                             </td>
                                             <td class="px-6 py-4 text-sm text-gray-700"><?php echo htmlspecialchars($load['program'] ?: $load['department_role']); ?></td>
-                                            <td class="px-6 py-4 text-sm text-gray-700"><?php echo htmlspecialchars($load['teaching_schedule'] ?: 'Schedule to be announced'); ?></td>
-                                            <td class="px-6 py-4 text-sm font-semibold text-gray-900"><?php echo (int)$load['remaining_vacancies']; ?> / <?php echo (int)($load['required_instructors'] ?: 1); ?></td>
+                                            <td class="px-6 py-4 text-sm text-gray-700">
+                                                <?php if ($load['lecture_units'] !== null || $load['laboratory_units'] !== null): ?>
+                                                    <?php echo htmlspecialchars(nc_format_number($load['lecture_units'] ?? 0)); ?> lecture + <?php echo htmlspecialchars(nc_format_number($load['laboratory_units'] ?? 0)); ?> laboratory units<br>
+                                                    <span class="text-xs text-gray-500"><?php echo htmlspecialchars(nc_format_number($load['teaching_hours_per_week'] ?? 0)); ?> hours/week</span>
+                                                <?php else: ?>
+                                                    <span class="text-gray-500">Legacy workload record</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="px-6 py-4 text-sm font-semibold text-gray-900"><?php echo (int)$load['remaining_vacancies']; ?> <?php echo (int)$load['remaining_vacancies'] === 1 ? 'section' : 'sections'; ?> available</td>
                                         </tr>
                                     <?php endwhile; ?>
                                 <?php else: ?>
@@ -1465,18 +1472,18 @@ $recent_activity = $conn->query($recent_activity_query);
                 <header class="ui-page-header">
                     <div class="ui-page-header__main">
                         <p class="ui-eyebrow">Application review</p>
-                        <h1 class="ui-page-title">Applicant Details</h1>
-                        <p class="ui-page-description">Review the applicant profile, supporting credentials, and recruitment progress.</p>
+                        <h1 id="applicantReviewName" class="ui-page-title">Applicant Review</h1>
+                        <p id="applicantReviewPosition" class="ui-page-description">Review the applicant profile, supporting credentials, and recruitment progress.</p>
                     </div>
-                    <div id="actionStatusBadge" class="ui-page-header__actions" aria-live="polite"></div>
+                    <div class="ui-page-header__actions" aria-live="polite"><div id="actionStatusBadge"></div><div id="actionStageBadge"></div></div>
                 </header>
 
                 <div class="ui-detail-layout ui-applicant-layout">
                     <div class="ui-detail-main">
                         <section class="ui-content-section">
                             <div class="ui-section-header">
-                                <p class="ui-eyebrow">Applicant profile</p>
-                                <h2>Personal Information</h2>
+                                <p class="ui-eyebrow">Applicant summary</p>
+                                <h2>Personal &amp; Application Information</h2>
                             </div>
                             <div id="personalInfo" class="ui-definition-grid">
                                 <!-- Personal info will be loaded here -->
@@ -1485,7 +1492,7 @@ $recent_activity = $conn->query($recent_activity_query);
 
                         <section class="ui-content-section">
                             <div class="ui-section-header">
-                                <p class="ui-eyebrow">Position classification</p>
+                                <p class="ui-eyebrow">Compensation assessment</p>
                                 <h2>Projected Compensation</h2>
                             </div>
                             <div id="salaryProjectionInfo" class="ui-definition-grid">
@@ -1494,7 +1501,7 @@ $recent_activity = $conn->query($recent_activity_query);
                         </section>
 
                         <section class="ui-content-section">
-                            <div class="ui-section-header"><p class="ui-eyebrow">Academic background</p><h2>Education</h2></div>
+                            <div class="ui-section-header"><p class="ui-eyebrow">Qualifications &amp; education</p><h2>Education</h2></div>
                             <div id="educationInfo" class="ui-record-list"><!-- Education info will be loaded here --></div>
                         </section>
 
@@ -1514,99 +1521,51 @@ $recent_activity = $conn->query($recent_activity_query);
                         </section>
 
                         <section class="ui-content-section">
-                            <div class="ui-section-header"><p class="ui-eyebrow">Application files</p><h2>Submitted Documents</h2></div>
+                            <div class="ui-section-header"><p class="ui-eyebrow">Application files</p><h2>Submitted Requirements</h2></div>
                             <div id="documentsGrid" class="ui-document-list"><!-- Documents will be loaded here --></div>
                         </section>
-                    </div>
-
-                    <aside class="ui-detail-aside" aria-label="Applicant actions and recruitment schedule">
-                        <div class="ui-sticky-aside">
-                            <section class="ui-summary-panel ui-action-workspace">
-                                <div class="ui-section-header ui-section-header--compact">
-                                    <p class="ui-eyebrow">Workflow</p>
-                                    <h2>Application Actions</h2>
-                                    <p>Available actions reflect the applicant's current stage and your role.</p>
-                                </div>
-                                <div id="actionButtons" class="ui-action-list">
-                                <!-- Secretary Action: Transfer to Dean -->
-                                <button id="transferToDeptHeadBtn" onclick="openTransferModal()" 
-                                        class="ui-button ui-button--primary ui-button--block hidden">
-                                    <i class="fas fa-share"></i>
-                                    Transfer to Dean
-                                </button>
-                                
-                                <button id="scheduleBtn" onclick="openScheduleModal()" 
-                                        class="ui-button ui-button--primary ui-button--block">
-                                    <i class="fas fa-calendar-alt"></i>
-                                    Schedule Interview
-                                </button>
-                                
-                                <button id="approveInterviewBtn" onclick="openApproveInterviewModal()" 
-                                        class="ui-button ui-button--primary ui-button--block hidden">
-                                    <i class="fas fa-user-check"></i>
-                                    Approve Interview
-                                </button>
-                                
-                                <button id="rescheduleInterviewBtn" onclick="openRescheduleInterviewModal()" 
-                                        class="ui-button ui-button--secondary ui-button--block hidden">
-                                    <i class="fas fa-calendar-edit"></i>
-                                    Reschedule Interview
-                                </button>
-                                
-                                <button id="scheduleDemoBtn" onclick="openDemoScheduleModal()" 
-                                        class="ui-button ui-button--primary ui-button--block hidden">
-                                    <i class="fas fa-chalkboard-teacher"></i>
-                                    Schedule Demo Teaching
-                                </button>
-                                
-                                <button id="approveDemoBtn" onclick="openApproveDemoModal()" 
-                                        class="ui-button ui-button--primary ui-button--block hidden">
-                                    <i class="fas fa-check-double"></i>
-                                    Approve Demo
-                                </button>
-                                
-                                <button id="rescheduleDemoBtn" onclick="openRescheduleDemoModal()" 
-                                        class="ui-button ui-button--secondary ui-button--block hidden">
-                                    <i class="fas fa-calendar-edit"></i>
-                                    Reschedule Demo Teaching
-                                </button>
-                                
-                                <button id="hireBtn" onclick="openHireModal()" 
-                                        class="ui-button ui-button--primary ui-button--block hidden">
-                                    <i class="fas fa-check-circle"></i>
-                                    Mark Application Passed
-                                </button>
-                                
-                                <button id="resubmitBtn" onclick="openResubmitModal()" 
-                                        class="ui-button ui-button--secondary ui-button--block">
-                                    <i class="fas fa-redo"></i>
-                                    Request Resubmission
-                                </button>
-                                
-                                <button id="rejectBtn" onclick="openRejectModal()" 
-                                        class="ui-button ui-button--danger ui-button--block">
-                                    <i class="fas fa-times"></i>
-                                    Reject Application
-                                </button>
+                        <section class="ui-content-section">
+                            <div class="ui-section-header"><p class="ui-eyebrow">Recruitment progress</p><h2>Application Process</h2><p>Review the recorded schedule and outcome for each completed stage.</p></div>
+                            <div class="ui-review-stage-grid">
+                                <section id="interviewInfo" class="ui-stage-panel" style="display: none;">
+                                    <div class="ui-section-header ui-section-header--compact"><p class="ui-eyebrow">Stage 2</p><h3>Interview</h3></div>
+                                    <div id="interviewDetails" class="ui-summary-list"><!-- Interview details will be loaded here --></div>
+                                </section>
+                                <section id="demoInfo" class="ui-stage-panel" style="display: none;">
+                                    <div class="ui-section-header ui-section-header--compact"><p class="ui-eyebrow">Stage 3</p><h3>Demo Teaching</h3></div>
+                                    <div id="demoDetails" class="ui-summary-list"><!-- Demo details will be loaded here --></div>
+                                </section>
+                                <section id="psychReceiptInfo" class="ui-stage-panel" style="display: none;">
+                                    <div class="ui-section-header ui-section-header--compact"><p class="ui-eyebrow">Stage 4</p><h3>Psychological Exam</h3></div>
+                                    <div id="psychReceiptDetails" class="ui-summary-list"><!-- Receipt details will be loaded here --></div>
+                                </section>
+                                <section id="initialHiringInfo" class="ui-stage-panel" style="display: none;">
+                                    <div class="ui-section-header ui-section-header--compact"><p class="ui-eyebrow">Stage 5</p><h3>Initial Hiring</h3></div>
+                                    <div id="initialHiringDetails" class="ui-summary-list"><!-- Hiring details will be loaded here --></div>
+                                </section>
                             </div>
-                            </section>
+                        </section>
 
-                            <section id="interviewInfo" class="ui-summary-panel ui-stage-panel" style="display: none;">
-                                <div class="ui-section-header ui-section-header--compact"><p class="ui-eyebrow">Recruitment stage</p><h2>Interview Details</h2></div>
-                                <div id="interviewDetails" class="ui-summary-list"><!-- Interview details will be loaded here --></div>
-                            </section>
-                        
-                            <section id="demoInfo" class="ui-summary-panel ui-stage-panel" style="display: none;">
-                                <div class="ui-section-header ui-section-header--compact"><p class="ui-eyebrow">Recruitment stage</p><h2>Demo Teaching Details</h2></div>
-                                <div id="demoDetails" class="ui-summary-list"><!-- Demo details will be loaded here --></div>
-                            </section>
-                        
-                            <section id="psychReceiptInfo" class="ui-summary-panel ui-stage-panel" style="display: none;">
-                                <div class="ui-section-header ui-section-header--compact"><p class="ui-eyebrow">Pre-employment</p><h2>Psychological Exam Receipt</h2></div>
-                                <div id="psychReceiptDetails" class="ui-summary-list"><!-- Receipt details will be loaded here --></div>
-                            </section>
-                        </div>
-                    </aside>
+                        <section class="ui-content-section ui-decision-section" aria-labelledby="applicationDecisionTitle">
+                            <div class="ui-section-header">
+                                <p class="ui-eyebrow">Decision &amp; actions</p>
+                                <h2 id="applicationDecisionTitle">Application Decision</h2>
+                                <p>You have reviewed the applicant's profile, qualifications, submitted requirements, and recruitment progress. Available actions reflect the current stage and your role.</p>
+                            </div>
+                            <div id="actionButtons" class="ui-decision-actions">
+                                <button id="transferToDeptHeadBtn" onclick="openTransferModal()" class="ui-button ui-button--primary hidden"><i class="fas fa-share"></i>Transfer to Dean</button>
+                                <button id="scheduleBtn" onclick="openScheduleModal()" class="ui-button ui-button--primary"><i class="fas fa-calendar-alt"></i>Schedule Interview</button>
+                                <button id="approveInterviewBtn" onclick="openApproveInterviewModal()" class="ui-button ui-button--primary hidden"><i class="fas fa-user-check"></i>Approve Interview</button>
+                                <button id="rescheduleInterviewBtn" onclick="openRescheduleInterviewModal()" class="ui-button ui-button--secondary hidden"><i class="fas fa-calendar-edit"></i>Reschedule Interview</button>
+                                <button id="scheduleDemoBtn" onclick="openDemoScheduleModal()" class="ui-button ui-button--primary hidden"><i class="fas fa-chalkboard-teacher"></i>Schedule Demo Teaching</button>
+                                <button id="approveDemoBtn" onclick="openApproveDemoModal()" class="ui-button ui-button--primary hidden"><i class="fas fa-check-double"></i>Approve Demo Teaching</button>
+                                <button id="rescheduleDemoBtn" onclick="openRescheduleDemoModal()" class="ui-button ui-button--secondary hidden"><i class="fas fa-calendar-edit"></i>Reschedule Demo Teaching</button>
+                                <button id="hireBtn" onclick="openHireModal()" class="ui-button ui-button--primary hidden"><i class="fas fa-check-circle"></i>Mark Application Passed</button>
+                                <button id="resubmitBtn" onclick="openResubmitModal()" class="ui-button ui-button--secondary"><i class="fas fa-redo"></i>Request Resubmission</button>
+                                <button id="rejectBtn" onclick="openRejectModal()" class="ui-button ui-button--danger"><i class="fas fa-times"></i>Reject Application</button>
+                            </div>
+                        </section>
+                    </div>
                 </div>
             </div>
 
@@ -1882,207 +1841,72 @@ $recent_activity = $conn->query($recent_activity_query);
     
     <!-- Create Teaching Load Modal -->
     <div id="createJobModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4">
-            <div class="p-6 border-b border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-900">Create New Teaching Load</h2>
-            </div>
-            
-            <form class="p-6 space-y-4" onsubmit="createJob(event)">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Teaching Load Title</label>
-                        <input type="text" name="title" value="Instructor" required 
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent "
-                               placeholder="Enter job title">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Department</label>
-                        <select name="department" required
-                                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                            <option value="">Select department</option>
-                            <option value="Computing Studies">Computing Studies</option>
-                            <option value="Hospitality Management">Hospitality Management</option>
-                            <option value="Education">Education</option>
-                            
-                        </select>
-                    </div>
-                </div>
+        <div class="ui-teaching-load-dialog bg-white rounded-xl w-full max-w-4xl max-h-[92vh] overflow-hidden m-4 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="createTeachingLoadTitle">
+            <form class="flex min-h-0 max-h-[92vh] flex-col" onsubmit="createJob(event)">
+                <header class="flex items-start justify-between border-b border-gray-200 px-6 py-5">
+                    <div><p class="ui-eyebrow">Workforce planning</p><h2 id="createTeachingLoadTitle" class="text-xl font-semibold text-gray-900">Create Teaching Load</h2><p class="mt-1 text-sm text-gray-500">Define the subject workload and remaining section capacity.</p></div>
+                    <button type="button" onclick="closeCreateJobModal()" class="text-gray-400 hover:text-gray-700" aria-label="Close"><i class="fas fa-times text-xl"></i></button>
+                </header>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Load Type</label>
-                        <select name="type" required
-                                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                            <option value="Full-time">Full-time</option>
-                            <option value="Part-time">Part-time</option>
-                        </select>
-                    </div>
+                <div class="teaching-load-modal__body min-h-0 flex-1 overflow-y-auto px-6 py-5 space-y-8" data-ranking-editor-container>
+                    <input type="hidden" name="title" value="Instructor">
                     <input type="hidden" name="location" value="Norzagaray College">
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input type="hidden" name="salary" value="">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Application Deadline</label>
-                        <input type="date" name="deadline" required
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                    </div>
-                    <div class="bg-blue-50 border border-blue-100 rounded-lg p-3">
-                        <p class="text-sm font-medium text-blue-900">Compensation Rule</p>
-                        <p class="text-xs text-blue-800 mt-1">Permanent/Full-time loads use the configured Salary Grade (SG). Part-time loads use the applicant's qualification rate and teaching hours.</p>
-                    </div>
+
+                    <section>
+                        <div class="mb-4 border-b border-gray-200 pb-3"><h3 class="font-semibold text-gray-900">Basic Information</h3></div>
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Employment Type</label><select name="type" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary"><option value="Full-time">Full-time</option><option value="Part-time">Part-time</option></select></div>
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Application Deadline</label><input type="date" name="deadline" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary"></div>
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Academic Year</label><input type="text" name="academic_year" value="<?php echo htmlspecialchars(nc_current_academic_year()); ?>" pattern="\d{4}-\d{4}" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary" placeholder="2026-2027"></div>
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Semester</label><select name="semester" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary"><option value="First Semester" <?php echo nc_current_semester() === 'First Semester' ? 'selected' : ''; ?>>First Semester</option><option value="Second Semester" <?php echo nc_current_semester() === 'Second Semester' ? 'selected' : ''; ?>>Second Semester</option><option value="Summer">Summer</option></select></div>
+                            <div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Department</label><select name="department" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary"><option value="">Select department</option><option value="Computing Studies">Computing Studies</option><option value="Hospitality Management">Hospitality Management</option><option value="Education">Education</option></select></div>
+                        </div>
+                    </section>
+
+                    <section>
+                        <div class="mb-4 border-b border-gray-200 pb-3"><h3 class="font-semibold text-gray-900">Subject Information</h3></div>
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Subject Code</label><input type="text" name="subject_code" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary" placeholder="e.g., CC 101"></div>
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Subject Name</label><input type="text" name="subject_name" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary" placeholder="e.g., Introduction to Computing"></div>
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Program</label><input type="text" name="program" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary" placeholder="e.g., BS Computer Science"></div>
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Subject Area</label><select name="subject" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary"><option value="">Select subject</option><option value="BSEd and BEED Professional Education Subjects">BSEd and BEED Professional Education Subjects</option><option value="Computing Studies Professional Subjects">Computing Studies Professional Subjects</option><option value="Major Subjects (Biology, Chemistry and Physics)">Major Subjects (Biology, Chemistry and Physics)</option><option value="Business Management Subjects">Business Management Subjects</option><option value="Social Sciences">Social Sciences</option><option value="English">English</option><option value="PATHFit">PATHFit</option></select></div>
+                        </div>
+                    </section>
+
+                    <section>
+                        <div class="mb-4 border-b border-gray-200 pb-3"><h3 class="font-semibold text-gray-900">Teaching Load Details</h3></div>
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Lecture Units</label><input id="createLectureUnits" type="number" name="lecture_units" value="0" min="0" step="0.25" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary"></div>
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Laboratory Units</label><input id="createLaboratoryUnits" type="number" name="laboratory_units" value="0" min="0" step="0.25" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary"></div>
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Teaching Hours / Week</label><div id="createTeachingHoursDisplay" class="min-h-[46px] rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 font-semibold text-gray-900" aria-live="polite">0 hours/week</div><input id="createTeachingHours" type="hidden" name="teaching_hours_per_week" value="0"></div>
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Available Sections</label><input type="number" name="available_sections" value="1" min="0" step="1" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary"><p class="mt-1 text-xs text-gray-500">The posting closes automatically when this reaches zero.</p></div>
+                            <div class="md:col-span-1 lg:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Salary Grade <span class="font-normal text-gray-500">(Full-time only)</span></label><input type="text" name="salary_grade" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary" placeholder="Instructor I defaults to SG13"></div>
+                        </div>
+                        <div class="mt-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3"><p class="text-sm font-medium text-blue-950">Compensation Rule</p><p class="mt-1 text-sm text-blue-800">Permanent/Full-time loads use the configured Salary Grade. Part-time loads use the applicant's verified qualification rate and calculated teaching hours.</p></div>
+                    </section>
+
+                    <section>
+                        <div class="mb-4 border-b border-gray-200 pb-3"><h3 class="font-semibold text-gray-900">Description</h3></div>
+                        <textarea name="description" rows="4" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary" placeholder="Enter a detailed teaching load description"></textarea>
+                    </section>
+
+                    <details class="rounded-lg border border-gray-200 p-4">
+                        <summary class="cursor-pointer font-semibold text-gray-900">Additional qualification details</summary>
+                        <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Education</label><textarea name="education" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2"></textarea></div>
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Experience</label><textarea name="experience" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2"></textarea></div>
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Training</label><textarea name="training" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2"></textarea></div>
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Eligibility</label><textarea name="eligibility" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2"></textarea></div>
+                            <div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Competency</label><textarea name="competency" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2"></textarea></div>
+                        </div>
+                    </details>
                 </div>
 
-                <div class="border-t border-gray-200 pt-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">TEACHING LOAD DETAILS</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Academic Year</label>
-                            <input type="text" name="academic_year" value="<?php echo htmlspecialchars(nc_current_academic_year()); ?>" required
-                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                   placeholder="2026-2027">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Semester</label>
-                            <select name="semester" required
-                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                <option value="First Semester" <?php echo nc_current_semester() === 'First Semester' ? 'selected' : ''; ?>>First Semester</option>
-                                <option value="Second Semester" <?php echo nc_current_semester() === 'Second Semester' ? 'selected' : ''; ?>>Second Semester</option>
-                                <option value="Summer">Summer</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Subject Code</label>
-                            <input type="text" name="subject_code"
-                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                   placeholder="e.g., CC 101">
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Subject Name</label>
-                            <input type="text" name="subject_name" required
-                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                   placeholder="e.g., Introduction to Computing">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Program</label>
-                            <input type="text" name="program" required
-                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                   placeholder="e.g., BS Computer Science">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Required Instructors</label>
-                            <input type="number" name="required_instructors" value="1" min="1" required
-                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Teaching Hours / Week</label>
-                            <input type="number" name="teaching_hours_per_week" min="0" step="0.25" required
-                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                   placeholder="e.g., 6">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Load Units</label>
-                            <input type="number" name="load_units" min="0" step="0.25"
-                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                   placeholder="e.g., 3">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Salary Grade (Full-time only)</label>
-                            <input type="text" name="salary_grade"
-                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                   placeholder="Instructor I defaults to SG13">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Teaching Schedule</label>
-                        <textarea name="teaching_schedule" rows="2"
-                                  class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                  placeholder="e.g., Mon/Wed 8:00 AM-10:00 AM"></textarea>
-                    </div>
-                </div>
-
-                <!-- Subject Field -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Subject Area <span class="text-red-500">*</span></label>
-                    <select name="subject" required
-                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                        <option value="">Select subject</option>
-                        <option value="BSEd and BEED Professional Education Subjects">BSEd and BEED Professional Education Subjects</option>
-                        <option value="Computing Studies Professional Subjects">Computing Studies Professional Subjects</option>
-                        <option value="Major Subjects (Biology, Chemistry and Physics)">Major Subjects (Biology, Chemistry and Physics)</option>
-                        <option value="Business Management Subjects">Business Management Subjects</option>
-                        <option value="Social Sciences">Social Sciences</option>
-                        <option value="English">English</option>
-                        <option value="PATHFit">PATHFit</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Teaching Load Description</label>
-                    <textarea name="description" rows="4" required
-                              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                              placeholder="Enter detailed job description"></textarea>
-                </div>
-
-                <!-- Minimum Qualifications Section -->
-                <div class="border-t border-gray-200 pt-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">MINIMUM QUALIFICATIONS</h3>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Education</label>
-                            <textarea name="education" rows="2"
-                                      class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                      placeholder="e.g., Elementary School Graduate"></textarea>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Experience</label>
-                            <textarea name="experience" rows="2"
-                                      class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                      placeholder="e.g., with no experience required"></textarea>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Training</label>
-                            <textarea name="training" rows="2"
-                                      class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                      placeholder="e.g., No training required"></textarea>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Eligibility</label>
-                            <textarea name="eligibility" rows="2"
-                                      class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                      placeholder="e.g., None required (MC 11 s. 1996, as amended, Category III)"></textarea>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Additional Details Section -->
-                <div class="border-t border-gray-200 pt-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">ADDITIONAL DETAILS</h3>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Competency</label>
-                        <textarea name="competency" rows="3"
-                                  class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                  placeholder="e.g., Core (Basic): Exemplifying Integrity and Professionalism; Delivering Service Excellence; Demonstrating Personal Effectiveness; Teamwork and Collaboration"></textarea>
-                    </div>
-
-                </div>
-
-                <div class="flex justify-end gap-3 pt-4">
-                    <button type="button" onclick="closeCreateJobModal()"
-                            class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                        Cancel
-                    </button>
-                    <button type="submit"
-                            class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-800 transition-colors">
-                        Create Teaching Load
-                    </button>
-                </div>
+                <footer class="flex items-center justify-end gap-3 border-t border-gray-200 bg-white px-6 py-4">
+                    <button type="button" onclick="closeCreateJobModal()" class="ui-button ui-button--secondary">Cancel</button>
+                    <button type="submit" class="ui-button ui-button--primary"><i class="fas fa-plus"></i>Create Teaching Load</button>
+                </footer>
             </form>
         </div>
     </div>
@@ -4284,14 +4108,41 @@ $recent_activity = $conn->query($recent_activity_query);
                             </div>
                                 <input type="hidden" name="locations" id="editLocation" value="Norzagaray College">
                             <input type="hidden" name="salary_range" id="editSalary" value="">
-                            <div class="bg-blue-50 border border-blue-100 rounded-lg p-3">
-                                <p class="text-sm font-medium text-blue-900">Compensation Rule</p>
-                                <p class="text-xs text-blue-800 mt-1">Permanent/Full-time loads use the configured Salary Grade (SG). Part-time loads use the applicant's qualification rate and teaching hours.</p>
-                            </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Application Deadline *</label>
                                 <input type="date" name="application_deadline" id="editDeadline" required
                                        class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                            </div>
+                        </div>
+
+                        <div class="mt-6 border-t border-gray-200 pt-5">
+                            <h4 class="text-sm font-semibold text-gray-900 mb-3">Subject Information</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Subject Code *</label>
+                                    <input type="text" name="subject_code" id="editSubjectCode" required class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., CC 101">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Subject Name *</label>
+                                    <input type="text" name="subject_name" id="editSubjectName" required class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., Introduction to Computing">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Program *</label>
+                                    <input type="text" name="program" id="editProgram" required class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., BS Computer Science">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Subject Area *</label>
+                                    <select name="subject" id="editSubjectArea" required class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        <option value="">Select subject</option>
+                                        <option value="BSEd and BEED Professional Education Subjects">BSEd and BEED Professional Education Subjects</option>
+                                        <option value="Computing Studies Professional Subjects">Computing Studies Professional Subjects</option>
+                                        <option value="Major Subjects (Biology, Chemistry and Physics)">Major Subjects (Biology, Chemistry and Physics)</option>
+                                        <option value="Business Management Subjects">Business Management Subjects</option>
+                                        <option value="Social Sciences">Social Sciences</option>
+                                        <option value="English">English</option>
+                                        <option value="PATHFit">PATHFit</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                         
@@ -4314,18 +4165,23 @@ $recent_activity = $conn->query($recent_activity_query);
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">Required Instructors</label>
-                                    <input type="number" name="required_instructors" id="editRequiredInstructors" min="1"
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Lecture Units</label>
+                                    <input type="number" name="lecture_units" id="editLectureUnits" min="0" step="0.25" required
+                                           class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Laboratory Units</label>
+                                    <input type="number" name="laboratory_units" id="editLaboratoryUnits" min="0" step="0.25" required
                                            class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Teaching Hours / Week</label>
-                                    <input type="number" name="teaching_hours_per_week" id="editTeachingHours" min="0" step="0.25"
-                                           class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                                    <div id="editTeachingHoursDisplay" class="min-h-[50px] rounded-lg border border-gray-200 bg-white px-4 py-3 font-semibold text-gray-900" aria-live="polite">0 hours/week</div>
+                                    <input type="hidden" name="teaching_hours_per_week" id="editTeachingHours" value="0">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">Load Units</label>
-                                    <input type="number" name="load_units" id="editLoadUnits" min="0" step="0.25"
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Available Sections</label>
+                                    <input type="number" name="available_sections" id="editAvailableSections" min="0" step="1" required
                                            class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
                                 </div>
                                 <div>
@@ -4335,10 +4191,9 @@ $recent_activity = $conn->query($recent_activity_query);
                                            placeholder="Instructor I defaults to SG13">
                                 </div>
                             </div>
-                            <div class="mt-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Teaching Schedule</label>
-                                <textarea name="teaching_schedule" id="editTeachingSchedule" rows="2"
-                                          class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"></textarea>
+                            <div class="mt-4 rounded-lg border border-blue-100 bg-blue-50 p-4">
+                                <p class="text-sm font-medium text-blue-900">Compensation Rule</p>
+                                <p class="text-sm text-blue-800 mt-1">Permanent/Full-time loads use the configured Salary Grade. Part-time loads use the applicant's verified qualification rate and calculated teaching hours.</p>
                             </div>
                         </div>
 
@@ -4385,11 +4240,11 @@ $recent_activity = $conn->query($recent_activity_query);
                         </div>
                     </div>
 
-                    <!-- Teaching Load Details Section -->
+                    <!-- Role details section -->
                     <div class="bg-green-50 rounded-lg p-6">
                         <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                             <i class="fas fa-tasks text-green-600 mr-2"></i>
-                            Teaching Load Details
+                            Requirements and Responsibilities
                         </h3>
                         
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">

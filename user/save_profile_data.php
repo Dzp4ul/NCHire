@@ -181,9 +181,12 @@ if (isset($_POST['saveEducation'])) {
     $ed_gpa = trim($_POST['ed_gpa'] ?? '');
     $education_level = strtolower(trim($_POST['education_level'] ?? $_POST['ed_level'] ?? 'other'));
     $education_status = strtolower(trim($_POST['education_status'] ?? $_POST['ed_status'] ?? 'completed'));
-    $completed_units = isset($_POST['completed_units']) && $_POST['completed_units'] !== ''
-        ? (int)$_POST['completed_units']
-        : (isset($_POST['ed_completed_units']) && $_POST['ed_completed_units'] !== '' ? (int)$_POST['ed_completed_units'] : null);
+    $completed_units_raw = $_POST['completed_units'] ?? ($_POST['ed_completed_units'] ?? '');
+    $completed_units = $completed_units_raw !== '' ? filter_var(
+        $completed_units_raw,
+        FILTER_VALIDATE_INT,
+        ['options' => ['min_range' => 0]]
+    ) : null;
     $year_completed = isset($_POST['year_completed']) && $_POST['year_completed'] !== ''
         ? (int)$_POST['year_completed']
         : (isset($_POST['ed_year_completed']) && $_POST['ed_year_completed'] !== '' ? (int)$_POST['ed_year_completed'] : null);
@@ -194,8 +197,8 @@ if (isset($_POST['saveEducation'])) {
     if (!in_array($education_status, ['completed', 'ongoing'], true)) {
         $education_status = 'completed';
     }
-    if ($completed_units !== null && ($completed_units < 0 || $completed_units > 200)) {
-        echo json_encode(['success' => false, 'message' => 'Completed graduate units must be between 0 and 200.']);
+    if ($completed_units_raw !== '' && $completed_units === false) {
+        echo json_encode(['success' => false, 'message' => "Completed Master's Units must be a whole number greater than or equal to 0."]);
         exit();
     }
     if ($education_level === 'other') {
@@ -213,9 +216,18 @@ if (isset($_POST['saveEducation'])) {
         }
     }
 
+    $is_graduate_ongoing = $education_status === 'ongoing' && $education_level === 'master';
+    if ($is_graduate_ongoing && $completed_units === null) {
+        echo json_encode(['success' => false, 'message' => "Completed Master's Units are required for ongoing Master's education."]);
+        exit();
+    }
+
     if ($education_status === 'ongoing') {
         $year_completed = null;
         $ed_ey = 0;
+        if ($education_level !== 'master') {
+            $completed_units = null;
+        }
     } else {
         $completed_units = null;
         $year_completed = $year_completed ?: $ed_ey;
@@ -240,9 +252,8 @@ if (isset($_POST['saveEducation'])) {
         exit();
     }
 
-    $is_graduate_ongoing = $education_status === 'ongoing' && $education_level === 'master';
     if ($is_graduate_ongoing && (!$certificate_of_grades || !$proof_of_enrollment)) {
-        echo json_encode(['success' => false, 'message' => 'Certificate of Grades and Proof of Enrollment are required for ongoing graduate education.']);
+        echo json_encode(['success' => false, 'message' => "Certificate of Grades and Proof of Enrollment are required for ongoing Master's education."]);
         exit();
     }
 
