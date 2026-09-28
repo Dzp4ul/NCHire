@@ -1627,7 +1627,8 @@ function initializeProfileModalHandlers() {
   const experienceForm = document.getElementById('experienceForm');
   const skillForm = document.getElementById('skillForm');
 
-  if (educationForm) {
+  if (educationForm && educationForm.dataset.profileSubmitBound !== '1') {
+    educationForm.dataset.profileSubmitBound = '1';
     educationForm.addEventListener('submit', function(e) {
       e.preventDefault();
       const formData = new FormData(this);
@@ -1672,7 +1673,8 @@ function initializeProfileModalHandlers() {
     });
   }
 
-  if (experienceForm) {
+  if (experienceForm && experienceForm.dataset.profileSubmitBound !== '1') {
+    experienceForm.dataset.profileSubmitBound = '1';
     experienceForm.addEventListener('submit', function(e) {
       e.preventDefault();
       const formData = new FormData(this);
@@ -1798,7 +1800,8 @@ function initializeProfileModalHandlers() {
     });
   }
 
-  if (skillForm) {
+  if (skillForm && skillForm.dataset.profileSubmitBound !== '1') {
+    skillForm.dataset.profileSubmitBound = '1';
     skillForm.addEventListener('submit', function(e) {
       e.preventDefault();
       const formData = new FormData(this);
