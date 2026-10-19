@@ -43,24 +43,80 @@ $otherPermanent = nc_calculate_salary_projection_from_education(
 salary_check($otherPermanent['salary_display'] === 'SG16', 'non-Instructor-I permanent jobs show only their assigned Salary Grade');
 
 $masterCompleted = nc_calculate_salary_projection_from_education(
-    salary_education('master', 'completed'),
+    salary_education('master', 'completed', 36),
     ['job_type' => 'Part-time']
 );
 salary_check($masterCompleted['applicable_hourly_rate'] === 200.0, "completed Master's receives 200/hour");
 salary_check($masterCompleted['salary_display'] === '₱200/hour', 'part-time job without hours displays only its hourly rate');
 
+$ongoingMasterCases = [
+    0 => 150.0,
+    9 => 150.0,
+    10 => 150.0,
+    17 => 150.0,
+    18 => 170.0,
+    19 => 170.0,
+    24 => 170.0,
+    36 => 170.0,
+];
+foreach ($ongoingMasterCases as $units => $expectedRate) {
+    $projection = nc_calculate_salary_projection_from_education(
+        salary_education('master', 'ongoing', $units),
+        ['job_type' => 'Part-time']
+    );
+    salary_check($projection['applicable_hourly_rate'] === $expectedRate, "ongoing Master's with {$units} units receives {$expectedRate}/hour");
+    salary_check(strpos($projection['qualification'], "{$units} Units") !== false, "{$units} completed units remain visible in the qualification");
+}
+
 $masterOngoing = nc_calculate_salary_projection_from_education(
-    salary_education('master', 'ongoing', 3),
+    salary_education('master', 'ongoing', 9),
     ['job_type' => 'Part-time']
 );
-salary_check($masterOngoing['applicable_hourly_rate'] === 150.0, "ongoing Master's receives 150/hour without a minimum-unit threshold");
-salary_check(strpos($masterOngoing['qualification'], '3 completed units') !== false, 'ongoing completed units remain visible in the qualification');
 
 $masterUpdated = nc_calculate_salary_projection_from_education(
     salary_education('master', 'completed', 3),
     ['job_type' => 'Part-time']
 );
 salary_check($masterOngoing['applicable_hourly_rate'] === 150.0 && $masterUpdated['applicable_hourly_rate'] === 200.0, 'changing current profile status updates future projections');
+$masterReopened = nc_calculate_salary_projection_from_education(
+    salary_education('master', 'ongoing', 3),
+    ['job_type' => 'Part-time']
+);
+salary_check($masterUpdated['applicable_hourly_rate'] === 200.0 && $masterReopened['applicable_hourly_rate'] === 150.0, 'changing completed Master\'s status back to ongoing restores the unit-based rate');
+
+$missingUnits = nc_calculate_salary_projection_from_education(
+    salary_education('master', 'ongoing'),
+    ['job_type' => 'Part-time']
+);
+salary_check($missingUnits['applicable_hourly_rate'] === null, 'missing ongoing Master\'s units do not receive an assumed rate');
+
+$invalidUnits = nc_calculate_salary_projection_from_education(
+    [['education_level' => 'master', 'education_status' => 'ongoing', 'completed_units' => 'not-a-number']],
+    ['job_type' => 'Part-time']
+);
+$negativeUnits = nc_calculate_salary_projection_from_education(
+    [['education_level' => 'master', 'education_status' => 'ongoing', 'completed_units' => -1]],
+    ['job_type' => 'Part-time']
+);
+salary_check($invalidUnits['applicable_hourly_rate'] === null && $negativeUnits['applicable_hourly_rate'] === null, 'invalid and negative units do not receive an assumed rate');
+
+$separateMasters = nc_calculate_salary_projection_from_education(
+    array_merge(salary_education('master', 'ongoing', 10), salary_education('master', 'ongoing', 10)),
+    ['job_type' => 'Part-time']
+);
+salary_check($separateMasters['applicable_hourly_rate'] === 150.0, 'separate ongoing Master\'s records use the highest record and do not combine units');
+
+$editedMasters = nc_calculate_salary_projection_from_education(
+    array_merge(salary_education('master', 'ongoing', 10), salary_education('master', 'ongoing', 18)),
+    ['job_type' => 'Part-time']
+);
+salary_check($editedMasters['applicable_hourly_rate'] === 170.0, 'editing a Master\'s record across the 18-unit boundary updates the rate');
+
+$afterDelete = nc_calculate_salary_projection_from_education(
+    salary_education('bachelor', 'completed'),
+    ['job_type' => 'Part-time']
+);
+salary_check($afterDelete['applicable_hourly_rate'] === null, 'deleting the only applicable graduate record removes its projected rate');
 
 $doctorate = nc_calculate_salary_projection_from_education(
     array_merge(salary_education('master', 'completed'), salary_education('doctorate', 'completed')),
@@ -81,6 +137,12 @@ $doctorateOngoingOnly = nc_calculate_salary_projection_from_education(
     ['job_type' => 'Part-time']
 );
 salary_check($doctorateOngoingOnly['applicable_hourly_rate'] === null && $doctorateOngoingOnly['salary_display'] === 'Rate to be determined', 'ongoing Doctorate alone safely returns rate to be determined');
+
+$bachelorOnly = nc_calculate_salary_projection_from_education(
+    salary_education('bachelor', 'completed'),
+    ['job_type' => 'Part-time']
+);
+salary_check($bachelorOnly['applicable_hourly_rate'] === null && $bachelorOnly['salary_display'] === 'Rate to be determined', 'existing Bachelor-only classification remains unchanged');
 
 $missingStatus = nc_calculate_salary_projection_from_education(
     [['education_level' => 'master', 'degree' => 'Master of Science']],

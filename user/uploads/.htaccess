@@ -1,0 +1,8 @@
+Options -Indexes
+RewriteEngine On
+# Legacy application documents were stored directly in this directory. Block
+# direct web access while allowing existing public subdirectories (for example,
+# profile pictures) to keep their current URLs. Authorized document endpoints
+# stream protected files after checking application ownership.
+RewriteRule ^[^/]+$ - [F,L]
+

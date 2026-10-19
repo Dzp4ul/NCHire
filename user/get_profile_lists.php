@@ -20,6 +20,8 @@ if ($conn->connect_error) {
     exit();
 }
 
+require_once __DIR__ . '/../shared/helpers/recruitment.php';
+
 // Get user ID
 $user_id = $_SESSION['user_id'] ?? null;
 if (!$user_id && isset($_SESSION['user_email'])) {
@@ -54,7 +56,17 @@ if ($type === 'education') {
         $data[] = $row;
     }
     $stmt->close();
-    echo json_encode(['success' => true, 'data' => $data]);
+    $qualificationProjection = nc_calculate_salary_projection_from_education(
+        $data,
+        ['job_type' => 'Part-time'],
+        null,
+        $conn
+    );
+    echo json_encode([
+        'success' => true,
+        'data' => $data,
+        'qualification_projection' => $qualificationProjection,
+    ]);
     exit();
 }
 

@@ -14,12 +14,29 @@ return [
             'hourly_rate' => 220.00,
         ],
         'master_completed' => [
-            'label' => "Master's - Completed",
+            'label' => "Master's — Completed",
             'hourly_rate' => 200.00,
         ],
         'master_ongoing' => [
-            'label' => "Master's - Ongoing",
+            'label' => "Master's — Ongoing",
             'hourly_rate' => 150.00,
+        ],
+    ],
+    // Fallback bands used when the database-backed graduate rate table is not
+    // available (for example, in isolated unit tests). Live requests use the
+    // same bands from graduate_unit_rate_rules.
+    'graduate_unit_rate_rules' => [
+        'master_ongoing' => [
+            [
+                'minimum_units' => 0,
+                'maximum_units' => 17,
+                'hourly_rate' => 150.00,
+            ],
+            [
+                'minimum_units' => 18,
+                'maximum_units' => null,
+                'hourly_rate' => 170.00,
+            ],
         ],
     ],
     'full_time_salary_grades' => [

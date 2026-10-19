@@ -7,6 +7,7 @@ $passed = 0;
 $failed = 0;
 $jobId = 0;
 $userId = 0;
+$educationId = 0;
 $applicationIds = [];
 
 function teaching_load_check(bool $condition, string $message): void
@@ -64,6 +65,7 @@ try {
     if (!$educationStmt->execute()) {
         throw new RuntimeException('Unable to create test education: ' . $educationStmt->error);
     }
+    $educationId = (int)$educationStmt->insert_id;
     $educationStmt->close();
 
     $jobStmt = $conn->prepare("INSERT INTO job (job_title, department_role, job_type, locations, salary_range, application_deadline, status, subject, subject_code, subject_name, program, academic_year, semester, teaching_hours_per_week, lecture_units, laboratory_units, required_instructors, initial_available_sections, available_sections, job_description) VALUES ('TST 101 - Transaction Test', 'Computing Studies', 'Part-time', 'Norzagaray College', '', '2099-12-31', 'Active', 'Computing Studies Professional Subjects', 'TST 101', 'Transaction Test', 'BS Computer Science', ?, ?, 6, 3, 1, 2, 2, 2, 'Automated integration test record')");
@@ -88,8 +90,8 @@ try {
     teaching_load_check($repeat['success'] === true && !empty($repeat['already_assigned']) && $capacityAfterRepeat === 1, 'reprocessing the same hiring transaction does not decrement twice');
 
     $assignment = $conn->query("SELECT * FROM teaching_assignments WHERE application_id = {$applicationIds[0]}")->fetch_assoc();
-    teaching_load_check((float)$assignment['projected_hourly_rate'] === 150.0, "ongoing Master's units use the configured graduate-unit rate");
-    teaching_load_check((float)$assignment['projected_weekly_compensation'] === 900.0, 'assignment snapshots projected hourly rate multiplied by teaching hours');
+    teaching_load_check((float)$assignment['projected_hourly_rate'] === 170.0, "24 ongoing Master's units use the configured 18+ graduate-unit rate");
+    teaching_load_check((float)$assignment['projected_weekly_compensation'] === 1020.0, 'assignment snapshots projected hourly rate multiplied by teaching hours');
 
     $applicationIds[] = create_test_application($conn, $userId, $jobId, $email, 2);
     $second = nc_finalize_teaching_assignment($conn, $applicationIds[1], null, 'Automated transaction test');
@@ -110,7 +112,9 @@ try {
         $conn->query("DELETE FROM job WHERE id = {$jobId}");
     }
     if ($userId > 0) {
-        $conn->query("DELETE FROM user_education WHERE user_id = {$userId}");
+        if ($educationId > 0) {
+            $conn->query("DELETE FROM user_education WHERE id = {$educationId} AND user_id = {$userId}");
+        }
         $conn->query("DELETE FROM applicants WHERE id = {$userId}");
     }
 }

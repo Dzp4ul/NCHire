@@ -99,68 +99,6 @@ function preventDuplicateSubmission(callback, loading = null) {
 // Sample data
 let jobs = [];
 
-const rankingRequirementFields = [
-    'minimum_education_level', 'required_degree_fields', 'graduate_requirement',
-    'minimum_graduate_units', 'minimum_experience_years',
-    'teaching_experience_requirement', 'required_skills',
-    'required_certifications', 'required_licenses', 'required_training',
-    'preferred_qualifications'
-];
-
-function getRankingRequirementPayload(formData) {
-    return Object.fromEntries(rankingRequirementFields.map(field => [field, formData.get(field) || '']));
-}
-
-function setRankingRequirementFormValues(form, job) {
-    if (!form) return;
-    rankingRequirementFields.forEach(field => {
-        const input = form.querySelector(`[name="${field}"]`);
-        if (input) input.value = job[field] ?? '';
-    });
-}
-
-function initializeRankingRequirementEditors() {
-    const formSelectors = [
-        '#createJobModal form', '#createutilityJobModal form', '#createsecJobModal form',
-        '#newEditJobForm', '#editSecretaryJobForm'
-    ];
-    const markup = `
-      <details class="border border-gray-200 bg-gray-50 rounded-lg p-4 ranking-requirements-editor">
-        <summary class="font-semibold text-gray-900 cursor-pointer">Candidate Ranking Criteria</summary>
-        <p class="text-xs text-gray-600 mt-2 mb-4">Open this optional section to define the education, experience, and credential criteria used by applicant ranking.</p>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div><label class="block text-sm font-medium text-gray-700 mb-1">Minimum Education</label><select name="minimum_education_level" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"><option value="">Not specified</option><option value="high_school">High School</option><option value="associate">Associate</option><option value="bachelor">Bachelor</option><option value="master">Master's</option><option value="doctorate">Doctorate</option></select></div>
-          <div><label class="block text-sm font-medium text-gray-700 mb-1">Required Degree/Course Fields</label><input name="required_degree_fields" type="text" placeholder="Computer Science, Information Technology" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"><p class="text-xs text-gray-500 mt-1">Separate alternatives with commas.</p></div>
-          <div><label class="block text-sm font-medium text-gray-700 mb-1">Graduate Qualification</label><select name="graduate_requirement" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"><option value="none">Not required</option><option value="preferred">Master's/Doctorate preferred</option><option value="master_required">Master's required</option><option value="doctorate_required">Doctorate required</option></select></div>
-          <div><label class="block text-sm font-medium text-gray-700 mb-1">Minimum Graduate Units</label><input name="minimum_graduate_units" type="number" min="0" max="200" placeholder="e.g., 9" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
-          <div><label class="block text-sm font-medium text-gray-700 mb-1">Minimum Experience (Years)</label><input name="minimum_experience_years" type="number" min="0" max="60" step="0.5" placeholder="e.g., 2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
-          <div><label class="block text-sm font-medium text-gray-700 mb-1">Teaching Experience</label><select name="teaching_experience_requirement" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"><option value="not_required">Not required</option><option value="preferred">Preferred</option><option value="required">Required</option></select></div>
-          <div><label class="block text-sm font-medium text-gray-700 mb-1">Required Skills</label><textarea name="required_skills" rows="2" placeholder="One per line or comma-separated" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea></div>
-          <div><label class="block text-sm font-medium text-gray-700 mb-1">Required Certifications</label><textarea name="required_certifications" rows="2" placeholder="One per line or comma-separated" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea></div>
-          <div><label class="block text-sm font-medium text-gray-700 mb-1">Required Licenses</label><textarea name="required_licenses" rows="2" placeholder="e.g., Licensed Professional Teacher" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea></div>
-          <div><label class="block text-sm font-medium text-gray-700 mb-1">Required Training</label><textarea name="required_training" rows="2" placeholder="One per line or comma-separated" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea></div>
-          <div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Preferred Qualifications</label><textarea name="preferred_qualifications" rows="2" placeholder="Other position-specific qualifications" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea></div>
-        </div>
-      </details>`;
-    formSelectors.forEach(selector => {
-        const form = document.querySelector(selector);
-        if (!form || form.querySelector('.ranking-requirements-editor')) return;
-        const editorContainer = form.querySelector('[data-ranking-editor-container]');
-        if (editorContainer) {
-            editorContainer.insertAdjacentHTML('beforeend', markup);
-            return;
-        }
-        const submitButton = form.querySelector('button[type="submit"]');
-        let actionRow = submitButton?.parentElement || null;
-        while (actionRow && actionRow.parentElement !== form) actionRow = actionRow.parentElement;
-        if (actionRow && actionRow.parentElement === form) actionRow.insertAdjacentHTML('beforebegin', markup);
-        else form.insertAdjacentHTML('beforeend', markup);
-    });
-}
-
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initializeRankingRequirementEditors);
-else initializeRankingRequirementEditors();
-
 async function loadJobs() {
     const tbody = document.getElementById('jobsTableBody');
     tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4">Loading...</td></tr>';
@@ -175,7 +113,6 @@ async function loadJobs() {
         
         // Display jobs using the filter display function
         displayFilteredJobs();
-        populateRankingJobOptions(allApplicantsData || []);
         
     } catch (error) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-red-500">Failed to load jobs.</td></tr>';
@@ -608,7 +545,6 @@ async function loadApplicants() {
         
         // Store applicants data globally for filtering
         allApplicantsData = applicants;
-        await ensureRankingJobOptions(applicants);
         
         // Update status counts
         updateStatusCounts();
@@ -993,6 +929,127 @@ function closeCreateUserModal() {
     }
 }
 
+const DEFAULT_APPLICATION_REQUIREMENTS = [
+    { requirement_key: 'application_letter', requirement_name: 'Application Letter', description: 'A signed letter introducing your application.', category: 'Application Documents', is_required: true },
+    { requirement_key: 'resume', requirement_name: 'Updated and Comprehensive Resume', description: 'Your current resume or curriculum vitae.', category: 'Application Documents', is_required: true },
+    { requirement_key: 'letter_of_intent', requirement_name: 'Letter of Intent', description: 'A letter describing your interest in the teaching load.', category: 'Application Documents', is_required: true },
+    { requirement_key: 'tor', requirement_name: 'Transcript of Records (TOR)', description: 'A clear copy of your official academic transcript.', category: 'Educational Documents', is_required: true },
+    { requirement_key: 'diploma', requirement_name: 'Diploma', description: 'A clear copy of your highest relevant diploma.', category: 'Educational Documents', is_required: true },
+    { requirement_key: 'professional_license', requirement_name: 'Professional License', description: 'A current professional or PRC license, when applicable.', category: 'Supporting Documents', is_required: false },
+    { requirement_key: 'coe', requirement_name: 'Certificate of Employment (COE)', description: 'Proof of relevant employment experience.', category: 'Supporting Documents', is_required: true },
+    { requirement_key: 'seminars_trainings', requirement_name: 'Seminars/Training Certificates', description: 'Relevant seminar or training certificates.', category: 'Supporting Documents', is_required: true },
+    { requirement_key: 'masteral_cert', requirement_name: 'Masteral Certificate', description: 'Supporting proof of a completed master\'s degree.', category: 'Educational Documents', is_required: false },
+    { requirement_key: 'certificate_of_grades', requirement_name: 'Certificate of Grades', description: 'Supporting graduate-school grade record.', category: 'Educational Documents', is_required: false },
+    { requirement_key: 'proof_of_enrollment', requirement_name: 'Proof of Enrollment', description: 'Supporting proof of current graduate-school enrollment.', category: 'Educational Documents', is_required: false },
+    { requirement_key: 'faculty_evaluation', requirement_name: 'Faculty Evaluation', description: 'Optional supporting evaluation for renewal applicants.', category: 'Supporting Documents', is_required: false }
+];
+
+function applicationRequirementRow(requirement = {}) {
+    const row = document.createElement('article');
+    row.className = 'application-requirement-row rounded-lg border border-gray-200 bg-white p-4 shadow-sm';
+    if (requirement.id) row.dataset.requirementId = String(requirement.id);
+    if (requirement.requirement_key) row.dataset.requirementKey = String(requirement.requirement_key);
+    const category = requirement.category || 'Application Documents';
+    const isRequired = requirement.is_required === true || Number(requirement.is_required) === 1;
+    row.innerHTML = `
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-12">
+            <div class="md:col-span-4">
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Requirement Name</label>
+                <input type="text" class="requirement-name w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200" maxlength="160" placeholder="e.g., Teaching Portfolio" value="${escapeAdminHtml(requirement.requirement_name || '')}">
+                <p class="requirement-name-error mt-1 hidden text-xs text-red-600">Requirement name is required.</p>
+            </div>
+            <div class="md:col-span-4">
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Description <span class="font-normal normal-case text-gray-400">(optional)</span></label>
+                <input type="text" class="requirement-description w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200" maxlength="1000" placeholder="What the applicant should provide" value="${escapeAdminHtml(requirement.description || '')}">
+            </div>
+            <div class="md:col-span-2">
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Category</label>
+                <select class="requirement-category w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
+                    ${['Application Documents', 'Educational Documents', 'Supporting Documents'].map(option => `<option value="${option}"${category === option ? ' selected' : ''}>${option}</option>`).join('')}
+                </select>
+            </div>
+            <div class="md:col-span-2">
+                <div class="flex items-end gap-2">
+                    <div class="min-w-0 flex-1">
+                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Status</label>
+                        <select class="requirement-status w-full rounded-lg border border-gray-300 px-3 py-2.5 font-medium focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
+                            <option value="1"${isRequired ? ' selected' : ''}>Required</option>
+                            <option value="0"${!isRequired ? ' selected' : ''}>Optional</option>
+                        </select>
+                    </div>
+                    <button type="button" class="remove-application-requirement mb-0.5 inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50" title="Remove requirement" aria-label="Remove requirement">
+                        <i class="fas fa-trash-alt" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </div>
+        </div>`;
+    row.querySelector('.remove-application-requirement').addEventListener('click', () => {
+        if (row.dataset.requirementId && !window.confirm('Remove this saved requirement? Existing applicant files will be preserved in application history.')) {
+            return;
+        }
+        row.remove();
+    });
+    row.querySelector('.requirement-name').addEventListener('input', event => {
+        event.target.classList.remove('border-red-500');
+        row.querySelector('.requirement-name-error').classList.add('hidden');
+    });
+    return row;
+}
+
+function renderApplicationRequirements(containerId, requirements = []) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = '';
+    requirements.forEach(requirement => container.appendChild(applicationRequirementRow(requirement)));
+}
+
+function addApplicationRequirement(containerId, requirement = {}) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.appendChild(applicationRequirementRow(requirement));
+    container.lastElementChild?.querySelector('.requirement-name')?.focus();
+}
+
+function collectApplicationRequirements(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return [];
+    let valid = true;
+    const requirements = Array.from(container.querySelectorAll('.application-requirement-row')).map((row, index) => {
+        const nameInput = row.querySelector('.requirement-name');
+        const name = nameInput.value.trim();
+        const error = row.querySelector('.requirement-name-error');
+        nameInput.classList.toggle('border-red-500', !name);
+        error.classList.toggle('hidden', Boolean(name));
+        if (!name) valid = false;
+        return {
+            id: row.dataset.requirementId ? Number(row.dataset.requirementId) : null,
+            requirement_key: row.dataset.requirementKey || null,
+            requirement_name: name,
+            description: row.querySelector('.requirement-description').value.trim(),
+            category: row.querySelector('.requirement-category').value,
+            is_required: row.querySelector('.requirement-status').value === '1',
+            display_order: index + 1
+        };
+    });
+    const listError = container.parentElement?.querySelector('.requirement-list-error');
+    if (listError) {
+        listError.textContent = valid ? '' : 'Give every requirement a name or remove the incomplete row.';
+        listError.classList.toggle('hidden', valid);
+    }
+    if (!valid) {
+        container.querySelector('.requirement-name.border-red-500')?.focus();
+        return null;
+    }
+    return requirements;
+}
+
+function canCurrentAdminManageApplicationRequirements() {
+    const role = typeof CURRENT_ADMIN_ROLE !== 'undefined' ? CURRENT_ADMIN_ROLE : '';
+    return role === 'Secretary' || role === 'Department Head';
+}
+
+window.addApplicationRequirement = addApplicationRequirement;
+
 async function createJob(event) {
     event.preventDefault();
     const formData = new FormData(event.target);
@@ -1013,6 +1070,12 @@ async function createJob(event) {
     const subjectArea = (formData.get('subject') || '').trim();
     const typedTitle = (formData.get('title') || formData.get('uti') || formData.get('sec') || '').trim();
     const derivedTitle = [subjectCode, subjectName || subjectArea].filter(Boolean).join(' - ');
+
+    const canManageApplicationRequirements = canCurrentAdminManageApplicationRequirements();
+    const applicationRequirements = usesSectionWorkload && canManageApplicationRequirements
+        ? collectApplicationRequirements('createApplicationRequirements')
+        : undefined;
+    if (usesSectionWorkload && canManageApplicationRequirements && applicationRequirements === null) return;
 
     const newJob = {
         job_title: typedTitle && typedTitle.toLowerCase() !== 'instructor' ? typedTitle : (derivedTitle || typedTitle || 'Teaching Load'),
@@ -1042,7 +1105,8 @@ async function createJob(event) {
         competency: formData.get('competency') || '',
         duties: formData.get('duties') || '',
         job_requirements: formData.get('job_requirements') || '',
-        ...getRankingRequirementPayload(formData)
+        application_requirements: applicationRequirements,
+        csrf_token: typeof NCHIRE_ADMIN_CSRF_TOKEN !== 'undefined' ? NCHIRE_ADMIN_CSRF_TOKEN : ''
     };
 
     const submitBtn = event.target.querySelector('button[type="submit"]');
@@ -1526,7 +1590,17 @@ function populateGeneralJobModal(job) {
     document.getElementById('editRequirements').value = job.job_requirements || "";
     document.getElementById('editDuties').value = job.duties || "";
     document.getElementById('editCompetency').value = job.competency || "";
-    setRankingRequirementFormValues(document.getElementById('newEditJobForm'), job);
+    if (canCurrentAdminManageApplicationRequirements()) {
+        renderApplicationRequirements('editApplicationRequirements', job.application_requirements || []);
+    }
+    const applicantWarning = document.getElementById('editRequirementApplicantWarning');
+    if (applicantWarning) {
+        const count = Number(job.applicant_count || 0);
+        applicantWarning.classList.toggle('hidden', count === 0);
+        applicantWarning.innerHTML = count > 0
+            ? `<i class="fas fa-exclamation-triangle mr-2" aria-hidden="true"></i><strong>${count} existing applicant${count === 1 ? '' : 's'}:</strong> required-document changes will be confirmed before saving. Uploaded files and recruitment stages will remain unchanged.`
+            : '';
+    }
 
     // Show the general job modal
     document.getElementById('newEditJobModal').classList.remove('hidden');
@@ -1562,7 +1636,6 @@ function populateSecretaryModal(job) {
     document.getElementById('editSecretaryRequirements').value = job.job_requirements || "";
     document.getElementById('editSecretaryDuties').value = job.duties || "";
     document.getElementById('editSecretaryCompetency').value = job.competency || "";
-    setRankingRequirementFormValues(document.getElementById('editSecretaryJobForm'), job);
 
     // Show the secretary modal
     document.getElementById('editSecretaryJobModal').classList.remove('hidden');
@@ -2023,6 +2096,10 @@ function openCreateJobModal(jobType) {
         closeJobTypeSelectionModal(); // Close the job type selection modal if it was open
     }
     document.getElementById('createJobModal').classList.remove('hidden'); // Open the job creation modal
+    const requirementsContainer = document.getElementById('createApplicationRequirements');
+    if (requirementsContainer && requirementsContainer.children.length === 0) {
+        renderApplicationRequirements('createApplicationRequirements', DEFAULT_APPLICATION_REQUIREMENTS);
+    }
     updateTeachingHoursDisplay('createLectureUnits', 'createLaboratoryUnits', 'createTeachingHours', 'createTeachingHoursDisplay');
 }
 
@@ -2046,6 +2123,7 @@ function closeCreateJobModal() {
     modal.classList.add('hidden');
     const form = modal.querySelector('form');
     if (form) form.reset();
+    renderApplicationRequirements('createApplicationRequirements', DEFAULT_APPLICATION_REQUIREMENTS);
     updateTeachingHoursDisplay('createLectureUnits', 'createLaboratoryUnits', 'createTeachingHours', 'createTeachingHoursDisplay');
 }
 
@@ -2404,7 +2482,7 @@ async function viewApplicantDetails(applicantId) {
             const stageBadge = document.getElementById('actionStageBadge');
             if (reviewName) reviewName.textContent = applicant.full_name || 'Applicant Review';
             if (reviewPosition) reviewPosition.textContent = job.teaching_load_title || applicant.position || 'Teaching load application';
-            if (stageBadge) stageBadge.innerHTML = `<span class="ui-status ui-status--neutral">Current stage: ${rankingEscapeHtml(stageLabel)}</span>`;
+            if (stageBadge) stageBadge.innerHTML = `<span class="ui-status ui-status--neutral">Current stage: ${escapeAdminHtml(stageLabel)}</span>`;
             
             // Update status badge in Actions section
             const statusBadgeHTML = getStatusBadge(applicant.status);
@@ -2444,11 +2522,11 @@ async function viewApplicantDetails(applicantId) {
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-600">Employment Type</label>
-                    <p class="text-gray-900">${rankingEscapeHtml(job.job_type || 'Not specified')}</p>
+                    <p class="text-gray-900">${escapeAdminHtml(job.job_type || 'Not specified')}</p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-600">Academic Period</label>
-                    <p class="text-gray-900">${rankingEscapeHtml([job.academic_year, job.semester].filter(Boolean).join(' · ') || 'Not specified')}</p>
+                    <p class="text-gray-900">${escapeAdminHtml([job.academic_year, job.semester].filter(Boolean).join(' · ') || 'Not specified')}</p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-600">Workload</label>
@@ -2471,23 +2549,23 @@ async function viewApplicantDetails(applicantId) {
                     salaryProjectionInfo.innerHTML = `
                         <div>
                             <label class="block text-sm font-medium text-gray-600">Employment Type</label>
-                            <p class="text-gray-900">${rankingEscapeHtml(projection.employment_type || 'Not specified')}</p>
+                            <p class="text-gray-900">${escapeAdminHtml(projection.employment_type || 'Not specified')}</p>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-600">Qualification / Salary Grade</label>
-                            <p class="text-gray-900">${rankingEscapeHtml(qualification)}</p>
+                            <p class="text-gray-900">${escapeAdminHtml(qualification)}</p>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-600">Projected Rate</label>
-                            <p class="text-blue-900 font-semibold">${rankingEscapeHtml(projection.rate_display || 'Rate to be determined')}<sup>*</sup></p>
+                            <p class="text-blue-900 font-semibold">${escapeAdminHtml(projection.rate_display || 'Rate to be determined')}<sup>*</sup></p>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-600">Projected Compensation</label>
-                            <p class="text-blue-900 font-semibold">${rankingEscapeHtml(total)}<sup>*</sup></p>
+                            <p class="text-blue-900 font-semibold">${escapeAdminHtml(total)}<sup>*</sup></p>
                         </div>
                         <div class="md:col-span-2 bg-blue-50 border border-blue-100 rounded-lg p-3">
-                            <p class="text-sm text-blue-900">${rankingEscapeHtml(projection.projection_basis || 'Rate to be determined')}</p>
-                            <p class="text-xs text-blue-700 mt-2">*${rankingEscapeHtml(projection.disclaimer || 'Guide only; final compensation is subject to profile and credential verification.')}</p>
+                            <p class="text-sm text-blue-900">${escapeAdminHtml(projection.projection_basis || 'Rate to be determined')}</p>
+                            <p class="text-xs text-blue-700 mt-2">*${escapeAdminHtml(projection.disclaimer || 'Guide only; final compensation is subject to profile and credential verification.')}</p>
                         </div>
                     `;
                 } else {
@@ -2520,11 +2598,11 @@ async function viewApplicantDetails(applicantId) {
                         <div class="border border-gray-200 rounded-lg p-4">
                             <div class="flex justify-between items-start mb-2">
                                 <h3 class="font-semibold text-gray-900">${edu.degree}</h3>
-                                <span class="text-sm text-gray-500">${rankingEscapeHtml(educationPeriod)}</span>
+                                <span class="text-sm text-gray-500">${escapeAdminHtml(educationPeriod)}</span>
                             </div>
                             <p class="text-gray-700 mb-1">${edu.field_of_study}</p>
                             <p class="text-gray-600 text-sm mb-1">${edu.institution}</p>
-                            <p class="text-gray-600 text-sm">${rankingEscapeHtml(educationLevel)} — ${rankingEscapeHtml(educationStatus)}</p>
+                            <p class="text-gray-600 text-sm">${escapeAdminHtml(educationLevel)} — ${escapeAdminHtml(educationStatus)}</p>
                             ${isOngoingMasters ? `<p class="mt-2 text-sm font-semibold text-gray-900">Completed Master's Units: ${edu.completed_units !== null && edu.completed_units !== '' ? Number(edu.completed_units) : 'Not declared'}</p>` : ''}
                             ${edu.gpa ? `<p class="text-gray-600 text-sm">GPA: ${edu.gpa}</p>` : ''}
                             ${ongoingMastersEvidence || (graduateDocuments ? `<div class="mt-3 flex flex-wrap gap-2">${graduateDocuments}</div>` : '')}
@@ -2551,7 +2629,7 @@ async function viewApplicantDetails(applicantId) {
                                 <span class="text-sm text-gray-500">${startDate} - ${endDate}</span>
                             </div>
                             <p class="text-gray-700 mb-1">${exp.company}</p>
-                            <span class="inline-block bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded-full mb-1">${rankingEscapeHtml(exp.experience_type || 'other')} experience</span>
+                            <span class="inline-block bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded-full mb-1">${escapeAdminHtml(exp.experience_type || 'other')} experience</span>
                             ${exp.location ? `<p class="text-gray-600 text-sm mb-2">${exp.location}</p>` : ''}
                             ${exp.description ? `<p class="text-gray-600 text-sm">${exp.description}</p>` : ''}
                             ${exp.is_current ? '<span class="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full mt-2">Current Position</span>' : ''}
@@ -2602,12 +2680,12 @@ async function viewApplicantDetails(applicantId) {
                     qualificationsInfo.innerHTML = data.qualifications.map(item => `
                         <div class="border border-gray-200 rounded-lg p-4">
                             <div class="flex flex-wrap items-center gap-2">
-                                <h3 class="font-semibold text-gray-900">${rankingEscapeHtml(item.title || 'Untitled qualification')}</h3>
-                                <span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs">${rankingEscapeHtml(item.qualification_type || 'qualification')}</span>
-                                <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs">${rankingEscapeHtml(item.verification_status || 'unverified')}</span>
+                                <h3 class="font-semibold text-gray-900">${escapeAdminHtml(item.title || 'Untitled qualification')}</h3>
+                                <span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs">${escapeAdminHtml(item.qualification_type || 'qualification')}</span>
+                                <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs">${escapeAdminHtml(item.verification_status || 'unverified')}</span>
                             </div>
-                            ${item.issuing_organization ? `<p class="text-gray-600 text-sm mt-1">${rankingEscapeHtml(item.issuing_organization)}</p>` : ''}
-                            <p class="text-gray-500 text-xs mt-2">${item.issued_date ? 'Issued: ' + rankingEscapeHtml(item.issued_date) : 'Issue date not provided'}${item.expiry_date ? ' | Expires: ' + rankingEscapeHtml(item.expiry_date) : ''}</p>
+                            ${item.issuing_organization ? `<p class="text-gray-600 text-sm mt-1">${escapeAdminHtml(item.issuing_organization)}</p>` : ''}
+                            <p class="text-gray-500 text-xs mt-2">${item.issued_date ? 'Issued: ' + escapeAdminHtml(item.issued_date) : 'Issue date not provided'}${item.expiry_date ? ' | Expires: ' + escapeAdminHtml(item.expiry_date) : ''}</p>
                             <p class="text-xs mt-2 ${item.proof_document ? 'text-green-700' : 'text-amber-700'}">${item.proof_document ? 'Proof document on file (not automatically verified)' : 'Proof document not provided'}</p>
                         </div>`).join('');
                 } else {
@@ -2617,7 +2695,7 @@ async function viewApplicantDetails(applicantId) {
             
             // Update documents grid
             const documentsGrid = document.getElementById('documentsGrid');
-            const documents = [
+            const legacyDocuments = [
                 { field: 'application_letter', label: 'Application Letter' },
                 { field: 'letter_of_intent', label: 'Letter of Intent' },
                 { field: 'resume', label: 'Updated and Comprehensive Resume' },
@@ -2631,6 +2709,14 @@ async function viewApplicantDetails(applicantId) {
                 { field: 'proof_of_enrollment', label: 'Proof of Enrollment' },
                 { field: 'faculty_evaluation', label: 'Faculty Evaluation (Optional - Renewal)' }
             ];
+            const documents = Array.isArray(data.application_requirements) && data.application_requirements.length
+                ? data.application_requirements.map(requirement => ({
+                    field: requirement.legacy_document_type || requirement.requirement_key,
+                    label: requirement.requirement_name,
+                    required: Boolean(requirement.is_required),
+                    submission: requirement.submission || null
+                }))
+                : legacyDocuments;
             
             console.log('📄 Document files from database:');
             console.log('  Application Letter:', applicant.application_letter);
@@ -2647,9 +2733,9 @@ async function viewApplicantDetails(applicantId) {
             
             let documentsHTML = '';
             documents.forEach(doc => {
-                if (applicant[doc.field]) {
-                    const fileName = applicant[doc.field];
-                    const documentUrl = getApplicantUploadUrl(fileName);
+                const fileName = doc.submission?.original_filename || applicant[doc.field];
+                if (fileName) {
+                    const documentUrl = doc.submission?.download_url || getApplicantUploadUrl(fileName);
                     const fileExtension = fileName.split('.').pop().toLowerCase();
                     const isImage = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileExtension);
                     const isPdf = fileExtension === 'pdf';
@@ -2657,13 +2743,13 @@ async function viewApplicantDetails(applicantId) {
                     documentsHTML += `
                         <div class="border border-gray-200 rounded-lg p-4">
                             <div class="flex items-center justify-between mb-2">
-                                <h3 class="font-medium text-gray-900">${doc.label}</h3>
+                                <h3 class="font-medium text-gray-900">${escapeAdminHtml(doc.label)}</h3>
                                 <div class="flex items-center gap-2">
-                                    <button onclick="viewDocument('${documentUrl}', '${doc.label}', '${isImage}')"
+                                    <button data-document-url="${escapeAdminHtml(documentUrl)}" data-document-label="${escapeAdminHtml(doc.label)}" data-document-image="${isImage ? '1' : '0'}" onclick="viewDocument(this.dataset.documentUrl, this.dataset.documentLabel, this.dataset.documentImage === '1')"
                                             class="text-blue-600 hover:text-blue-800 text-sm">
                                         <i class="fas fa-eye"></i> View
                                     </button>
-                                    <a href="${documentUrl}"
+                                    <a href="${escapeAdminHtml(documentUrl)}"
                                        download 
                                        class="text-green-600 hover:text-green-800 text-sm">
                                         <i class="fas fa-download"></i> Download
@@ -2672,7 +2758,7 @@ async function viewApplicantDetails(applicantId) {
                             </div>
                             <div class="flex items-center gap-2 text-gray-600 text-sm">
                                 <i class="fas ${isImage ? 'fa-image' : isPdf ? 'fa-file-pdf' : 'fa-file-alt'}"></i>
-                                <span class="truncate">${fileName}</span>
+                                <span class="truncate">${escapeAdminHtml(fileName)}</span>
                             </div>
                             <div class="mt-2 flex flex-wrap gap-2">
                                 <span class="ui-status ui-status--success">Submitted</span>
@@ -2680,14 +2766,16 @@ async function viewApplicantDetails(applicantId) {
                             </div>
                             ${isImage ? `
                                 <div class="mt-3">
-                                    <img src="${documentUrl}"
-                                         alt="${doc.label}" 
+                                    <img src="${escapeAdminHtml(documentUrl)}"
+                                         alt="${escapeAdminHtml(doc.label)}"
                                          class="w-full h-32 object-cover rounded border cursor-pointer"
-                                         onclick="viewDocument('${documentUrl}', '${doc.label}', true)">
+                                         data-document-url="${escapeAdminHtml(documentUrl)}" data-document-label="${escapeAdminHtml(doc.label)}" onclick="viewDocument(this.dataset.documentUrl, this.dataset.documentLabel, true)">
                                 </div>
                             ` : ''}
                         </div>
                     `;
+                } else if (doc.required) {
+                    documentsHTML += `<div class="rounded-lg border border-amber-200 bg-amber-50 p-4"><div class="flex items-center justify-between gap-3"><h3 class="font-medium text-gray-900">${escapeAdminHtml(doc.label)}</h3><span class="ui-status ui-status--warning">Missing required document</span></div></div>`;
                 }
             });
             
@@ -2808,7 +2896,7 @@ async function viewApplicantDetails(applicantId) {
             const psychReceiptDetails = document.getElementById('psychReceiptDetails');
             
             if (applicant.psych_exam_receipt) {
-                const receiptPath = getApplicantUploadUrl(applicant.psych_exam_receipt);
+                const receiptPath = `../user/download_application_file.php?application_id=${encodeURIComponent(applicant.id)}&type=psych`;
                 const fileExtension = applicant.psych_exam_receipt.split('.').pop().toLowerCase();
                 const isPDF = fileExtension === 'pdf';
                 
@@ -2872,8 +2960,8 @@ async function viewApplicantDetails(applicantId) {
                 const hiringNotes = applicant.hire_notes || applicant.initially_hired_notes || '';
                 initialHiringDetails.innerHTML = `
                     <div><dt>Status</dt><dd>Application Passed / Teaching Load Assigned</dd></div>
-                    <div><dt>Recorded</dt><dd>${rankingEscapeHtml(hiringDate)}</dd></div>
-                    ${hiringNotes ? `<div><dt>Notes</dt><dd>${rankingEscapeHtml(hiringNotes)}</dd></div>` : ''}
+                    <div><dt>Recorded</dt><dd>${escapeAdminHtml(hiringDate)}</dd></div>
+                    ${hiringNotes ? `<div><dt>Notes</dt><dd>${escapeAdminHtml(hiringNotes)}</dd></div>` : ''}
                 `;
             } else {
                 initialHiringDetails.innerHTML = '<p class="text-sm text-gray-500">No hiring decision has been recorded.</p>';
@@ -4757,223 +4845,10 @@ function displayFilteredApplicants() {
     }).join('');
 }
 
-function rankingEscapeHtml(value) {
+function escapeAdminHtml(value) {
     const div = document.createElement('div');
     div.textContent = value == null ? '' : String(value);
     return div.innerHTML;
-}
-
-async function ensureRankingJobOptions(applicants) {
-    if (!jobs.length) {
-        try {
-            const response = await fetch('gets_job.php', {credentials: 'same-origin'});
-            const loadedJobs = await response.json();
-            if (response.ok && Array.isArray(loadedJobs)) jobs = loadedJobs;
-        } catch (error) {
-            console.warn('Unable to load empty-job ranking options:', error);
-        }
-    }
-    populateRankingJobOptions(applicants);
-}
-
-function populateRankingJobOptions(applicants) {
-    const select = document.getElementById('rankingJobFilter');
-    if (!select) return;
-    const previous = select.value;
-    const options = new Map();
-    const normalizeDepartment = value => value === 'Computer Science' ? 'Computing Studies' : String(value || '').trim();
-    const currentDepartment = typeof CURRENT_ADMIN_DEPARTMENT === 'undefined' ? '' : normalizeDepartment(CURRENT_ADMIN_DEPARTMENT);
-    (jobs || []).forEach(job => {
-        const visible = typeof CURRENT_ADMIN_ROLE !== 'undefined' && CURRENT_ADMIN_ROLE === 'Secretary'
-            ? true
-            : currentDepartment !== '' && normalizeDepartment(job.department_role) === currentDepartment;
-        if (visible && job.id) options.set(String(job.id), job.teaching_load_title || job.job_title || `Job #${job.id}`);
-    });
-    (applicants || []).forEach(applicant => {
-        if (applicant.job_id) options.set(String(applicant.job_id), applicant.position || `Job #${applicant.job_id}`);
-    });
-    select.innerHTML = '<option value="">Select a posting</option>' + [...options.entries()]
-        .sort((a, b) => a[1].localeCompare(b[1]))
-        .map(([id, label]) => `<option value="${Number(id)}">${rankingEscapeHtml(label)}</option>`).join('');
-    if (previous && options.has(previous)) select.value = previous;
-    else if (options.size === 1) {
-        select.value = [...options.keys()][0];
-        loadCandidateRanking();
-    }
-}
-
-async function candidateRankingRequest(action, payload = {}) {
-    const response = await fetch('api/candidate_rankings.php', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-NCHire-CSRF': NCHIRE_RANKING_CSRF
-        },
-        credentials: 'same-origin',
-        body: JSON.stringify({action, ...payload})
-    });
-    const result = await response.json().catch(() => ({success: false, error: 'Invalid server response.'}));
-    if (!response.ok || !result.success) throw new Error(result.error || 'Candidate ranking request failed.');
-    return result.data;
-}
-
-function rankingScoreCell(category) {
-    if (!category || category.score === null || category.applicable === false) {
-        return '<span class="text-gray-500 text-xs">Not applicable</span>';
-    }
-    const status = category.data_status !== 'Complete'
-        ? `<div class="text-amber-700 text-xs mt-1">${rankingEscapeHtml(category.data_status)}</div>`
-        : '';
-    return `<span class="font-medium text-gray-900">${Number(category.score).toFixed(1)}/${Number(category.maximum).toFixed(0)}</span>${status}`;
-}
-
-function rankingLabelClass(label) {
-    if (label === 'Highly Qualified') return 'bg-green-100 text-green-800';
-    if (label === 'Very Qualified') return 'bg-emerald-100 text-emerald-800';
-    if (label === 'Qualified') return 'bg-blue-100 text-blue-800';
-    if (label === 'Partially Qualified') return 'bg-amber-100 text-amber-800';
-    return 'bg-gray-100 text-gray-700';
-}
-
-async function loadCandidateRanking() {
-    const select = document.getElementById('rankingJobFilter');
-    const tbody = document.getElementById('candidateRankingTableBody');
-    const notice = document.getElementById('rankingNotice');
-    const recalculate = document.getElementById('recalculateRankingBtn');
-    if (!select || !tbody) return;
-    const jobId = Number(select.value);
-    recalculate.disabled = !jobId;
-    if (!jobId) {
-        tbody.innerHTML = '<tr><td colspan="10" class="px-5 py-8 text-center text-gray-500">No job selected.</td></tr>';
-        notice.textContent = 'Select a job posting to compare its requirements with applicants assigned to it.';
-        return;
-    }
-    tbody.innerHTML = '<tr><td colspan="10" class="px-5 py-8 text-center text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Calculating deterministic rankings...</td></tr>';
-    try {
-        const data = await candidateRankingRequest('list', {job_id: jobId});
-        const warnings = data.rankings[0]?.job_requirement_warnings || [];
-        notice.innerHTML = warnings.length
-            ? `<span class="text-amber-700"><i class="fas fa-triangle-exclamation mr-1"></i>${rankingEscapeHtml(warnings.join(' '))}</span>`
-            : `${data.count} candidate${data.count === 1 ? '' : 's'} ranked for ${rankingEscapeHtml(data.job.job_title || 'this posting')}.`;
-        if (!data.rankings.length) {
-            tbody.innerHTML = '<tr><td colspan="10" class="px-5 py-8 text-center text-gray-500">No authorized applications were found for this job posting.</td></tr>';
-            return;
-        }
-        tbody.innerHTML = data.rankings.map(item => {
-            const categories = item.categories || {};
-            const overall = item.overall_score === null ? 'N/A' : `${Number(item.overall_score).toFixed(1)}%`;
-            return `<tr class="hover:bg-gray-50">
-                <td class="px-4 py-4 font-semibold text-gray-700">${Number(item.rank)}</td>
-                <td class="px-4 py-4 font-medium text-gray-900">${rankingEscapeHtml(item.applicant_name)}</td>
-                <td class="px-4 py-4 text-lg font-bold text-blue-800">${overall}</td>
-                <td class="px-4 py-4"><span class="px-2 py-1 rounded-full text-xs font-semibold ${rankingLabelClass(item.qualification_label)}">${rankingEscapeHtml(item.qualification_label)}</span></td>
-                <td class="px-4 py-4">${rankingScoreCell(categories.education)}</td>
-                <td class="px-4 py-4">${rankingScoreCell(categories.experience)}</td>
-                <td class="px-4 py-4">${rankingScoreCell(categories.skills)}</td>
-                <td class="px-4 py-4">${rankingScoreCell(categories.certifications)}</td>
-                <td class="px-4 py-4">${rankingScoreCell(categories.requirements)}</td>
-                <td class="px-4 py-4"><button type="button" onclick="viewCandidateRankingDetails(${Number(item.application_id)})" class="text-blue-700 hover:text-blue-900 font-medium text-sm">View Ranking Details</button></td>
-            </tr>`;
-        }).join('');
-    } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="10" class="px-5 py-8 text-center text-red-600">${rankingEscapeHtml(error.message)}</td></tr>`;
-        notice.textContent = 'Candidate rankings could not be loaded.';
-    }
-}
-
-async function recalculateCandidateRanking() {
-    const jobId = Number(document.getElementById('rankingJobFilter')?.value || 0);
-    if (!jobId) return;
-    const button = document.getElementById('recalculateRankingBtn');
-    button.disabled = true;
-    const original = button.innerHTML;
-    button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Recalculating';
-    try {
-        await candidateRankingRequest('recalculate', {job_id: jobId});
-        showToast('Deterministic candidate rankings recalculated.', 'success');
-        await loadCandidateRanking();
-    } catch (error) {
-        showToast(error.message, 'error');
-    } finally {
-        button.innerHTML = original;
-        button.disabled = false;
-    }
-}
-
-function rankingList(items, emptyMessage) {
-    if (!Array.isArray(items) || !items.length) return `<p class="text-gray-500 italic">${rankingEscapeHtml(emptyMessage)}</p>`;
-    return `<ul class="space-y-2">${items.map(item => `<li class="flex items-start gap-2"><i class="fas fa-circle text-[6px] mt-2 text-blue-500"></i><span>${rankingEscapeHtml(item)}</span></li>`).join('')}</ul>`;
-}
-
-function formatRequirementValue(value) {
-    if (Array.isArray(value)) return value.length ? value.join(', ') : 'Not applicable';
-    if (value === null || value === '' || value === 'none' || value === 'not_required') return 'Not applicable';
-    return String(value).replaceAll('_', ' ');
-}
-
-function renderCandidateRankingDetails(data) {
-    const content = document.getElementById('candidateRankingDetailsContent');
-    const subtitle = document.getElementById('rankingDetailsSubtitle');
-    const ranking = data.ranking;
-    subtitle.textContent = `${data.applicant.name} — ${data.job.job_title || 'Job posting'}`;
-    const categoryCards = Object.entries(ranking.categories || {}).map(([key, category]) => {
-        const score = category.applicable === false || category.score === null ? 'Not applicable' : `${Number(category.score).toFixed(1)}/${Number(category.maximum).toFixed(0)}`;
-        const criteria = (category.criteria || []).map(item => `<div class="border-t border-gray-100 pt-2 mt-2"><div class="flex justify-between gap-3"><span class="font-medium">${rankingEscapeHtml(item.name)}</span><span>${Number(item.score).toFixed(1)}/${Number(item.maximum).toFixed(1)}</span></div><p class="text-xs text-gray-600 mt-1">${rankingEscapeHtml(item.explanation)}</p></div>`).join('');
-        return `<div class="border border-gray-200 rounded-lg p-4"><div class="flex justify-between items-center"><h4 class="font-semibold text-gray-900 capitalize">${rankingEscapeHtml(key)}</h4><span class="font-bold text-blue-800">${score}</span></div><p class="text-xs text-gray-500 mt-1">Data: ${rankingEscapeHtml(category.data_status)}</p>${criteria}</div>`;
-    }).join('');
-    const requirements = Object.entries(ranking.requirements || {}).filter(([key]) => !['warnings','source','completeness'].includes(key)).map(([key, value]) => `<div><dt class="text-xs uppercase text-gray-500">${rankingEscapeHtml(key.replaceAll('_', ' '))}</dt><dd class="text-sm text-gray-900 mt-1">${rankingEscapeHtml(formatRequirementValue(value))}</dd></div>`).join('');
-    const education = (data.profile.education || []).map(item => `${item.degree || 'Degree not provided'} — ${item.field_of_study || 'Field not provided'} (${item.education_status || 'status not provided'}${item.completed_units ? `, ${item.completed_units} units` : ''})`);
-    const experience = (data.profile.experience || []).map(item => `${item.job_title || 'Title not provided'} — ${item.company || 'Organization not provided'} (${item.experience_type || 'type not provided'})`);
-    const skills = (data.profile.skills || []).map(item => `${item.skill_name} (level ${item.skill_level || 'not provided'})`);
-    const qualifications = (data.profile.qualifications || []).map(item => `${item.title} — ${item.qualification_type}${item.verification_status ? ` (${item.verification_status})` : ''}`);
-    const ai = ranking.ai_analysis || {available: false, status: 'loading', message: 'AI explanation is loading. Deterministic scores are already available.'};
-    const aiHtml = ai.available ? `
-        <p class="text-gray-800">${rankingEscapeHtml(ai.summary)}</p>
-        <div class="grid md:grid-cols-2 gap-4 mt-4"><div><h5 class="font-medium text-gray-900 mb-2">Strengths</h5>${rankingList(ai.strengths, 'No additional strengths returned.')}</div><div><h5 class="font-medium text-gray-900 mb-2">Missing Qualifications</h5>${rankingList(ai.missing_requirements, 'No additional missing requirements returned.')}</div></div>
-        <p class="text-sm text-gray-700 mt-4">${rankingEscapeHtml(ai.job_match_explanation)}</p>`
-        : `<p class="text-sm ${ai.status === 'loading' ? 'text-blue-700' : 'text-amber-700'}"><i class="fas ${ai.status === 'loading' ? 'fa-spinner fa-spin' : 'fa-circle-info'} mr-2"></i>${rankingEscapeHtml(ai.message || 'AI analysis has not been requested.')}</p>`;
-
-    content.innerHTML = `
-      <div class="grid lg:grid-cols-3 gap-5">
-        <div class="lg:col-span-2 space-y-5">
-          <div class="bg-blue-50 border border-blue-100 rounded-lg p-5 flex flex-wrap gap-5 items-center justify-between"><div><p class="text-sm text-blue-800">Overall job match</p><p class="text-4xl font-bold text-blue-950">${ranking.overall_score === null ? 'N/A' : Number(ranking.overall_score).toFixed(1) + '%'}</p></div><span class="px-3 py-2 rounded-full font-semibold ${rankingLabelClass(ranking.qualification_label)}">${rankingEscapeHtml(ranking.qualification_label)}</span></div>
-          <div><h3 class="font-semibold text-gray-900 mb-3">Score Breakdown</h3><div class="grid md:grid-cols-2 gap-3">${categoryCards}</div></div>
-          <div class="border border-gray-200 rounded-lg p-5"><h3 class="font-semibold text-gray-900 mb-3">Matching Qualifications</h3>${rankingList(ranking.matching_qualifications, 'No confirmed matches were found in the stored profile.')}</div>
-          <div class="border border-amber-200 bg-amber-50 rounded-lg p-5"><h3 class="font-semibold text-amber-950 mb-3">Missing or Partially Met Requirements</h3>${rankingList(ranking.missing_requirements, 'No missing requirements identified from the configured criteria.')}</div>
-          <div class="border border-purple-200 bg-purple-50 rounded-lg p-5" id="rankingAiPanel"><div class="flex items-center justify-between mb-3"><h3 class="font-semibold text-purple-950">Groq AI Explanation</h3><span class="text-xs text-purple-700">Does not affect score</span></div>${aiHtml}</div>
-        </div>
-        <div class="space-y-5">
-          <div class="border border-gray-200 rounded-lg p-5"><h3 class="font-semibold text-gray-900 mb-3">Job Requirements Compared</h3><dl class="space-y-3">${requirements}</dl></div>
-          <div class="border border-gray-200 rounded-lg p-5"><h3 class="font-semibold text-gray-900 mb-3">Applicant Qualifications</h3><div class="space-y-4 text-sm"><div><h4 class="font-medium">Education</h4>${rankingList(education, 'Not provided')}</div><div><h4 class="font-medium">Experience</h4>${rankingList(experience, 'Not provided')}</div><div><h4 class="font-medium">Skills</h4>${rankingList(skills, 'Not provided')}</div><div><h4 class="font-medium">Certifications / Licenses / Training</h4>${rankingList(qualifications, 'Not provided')}</div></div></div>
-          <div class="text-xs text-gray-500 border border-gray-200 rounded-lg p-4">Scoring version ${rankingEscapeHtml(ranking.scoring_version)}. ${rankingEscapeHtml(data.decision_support_notice)}</div>
-        </div>
-      </div>`;
-}
-
-async function viewCandidateRankingDetails(applicationId) {
-    const modal = document.getElementById('candidateRankingDetailsModal');
-    const content = document.getElementById('candidateRankingDetailsContent');
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-    document.body.style.overflow = 'hidden';
-    content.innerHTML = '<div class="py-16 text-center text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading deterministic ranking...</div>';
-    try {
-        const details = await candidateRankingRequest('details', {application_id: applicationId});
-        renderCandidateRankingDetails(details);
-        if (!details.ranking.ai_analysis?.available) {
-            const analyzed = await candidateRankingRequest('analyze', {application_id: applicationId});
-            renderCandidateRankingDetails(analyzed);
-        }
-    } catch (error) {
-        content.innerHTML = `<div class="py-16 text-center text-red-600">${rankingEscapeHtml(error.message)}</div>`;
-    }
-}
-
-function closeCandidateRankingDetails() {
-    const modal = document.getElementById('candidateRankingDetailsModal');
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-    document.body.style.overflow = '';
 }
 
 // Update status counts in filter display
@@ -5051,8 +4926,7 @@ async function submitSecretaryEditJob(event) {
         training: formData.get('training'),
         eligibility: formData.get('eligibility'),
         duties: formData.get('duties'),
-        competency: formData.get('competency'),
-        ...getRankingRequirementPayload(formData)
+        competency: formData.get('competency')
     };
     
     try {
@@ -5112,6 +4986,16 @@ async function submitEditJob(event) {
     }
     
     // Convert FormData to JSON object
+    const canManageApplicationRequirements = canCurrentAdminManageApplicationRequirements();
+    const applicationRequirements = canManageApplicationRequirements
+        ? collectApplicationRequirements('editApplicationRequirements')
+        : undefined;
+    if (canManageApplicationRequirements && applicationRequirements === null) {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+        return;
+    }
+
     const jobData = {
         id: formData.get('job_id'),
         job_title: formData.get('job_title'),
@@ -5140,11 +5024,12 @@ async function submitEditJob(event) {
         eligibility: formData.get('eligibility'),
         duties: formData.get('duties'),
         competency: formData.get('competency'),
-        ...getRankingRequirementPayload(formData)
+        application_requirements: applicationRequirements,
+        csrf_token: typeof NCHIRE_ADMIN_CSRF_TOKEN !== 'undefined' ? NCHIRE_ADMIN_CSRF_TOKEN : ''
     };
     
     try {
-        const response = await fetch('update_job.php', {
+        let response = await fetch('update_job.php', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -5152,10 +5037,25 @@ async function submitEditJob(event) {
             body: JSON.stringify(jobData)
         });
         
-        const result = await response.json();
+        let result = await response.json();
+        if (result.confirmation_required) {
+            const changes = Array.isArray(result.changes) ? result.changes.map(change => `\u2022 ${change}`).join('\n') : '';
+            const confirmed = window.confirm(`${result.message || 'Application requirements changed.'}\n\nAffected applicants: ${result.affected_applicants || 0}${changes ? `\n\n${changes}` : ''}\n\nApply these changes?`);
+            if (!confirmed) return;
+            jobData.confirm_requirement_changes = true;
+            response = await fetch('update_job.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(jobData)
+            });
+            result = await response.json();
+        }
         
         if (result.success) {
-            showToast('Job updated successfully!', 'success');
+            const notificationText = Number(result.applicants_notified || 0) > 0
+                ? ` ${result.applicants_notified} affected applicant${Number(result.applicants_notified) === 1 ? '' : 's'} notified.`
+                : '';
+            showToast('Teaching load updated successfully!' + notificationText, 'success');
             closeNewEditJobModal();
             loadJobs(); // Refresh the jobs list
         } else {

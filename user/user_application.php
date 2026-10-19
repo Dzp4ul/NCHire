@@ -5,89 +5,56 @@ session_start();
 ?>
 
 <div class="ui-page-stack ui-applications-page">
-<header class="ui-page-header">
+<header class="ui-page-header ui-applications-hero">
   <div class="ui-page-header__main">
     <p class="ui-eyebrow">Your recruitment activity</p>
     <h1 class="ui-page-title">My Applications</h1>
-    <p class="ui-page-description">Track each application, review its progress, and maintain required attachments.</p>
+    <p class="ui-page-description">Track your applications, monitor their progress, and manage your required documents—all in one place.</p>
   </div>
 </header>
-<section class="ui-data-region">
-  <div class="ui-data-region__header">
-    <div><p class="ui-eyebrow">Application history</p><h2>Submitted Applications</h2><p>Open an application to review its current stage or maintain its documents.</p></div>
+<section class="ui-applications-workspace" aria-labelledby="applicationsListTitle">
+  <div class="ui-application-toolbar" role="search" aria-label="Search and filter applications">
+    <label class="ui-application-control ui-application-search" for="applicationSearch">
+      <span class="sr-only">Search applications</span>
+      <i class="ri-search-line" aria-hidden="true"></i>
+      <input id="applicationSearch" type="search" autocomplete="off" placeholder="Search applications by title, course code, or application ID...">
+      <button type="button" id="clearApplicationSearch" class="ui-application-search__clear" aria-label="Clear application search" hidden>
+        <i class="ri-close-line" aria-hidden="true"></i>
+      </button>
+    </label>
+    <label class="ui-application-control ui-application-select" for="applicationStatusFilter">
+      <i class="ri-filter-3-line" aria-hidden="true"></i>
+      <span class="sr-only">Filter by status</span>
+      <select id="applicationStatusFilter">
+        <option value="">All statuses</option>
+      </select>
+      <i class="ri-arrow-down-s-line ui-application-select__arrow" aria-hidden="true"></i>
+    </label>
+    <label class="ui-application-control ui-application-select" for="applicationSort">
+      <i class="ri-arrow-up-down-line" aria-hidden="true"></i>
+      <span class="sr-only">Sort applications</span>
+      <select id="applicationSort">
+        <option value="newest">Newest Applications</option>
+        <option value="oldest">Oldest Applications</option>
+        <option value="title-asc">Application Title (A–Z)</option>
+        <option value="title-desc">Application Title (Z–A)</option>
+      </select>
+      <i class="ri-arrow-down-s-line ui-application-select__arrow" aria-hidden="true"></i>
+    </label>
+  </div>
+
+  <div class="ui-applications-list-header">
+    <div>
+      <p class="ui-eyebrow">Application history</p>
+      <h2 id="applicationsListTitle">Submitted Applications</h2>
+    </div>
+    <p id="applicationResultsCount" class="ui-application-results-count" aria-live="polite">Loading applications…</p>
   </div>
   <div id="applicationsContainer" class="ui-application-list">
-    <?php
-      // Immediate server-side rendering for zero perceived loading
-      $host = "127.0.0.1";
-      $user = "root";
-      $pass = "";
-      $dbname = "nchire";
-      $conn = @new mysqli($host, $user, $pass, $dbname);
-      if ($conn && !$conn->connect_error) {
-          $user_id = $_SESSION['user_id'] ?? null;
-          $user_email = $_SESSION['email'] ?? ($_SESSION['applicant_email'] ?? null);
-
-          if ($user_id) {
-              $stmt = $conn->prepare("SELECT id, position, applied_date, status FROM job_applicants WHERE user_id = ? ORDER BY applied_date DESC, id DESC");
-              $stmt->bind_param("i", $user_id);
-          } else if ($user_email) {
-              $stmt = $conn->prepare("SELECT id, position, applied_date, status FROM job_applicants WHERE applicant_email = ? ORDER BY applied_date DESC, id DESC");
-              $stmt->bind_param("s", $user_email);
-          } else {
-              $stmt = null;
-          }
-
-          if ($stmt && $stmt->execute()) {
-              $result = $stmt->get_result();
-              if ($result->num_rows > 0) {
-                  while ($row = $result->fetch_assoc()) {
-                      $id = (int)$row['id'];
-                      $position = htmlspecialchars($row['position'] ?? 'Unknown Position');
-                      $status = $row['status'] ?? 'Pending';
-                      $status_l = strtolower($status);
-                      $status_class = 'bg-yellow-100 text-yellow-800';
-                      if (strpos($status_l, 'cancel') !== false) $status_class = 'bg-gray-100 text-gray-800';
-                      else if (strpos($status_l, 'interview') !== false && strpos($status_l, 'passed') !== false) $status_class = 'bg-teal-100 text-teal-800';
-                      else if (strpos($status_l, 'interview') !== false) $status_class = 'bg-blue-100 text-blue-800';
-                      else if (strpos($status_l, 'demo') !== false && strpos($status_l, 'passed') !== false) $status_class = 'bg-emerald-100 text-emerald-800';
-                      else if (strpos($status_l, 'demo') !== false) $status_class = 'bg-indigo-100 text-indigo-800';
-                      else if (strpos($status_l, 'resubmission') !== false) $status_class = 'bg-orange-100 text-orange-800';
-                      else if (strpos($status_l, 'reject') !== false) $status_class = 'bg-red-100 text-red-800';
-                      else if (strpos($status_l, 'accept') !== false || strpos($status_l, 'hired') !== false) $status_class = 'bg-green-100 text-green-800';
-                      $applied_pretty = $row['applied_date'] ? date('m/d/Y', strtotime($row['applied_date'])) : '';
-                      // Check if cancel button should be shown
-                      $show_cancel_btn = !(strpos($status_l, 'cancel') !== false || strpos($status_l, 'hired') !== false);
-                      
-                      echo '<article class="ui-application-item" data-id="'.$id.'">'
-                        .'<div class="ui-application-item__main"><div class="ui-application-item__title"><span>Application #'.$id.'</span><h3>'.$position.'</h3></div>'
-                        .'<div class="ui-application-item__meta"><span class="ui-application-status '.$status_class.'">'.htmlspecialchars($status).'</span><span><i class="ri-calendar-line"></i>Applied '.htmlspecialchars($applied_pretty).'</span></div></div>'
-                        .'<div class="ui-application-item__actions"><button class="ui-link-action" data-action="view"><i class="ri-eye-line"></i>View progress</button><button class="ui-link-action" data-action="attachments"><i class="ri-attachment-2"></i>Attachments</button>'
-                        .($show_cancel_btn ? '<details class="ui-action-menu"><summary aria-label="More application actions"><i class="ri-more-2-fill"></i></summary><div class="ui-action-menu__items"><button class="ui-action-menu__danger" data-action="cancel"><i class="ri-close-circle-line"></i>Cancel application</button></div></details>' : '')
-                        .'</div></article>';
-                  }
-              } else {
-                  echo '<div class="p-8 text-center text-gray-500">'
-                      .'<i class="ri-inbox-line text-3xl mb-2 block"></i>'
-                      .'<p class="text-sm">You haven\'t applied to any jobs yet.</p>'
-                      .'</div>';
-              }
-          } else {
-              echo '<div class="p-8 text-center text-red-600">'
-                  .'<i class="ri-error-warning-line text-2xl mb-2 block"></i>'
-                  .'<p class="text-sm">Unable to load applications.</p>'
-                  .'</div>';
-          }
-
-          if ($stmt) { $stmt->close(); }
-          $conn->close();
-      } else {
-          echo '<div class="p-8 text-center text-red-600">'
-              .'<i class="ri-error-warning-line text-2xl mb-2 block"></i>'
-              .'<p class="text-sm">Database connection failed.</p>'
-              .'</div>';
-      }
-    ?>
+    <div class="ui-application-state" role="status">
+      <i class="ri-loader-4-line ui-application-state__spinner" aria-hidden="true"></i>
+      <div><strong>Loading your applications</strong><p>Please wait while we retrieve your recruitment activity.</p></div>
+    </div>
   </div>
 </section>
 </div>
@@ -286,7 +253,15 @@ session_start();
       return;
     }
     
-    console.log('✅ Applications container found');
+    console.log('Applications container found');
+
+  const searchInput = document.getElementById('applicationSearch');
+  const clearSearchButton = document.getElementById('clearApplicationSearch');
+  const statusFilter = document.getElementById('applicationStatusFilter');
+  const sortControl = document.getElementById('applicationSort');
+  const resultsCount = document.getElementById('applicationResultsCount');
+  const applicationCollator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+  let allApplications = [];
 
   const statusToClasses = (status) => {
     const s = (status || '').toLowerCase();
@@ -295,15 +270,65 @@ session_start();
     if (s.includes('resubmission')) return 'bg-orange-100 text-orange-800';
     if (s.includes('reject')) return 'bg-red-100 text-red-800';
     if (s.includes('accept') || s.includes('hired')) return 'bg-green-100 text-green-800';
-    return 'bg-yellow-100 text-yellow-800'; // Pending/Under Review
+    return 'bg-yellow-100 text-yellow-800';
   };
 
-  function renderApplications(apps) {
+  const statusPresentation = (status) => {
+    const normalized = String(status || '').toLowerCase();
+    if (normalized.includes('reject')) return { tone: 'is-rejected', icon: 'ri-close-circle-fill' };
+    if (normalized.includes('hired') || normalized.includes('accept')) return { tone: 'is-hired', icon: 'ri-team-fill' };
+    if (normalized.includes('interview')) return { tone: 'is-interview', icon: 'ri-calendar-event-fill' };
+    if (normalized.includes('demo')) return { tone: 'is-demo', icon: 'ri-presentation-fill' };
+    if (normalized.includes('passed')) return { tone: 'is-passed', icon: 'ri-checkbox-circle-fill' };
+    if (normalized.includes('resubmission')) return { tone: 'is-attention', icon: 'ri-error-warning-fill' };
+    if (normalized.includes('cancel')) return { tone: 'is-cancelled', icon: 'ri-forbid-2-fill' };
+    return { tone: 'is-pending', icon: 'ri-time-fill' };
+  };
+
+  function applicationTitleParts(app) {
+    const courseCode = String(app.course_code || '').trim();
+    let title = String(app.position || app.job_title || 'Unknown Position').trim();
+    if (courseCode && title.toLocaleLowerCase().startsWith(courseCode.toLocaleLowerCase())) {
+      const withoutCode = title.slice(courseCode.length).replace(/^\s*[-–—:]\s*/, '').trim();
+      if (withoutCode) title = withoutCode;
+    }
+    return { courseCode, title };
+  }
+
+  function compensationDisplay(app) {
+    const details = app.salary_projection_details || {};
+    if (details.calculation_type === 'salary_grade') {
+      return {
+        value: details.salary_grade || details.salary_display || 'Salary grade to be determined',
+        isSalaryGrade: true,
+      };
+    }
+
+    let value = String(details.salary_display || '').trim();
+    if (!value && app.applicable_hourly_rate !== null && app.applicable_hourly_rate !== undefined && app.applicable_hourly_rate !== '') {
+      const rate = Number(app.applicable_hourly_rate);
+      value = Number.isFinite(rate)
+        ? `₱${rate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/hour`
+        : '';
+    }
+
+    return {
+      value: (value || 'Rate to be determined').replace(/\$/g, '₱'),
+      isSalaryGrade: false,
+    };
+  }
+
+  function renderApplicationCards(apps) {
     if (!apps || apps.length === 0) {
+      const hasActiveFilters = Boolean((searchInput?.value || '').trim() || statusFilter?.value);
       container.innerHTML = `
-        <div class="p-8 text-center text-gray-500">
-          <i class="ri-inbox-line text-3xl mb-2 block"></i>
-          <p class="text-sm">You haven't applied to any jobs yet.</p>
+        <div class="ui-application-state">
+          <span class="ui-application-state__icon"><i class="${hasActiveFilters ? 'ri-search-eye-line' : 'ri-inbox-2-line'}" aria-hidden="true"></i></span>
+          <div>
+            <strong>${hasActiveFilters ? 'No matching applications' : 'No applications yet'}</strong>
+            <p>${hasActiveFilters ? 'Try a different search term or clear your status filter.' : 'Applications you submit will appear here with their current progress.'}</p>
+            ${hasActiveFilters ? '<button type="button" class="ui-application-empty-action" data-reset-application-filters>Clear search and filters</button>' : ''}
+          </div>
         </div>
       `;
       return;
@@ -312,28 +337,97 @@ session_start();
     container.innerHTML = apps.map(app => {
       const status = (app.status || '').toLowerCase();
       const showCancelBtn = !(status.includes('cancel') || status.includes('hired'));
-      
+      const title = applicationTitleParts(app);
+      const statusStyle = statusPresentation(app.status);
+      const compensation = compensationDisplay(app);
+      const attachmentCount = Math.max(0, Number.parseInt(app.attachment_count, 10) || 0);
+      const attachmentLabel = `${attachmentCount} ${attachmentCount === 1 ? 'attachment' : 'attachments'}`;
+
       return `
       <article class="ui-application-item" data-id="${app.id}">
         <div class="ui-application-item__main">
+          <span class="ui-application-item__icon" aria-hidden="true"><i class="ri-briefcase-4-line"></i></span>
           <div class="ui-application-item__title">
-            <span>Application #${app.id}</span>
-            <h3>${escapeHtml(app.position || 'Unknown Position')}</h3>
-          </div>
-          <div class="ui-application-item__meta">
-            <span class="ui-application-status ${statusToClasses(app.status)}">${escapeHtml(app.status || 'Pending')}</span>
-            <span><i class="ri-calendar-line"></i>Applied ${escapeHtml(app.applied_date_pretty || (app.applied_date ? new Date(app.applied_date).toLocaleDateString('en-US', {month: '2-digit', day: '2-digit', year: 'numeric'}).replace(/\//g, '/') : ''))}</span>
-            <span><i class="ri-money-dollar-circle-line"></i>${escapeHtml(app.salary_projection_details?.salary_display || 'Rate to be determined')}<sup>*</sup></span>
+            <span class="ui-application-item__id">Application #${escapeHtml(app.id)}</span>
+            <h3>${title.courseCode ? `<span class="ui-application-item__course">${escapeHtml(title.courseCode)}</span><span class="ui-application-item__separator" aria-hidden="true">·</span>` : ''}<span>${escapeHtml(title.title)}</span></h3>
+            <div class="ui-application-item__meta">
+              <span class="ui-application-meta-item">
+                <span class="ui-application-meta-item__icon"><i class="ri-calendar-line" aria-hidden="true"></i></span>
+                <span><small>Applied</small><strong>${escapeHtml(app.applied_date_pretty || app.applied_date || 'Date unavailable')}</strong></span>
+              </span>
+              <span class="ui-application-meta-item">
+                <span class="ui-application-meta-item__icon ui-application-meta-item__icon--compensation">${compensation.isSalaryGrade ? '<i class="ri-scales-3-line" aria-hidden="true"></i>' : '<span aria-hidden="true">₱</span>'}</span>
+                <span><small>${compensation.isSalaryGrade ? 'Salary grade' : 'Compensation'}</small><strong>${escapeHtml(compensation.value)}</strong></span>
+              </span>
+            </div>
           </div>
         </div>
+        <div class="ui-application-item__status">
+          <span class="ui-application-status ${statusStyle.tone}"><i class="${statusStyle.icon}" aria-hidden="true"></i>${escapeHtml(app.status || 'Pending')}</span>
+        </div>
         <div class="ui-application-item__actions">
-          <button class="ui-link-action" data-action="view"><i class="ri-eye-line"></i>View progress</button>
-          <button class="ui-link-action" data-action="attachments"><i class="ri-attachment-2"></i>Attachments</button>
-          ${showCancelBtn ? `<details class="ui-action-menu"><summary aria-label="More application actions"><i class="ri-more-2-fill"></i></summary><div class="ui-action-menu__items"><button class="ui-action-menu__danger" data-action="cancel"><i class="ri-close-circle-line"></i>Cancel application</button></div></details>` : ''}
+          <button type="button" class="ui-application-action ui-application-action--progress" data-action="view"><i class="ri-eye-line" aria-hidden="true"></i><span>View Progress</span></button>
+          <button type="button" class="ui-application-action ui-application-action--attachments" data-action="attachments" aria-label="Manage ${escapeHtml(attachmentLabel)} for application ${escapeHtml(app.id)}"><i class="ri-attachment-2" aria-hidden="true"></i><span>Attachments <span class="ui-application-action__count">${attachmentCount}</span></span></button>
+          ${showCancelBtn ? `<details class="ui-action-menu ui-application-more"><summary aria-label="More actions for application ${escapeHtml(app.id)}"><i class="ri-more-2-fill" aria-hidden="true"></i></summary><div class="ui-action-menu__items"><button type="button" class="ui-action-menu__danger" data-action="cancel"><i class="ri-close-circle-line" aria-hidden="true"></i>Cancel application</button></div></details>` : ''}
         </div>
       </article>
     `;
     }).join('');
+  }
+
+  function updateStatusOptions(apps) {
+    if (!statusFilter) return;
+    const selectedStatus = statusFilter.value;
+    const statuses = [...new Set((apps || []).map(app => String(app.status || 'Pending').trim()).filter(Boolean))]
+      .sort(applicationCollator.compare);
+    statusFilter.replaceChildren(new Option('All statuses', ''));
+    statuses.forEach(status => statusFilter.add(new Option(status, status)));
+    statusFilter.value = statuses.includes(selectedStatus) ? selectedStatus : '';
+  }
+
+  function applyApplicationControls() {
+    const query = String(searchInput?.value || '').trim().toLocaleLowerCase();
+    const selectedStatus = String(statusFilter?.value || '').toLocaleLowerCase();
+    const sortValue = sortControl?.value || 'newest';
+    const filtered = allApplications.filter(app => {
+      const searchable = [app.id, `application ${app.id}`, app.position, app.course_code, app.course_name, app.job_title]
+        .filter(value => value !== null && value !== undefined)
+        .join(' ')
+        .toLocaleLowerCase();
+      return (!query || searchable.includes(query))
+        && (!selectedStatus || String(app.status || 'Pending').toLocaleLowerCase() === selectedStatus);
+    });
+
+    filtered.sort((a, b) => {
+      if (sortValue === 'title-asc' || sortValue === 'title-desc') {
+        const firstTitle = applicationTitleParts(a);
+        const secondTitle = applicationTitleParts(b);
+        const comparison = applicationCollator.compare(
+          [firstTitle.courseCode, firstTitle.title].filter(Boolean).join(' '),
+          [secondTitle.courseCode, secondTitle.title].filter(Boolean).join(' ')
+        );
+        return sortValue === 'title-desc' ? -comparison : comparison;
+      }
+      const firstDate = Date.parse(`${a.applied_date || ''}T00:00:00`) || 0;
+      const secondDate = Date.parse(`${b.applied_date || ''}T00:00:00`) || 0;
+      const dateComparison = firstDate - secondDate || Number(a.id || 0) - Number(b.id || 0);
+      return sortValue === 'oldest' ? dateComparison : -dateComparison;
+    });
+
+    renderApplicationCards(filtered);
+    if (resultsCount) {
+      const total = allApplications.length;
+      resultsCount.textContent = filtered.length === total
+        ? `${total} ${total === 1 ? 'application' : 'applications'}`
+        : `${filtered.length} of ${total} applications`;
+    }
+    if (clearSearchButton) clearSearchButton.hidden = !String(searchInput?.value || '').length;
+  }
+
+  function renderApplications(apps) {
+    allApplications = Array.isArray(apps) ? apps : [];
+    updateStatusOptions(allApplications);
+    applyApplicationControls();
   }
 
   function escapeHtml(str) {
@@ -348,19 +442,32 @@ session_start();
 
   async function loadApplications() {
     try {
+      container.setAttribute('aria-busy', 'true');
       const res = await fetch('get_user_applications.php', { credentials: 'same-origin' });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Failed to load applications');
       renderApplications(data.applications);
     } catch (err) {
       container.innerHTML = `
-        <div class="p-8 text-center text-red-600">
-          <i class="ri-error-warning-line text-2xl mb-2 block"></i>
-          <p class="text-sm">Error loading applications: ${escapeHtml(err.message)}</p>
+        <div class="ui-application-state ui-application-state--error" role="alert">
+          <span class="ui-application-state__icon"><i class="ri-error-warning-line" aria-hidden="true"></i></span>
+          <div><strong>Applications could not be loaded</strong><p>${escapeHtml(err.message)}</p><button type="button" class="ui-application-empty-action" data-retry-applications>Try again</button></div>
         </div>
       `;
+      if (resultsCount) resultsCount.textContent = 'Unable to load applications';
+    } finally {
+      container.removeAttribute('aria-busy');
     }
   }
+
+  searchInput?.addEventListener('input', applyApplicationControls);
+  statusFilter?.addEventListener('change', applyApplicationControls);
+  sortControl?.addEventListener('change', applyApplicationControls);
+  clearSearchButton?.addEventListener('click', () => {
+    searchInput.value = '';
+    searchInput.focus();
+    applyApplicationControls();
+  });
 
   const attachmentsModal = document.getElementById('attachmentsModal');
   const attachmentsForm = document.getElementById('attachmentsForm');
@@ -479,6 +586,17 @@ session_start();
   
   // Delegated events for view and delete
   container.addEventListener('click', async (e) => {
+    if (e.target.closest('[data-reset-application-filters]')) {
+      if (searchInput) searchInput.value = '';
+      if (statusFilter) statusFilter.value = '';
+      applyApplicationControls();
+      searchInput?.focus();
+      return;
+    }
+    if (e.target.closest('[data-retry-applications]')) {
+      loadApplications();
+      return;
+    }
     const btn = e.target.closest('button[data-action]');
     if (!btn) return;
     const row = btn.closest('[data-id]');
@@ -875,7 +993,7 @@ session_start();
             <div class="bg-green-50 border border-green-200 rounded-lg p-4 max-w-md mx-auto mt-4">
               <i class="ri-check-circle-line text-2xl text-green-600 mb-2"></i>
               <p class="text-sm font-semibold text-green-800 mb-2">Receipt Uploaded Successfully</p>
-              <a href="../user/uploads/${escapeHtml(app.psych_exam_receipt)}" target="_blank" 
+              <a href="download_application_file.php?application_id=${encodeURIComponent(app.id)}&type=psych" target="_blank"
                  class="text-sm text-blue-600 hover:underline">View uploaded receipt</a>
             </div>
           ` : app.psych_exam_date ? `

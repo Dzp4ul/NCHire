@@ -1,6 +1,10 @@
 <?php
 session_start();
 
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 // Check if user is logged in
 if (!isset($_SESSION['user_id']) && !isset($_SESSION['user_email'])) {
     // Save the intended view parameter if coming from email
@@ -57,6 +61,7 @@ if ($conn->connect_error) {
 }
 require_once __DIR__ . '/../shared/helpers/recruitment.php';
 require_once __DIR__ . '/../shared/helpers/application_documents.php';
+require_once __DIR__ . '/../shared/helpers/dynamic_application_requirements.php';
 
 // Check if this is an AJAX request early to suppress debug output
 $is_ajax_request = ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_submit']));
@@ -219,6 +224,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         error_log("AJAX SUBMIT DETECTED - Output buffering started");
     }
 
+    $requestCsrfToken = (string)($_POST['csrf_token'] ?? '');
+    if ($requestCsrfToken === '' || !hash_equals((string)$_SESSION['csrf_token'], $requestCsrfToken)) {
+        $error_msg = 'Your session token expired. Refresh the page and try again.';
+        if ($is_ajax_submit) {
+            while (ob_get_level()) ob_end_clean();
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => $error_msg, 'message' => $error_msg]);
+            exit();
+        }
+        $_SESSION['application_error'] = $error_msg;
+        header('Location: ' . $_SERVER['PHP_SELF']);
+        exit();
+    }
+
     $uploadDir = __DIR__ . "/uploads/";
     if (!is_dir($uploadDir)) {
         if (!mkdir($uploadDir, 0777, true)) {
@@ -257,6 +277,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
     }
 
       $preflight_job_id = isset($_POST['job_id']) ? (int)$_POST['job_id'] : 0;
+      $active_application_requirements = $preflight_job_id > 0
+        ? nc_get_teaching_load_requirements($conn, $preflight_job_id, true)
+        : [];
       if ($preflight_job_id > 0) {
         $preflight_stmt = $conn->prepare("SELECT job_type FROM job WHERE id = ? LIMIT 1");
         if ($preflight_stmt) {
@@ -684,43 +707,102 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         }
     }
 
+    // Move newly uploaded legacy-compatible documents behind the protected
+    // requirements directory. Existing historical files keep their original
+    // paths, while all new application uploads use randomized storage names.
+    $secured_legacy_upload_paths = [];
+    $legacy_original_names = [];
+    {
+      $secureBase = __DIR__ . '/uploads/requirements/' . (int)$user_id;
+      if (!is_dir($secureBase) && !mkdir($secureBase, 0750, true)) {
+        $upload_errors[] = 'Secure document storage is unavailable';
+      } else {
+        $legacyDefinitions = nc_requirement_legacy_definitions();
+        foreach ($fresh_document_values as $field => $freshValue) {
+          if (empty($freshValue) || str_starts_with(str_replace('\\', '/', (string)$freshValue), 'uploads/')) {
+            continue;
+          }
+          $inputKey = rtrim((string)($legacyDefinitions[$field]['input'] ?? ''), '[]');
+          $postedNames = $inputKey !== '' ? ($_FILES[$inputKey]['name'] ?? null) : null;
+          if (is_array($postedNames)) {
+            $postedNames = implode(', ', array_values(array_filter(array_map('basename', $postedNames))));
+          }
+          $legacy_original_names[$field] = trim((string)$postedNames) ?: basename(explode(',', (string)$freshValue)[0]);
+
+          $securedValues = [];
+          foreach (array_filter(array_map('trim', explode(',', (string)$freshValue))) as $legacyFile) {
+            if (str_starts_with(str_replace('\\', '/', $legacyFile), 'requirements/')) {
+              $securedValues[] = $legacyFile;
+              continue;
+            }
+            $source = __DIR__ . '/uploads/' . basename($legacyFile);
+            if (!is_file($source)) {
+              $upload_errors[] = ($legacyDefinitions[$field]['name'] ?? $field) . ' could not be secured';
+              continue;
+            }
+            $extension = strtolower(pathinfo($legacyFile, PATHINFO_EXTENSION));
+            $secureName = bin2hex(random_bytes(20)) . ($extension !== '' ? '.' . $extension : '');
+            $target = $secureBase . '/' . $secureName;
+            if (!rename($source, $target)) {
+              $upload_errors[] = ($legacyDefinitions[$field]['name'] ?? $field) . ' could not be secured';
+              continue;
+            }
+            $securedValues[] = 'requirements/' . (int)$user_id . '/' . $secureName;
+            $secured_legacy_upload_paths[] = $target;
+          }
+          if ($securedValues) {
+            $fresh_document_values[$field] = implode(',', $securedValues);
+            ${$field} = $fresh_document_values[$field];
+          }
+        }
+      }
+    }
+
+    $dynamic_requirement_uploads = [];
+    $dynamic_requirement_upload_paths = [];
+    if (!$is_resubmission) {
+      foreach ($active_application_requirements as $requirement) {
+        if (!empty($requirement['legacy_document_type'])) {
+          continue;
+        }
+        $inputName = rtrim((string)$requirement['input_name'], '[]');
+        if (!isset($_FILES[$inputName]) || (int)($_FILES[$inputName]['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+          continue;
+        }
+        try {
+          $storedRequirement = nc_store_secure_requirement_upload($_FILES[$inputName], (int)$user_id);
+          $dynamic_requirement_uploads[(int)$requirement['id']] = $storedRequirement;
+          $dynamic_requirement_upload_paths[] = __DIR__ . '/uploads/requirements/' . $storedRequirement['file_path'];
+        } catch (Throwable $uploadException) {
+          $upload_errors[] = $requirement['requirement_name'] . ': ' . $uploadException->getMessage();
+        }
+      }
+    }
+
     // Skip validation for an admin-requested resubmission; it is validated
     // after its current files have been merged below.
     if (!$is_resubmission) {
-        // Check if required files were uploaded or available from draft (NEW APPLICATION ONLY)
-        if (!$application_letter) {
-            $upload_errors[] = 'Application Letter is required';
-        }
-        if (!$resume) {
-            $upload_errors[] = 'Resume is required';
-        }
-        if (!$tor) {
-            $upload_errors[] = 'Transcript of Records is required';
-        }
-        if (!$diploma) {
-            $upload_errors[] = 'Diploma is required';
-        }
-        if (!$coe) {
-            $upload_errors[] = 'Certificate of Employment is required';
-        }
-        if (!$seminars_trainings) {
-            $upload_errors[] = 'Seminar/Training Certificates are required';
-        }
-        if (!$letter_of_intent) {
-            $upload_errors[] = 'Letter of Intent is required';
-        }
-
-        if ($master_status['requires_ongoing_documents']) {
-            if (!$certificate_of_grades) {
-                $upload_errors[] = 'Certificate of Grades is required for ongoing master\'s applicants';
+        // The teaching load configuration is the server-side source of truth.
+        // Optional documents never block submission, even if the browser is
+        // manipulated to remove its client-side checks.
+        foreach ($active_application_requirements as $requirement) {
+            if (empty($requirement['is_required'])) {
+                continue;
             }
-            if (!$proof_of_enrollment) {
-                $upload_errors[] = 'Proof of Enrollment is required for ongoing master\'s applicants';
+            $legacyKey = $requirement['legacy_document_type'] ?? null;
+            $hasDocument = $legacyKey
+                ? !empty(${$legacyKey})
+                : isset($dynamic_requirement_uploads[(int)$requirement['id']]);
+            if (!$hasDocument) {
+                $upload_errors[] = $requirement['requirement_name'] . ' is required';
             }
         }
     }
     
     if (!empty($upload_errors) && !$is_resubmission) {
+        foreach (array_merge($secured_legacy_upload_paths, $dynamic_requirement_upload_paths) as $storedPath) {
+            if (is_file($storedPath)) @unlink($storedPath);
+        }
         $error_message = implode('. ', $upload_errors) . '. Please upload all required documents or save them as draft first.';
         
         // Check if this is an AJAX request
@@ -837,6 +919,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
     }
 
     if (!empty($job_validation_errors)) {
+        foreach (array_merge($secured_legacy_upload_paths, $dynamic_requirement_upload_paths) as $storedPath) {
+            if (is_file($storedPath)) @unlink($storedPath);
+        }
         $error_message = implode('. ', $job_validation_errors) . '.';
         $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
         $is_ajax = $is_ajax || (isset($_POST['ajax_submit']) && $_POST['ajax_submit'] == '1');
@@ -979,7 +1064,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
                         $application_id,
                         $field,
                         $freshFile,
-                        basename($freshFile)
+                        $legacy_original_names[$field] ?? basename($freshFile)
+                    );
+                }
+                $resubmissionRequirements = nc_get_teaching_load_requirements($conn, (int)$job_id, true);
+                foreach ($resubmissionRequirements as $requirement) {
+                    $legacyKey = $requirement['legacy_document_type'] ?? null;
+                    if (!$legacyKey || empty($fresh_document_values[$legacyKey])) {
+                        continue;
+                    }
+                    $fileName = (string)$fresh_document_values[$legacyKey];
+                    $normalizedFile = str_replace('\\', '/', $fileName);
+                    $storageArea = str_starts_with($normalizedFile, 'requirements/') ? 'requirements' : 'legacy';
+                    $submissionPath = $storageArea === 'requirements'
+                        ? substr($normalizedFile, strlen('requirements/'))
+                        : $fileName;
+                    nc_record_requirement_submission(
+                        $conn,
+                        $application_id,
+                        (int)$requirement['id'],
+                        $submissionPath,
+                        $legacy_original_names[$legacyKey] ?? basename($fileName),
+                        $storageArea
                     );
                 }
                 $_SESSION['application_success'] = "Documents resubmitted successfully! Your application is now under review.";
@@ -1076,6 +1182,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         // NEW APPLICATION - Insert into job_applicants table
         // Applications now go to Secretary first for document review
         $workflow_stage = 'secretary_review';
+        // The legacy schema keeps this column NOT NULL. Dynamic teaching-load
+        // requirements may make it optional or remove it, so store an empty
+        // compatibility value when no file is configured/submitted.
+        $letter_of_intent = $letter_of_intent ?? '';
         $stmt = $conn->prepare("INSERT INTO job_applicants 
             (applicant_name, position, applied_date, status, workflow_stage, full_name, applicant_email, contact_num, user_id, job_id, assigned_to_department,
              application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, faculty_evaluation, letter_of_intent)
@@ -1135,8 +1245,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
                 $application_id,
                 $field,
                 $fileName,
-                basename($fileName),
+                $legacy_original_names[$field] ?? basename($fileName),
                 $sourceApplicationId
+            );
+        }
+
+        foreach ($active_application_requirements as $requirement) {
+            $requirementId = (int)$requirement['id'];
+            $legacyKey = $requirement['legacy_document_type'] ?? null;
+            if ($legacyKey) {
+                $fileName = $active_document_values[$legacyKey] ?? null;
+                if (empty($fileName)) {
+                    continue;
+                }
+                $storageArea = str_starts_with(str_replace('\\', '/', (string)$fileName), 'requirements/') ? 'requirements' : 'legacy';
+                $submissionPath = $storageArea === 'requirements'
+                    ? substr(str_replace('\\', '/', (string)$fileName), strlen('requirements/'))
+                    : (string)$fileName;
+                nc_record_requirement_submission($conn, $application_id, $requirementId, $submissionPath, $legacy_original_names[$legacyKey] ?? basename((string)$fileName), $storageArea);
+                continue;
+            }
+            if (!isset($dynamic_requirement_uploads[$requirementId])) {
+                continue;
+            }
+            $storedRequirement = $dynamic_requirement_uploads[$requirementId];
+            nc_record_requirement_submission(
+                $conn,
+                $application_id,
+                $requirementId,
+                $storedRequirement['file_path'],
+                $storedRequirement['original_filename'],
+                $storedRequirement['storage_area']
             );
         }
 
@@ -1170,6 +1309,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         }
         } else {
             // ? Error - check if AJAX request
+            foreach (array_merge($secured_legacy_upload_paths, $dynamic_requirement_upload_paths) as $storedPath) {
+                if (is_file($storedPath)) @unlink($storedPath);
+            }
             $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
                        strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
             
@@ -2136,6 +2278,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                     <form id="requirementsForm" class="space-y-4" method="POST" enctype="multipart/form-data" novalidate>
                         <input type="hidden" name="submit_application" value="1">
                         <input type="hidden" name="ajax_submit" value="1">
+                        <input type="hidden" name="csrf_token" id="requirementsCsrfToken" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
                         <input type="hidden" name="job_id" id="rf_job_id">
                         <input type="hidden" name="job_title" id="rf_job_title">
                         <input type="hidden" name="full_name" id="rf_full_name">
@@ -2251,6 +2394,9 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                                 </button>
                                 <button type="submit" class="flex items-center px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg font-semibold">
                                     <i class="ri-send-plane-line mr-2"></i>Submit Application
+                                </button>
+                                <button type="button" id="saveRequirementUpdatesBtn" class="hidden flex items-center px-6 py-3 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors font-semibold">
+                                    <i class="ri-upload-cloud-2-line mr-2"></i>Save Document Updates
                                 </button>
                             </div>
                             <button type="button" id="step1NextBtn" onclick="setStep(2)" class="hidden flex items-center px-8 py-3 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors font-semibold">
@@ -2822,9 +2968,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // When navigating to Step 2, restore file indicators if application data exists
     // Draft loading is now manual via "Load Saved Documents" button
     if (n === 1) {
-      if (!window.currentApplicationData) {
-        loadReusableDocumentsForRenewal();
-      }
+      const requirementsJobId = context.jobId || window.selectedJobId || document.getElementById('rf_job_id')?.value;
+      const requirementsApplicationId = window.currentApplicationData?.application_id || window.currentApplicationData?.id || null;
+      loadDynamicApplicationRequirements(requirementsJobId, requirementsApplicationId);
       // Check if any files are already uploaded and hide the Load Saved Documents button
       setTimeout(() => {
         const fileInputs = document.querySelectorAll('#step1 input[type="file"]');
@@ -4059,6 +4205,12 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
       removeViewModeRestrictions();
     }
+
+    const requirementsJobId = context.jobId || window.selectedJobId || document.getElementById('rf_job_id')?.value;
+    const requirementsApplicationId = window.currentApplicationData?.application_id || window.currentApplicationData?.id || null;
+    if (requirementsJobId) {
+      loadDynamicApplicationRequirements(requirementsJobId, requirementsApplicationId);
+    }
     
     console.log('showWizard() completed');
   }
@@ -4709,6 +4861,122 @@ document.addEventListener('DOMContentLoaded', function() {
     faculty_evaluation: 'faculty_evaluation'
   };
 
+  const requirementCategoryMeta = {
+    'Application Documents': { description: 'Core documents that introduce your application.' },
+    'Educational Documents': { description: 'Records that confirm your academic qualifications.' },
+    'Supporting Documents': { description: 'Employment, license, training, and other supporting records.' }
+  };
+  let dynamicRequirementsRequest = 0;
+
+  function renderDynamicApplicationRequirements(payload) {
+    const sectionsContainer = document.querySelector('#requirementsForm .ui-document-sections');
+    if (!sectionsContainer) return;
+    const requirements = Array.isArray(payload.requirements) ? payload.requirements : [];
+    window.currentDynamicRequirements = requirements;
+    window.currentRequirementsApplicationId = payload.application_id || null;
+    window.currentRequirementsUpdatedAt = payload.requirements_updated_at || null;
+
+    const grouped = requirements.reduce((groups, requirement) => {
+      const category = requirement.category || 'Supporting Documents';
+      if (!groups[category]) groups[category] = [];
+      groups[category].push(requirement);
+      return groups;
+    }, {});
+
+    sectionsContainer.innerHTML = '';
+    Object.entries(grouped).forEach(([category, categoryRequirements]) => {
+      if (!categoryRequirements.length) return;
+      const section = document.createElement('section');
+      section.className = 'ui-document-section border-t pt-3';
+      section.dataset.documentCategory = category;
+      const meta = requirementCategoryMeta[category] || requirementCategoryMeta['Supporting Documents'];
+      section.innerHTML = `
+        <div class="ui-document-section__header">
+          <h4>${escapeDocumentHtml(category)}</h4>
+          <p>${escapeDocumentHtml(meta.description)}</p>
+        </div>
+        <div class="ui-document-grid"></div>`;
+      const grid = section.querySelector('.ui-document-grid');
+
+      categoryRequirements.forEach(requirement => {
+        const isRequired = Boolean(requirement.is_required);
+        const submission = requirement.submission || null;
+        const inputName = requirement.input_name || `requirement_file_${requirement.id}`;
+        const inputId = `document_requirement_${requirement.id}`;
+        const fieldKey = requirement.legacy_document_type || requirement.requirement_key || `requirement_${requirement.id}`;
+        const article = document.createElement('article');
+        article.className = 'space-y-2 ui-document-card';
+        article.dataset.documentField = fieldKey;
+        article.dataset.requirementId = String(requirement.id);
+        article.dataset.required = isRequired ? 'true' : 'false';
+        article.innerHTML = `
+          <div class="ui-document-card__heading">
+            <span class="ui-document-card__icon" aria-hidden="true"><i class="ri-file-text-line"></i></span>
+            <div class="ui-document-card__title">
+              <label for="${inputId}">${escapeDocumentHtml(requirement.requirement_name)}${isRequired ? ' <span class="ui-required-mark" aria-label="required">*</span>' : ''}</label>
+              <span class="ui-document-badge ${isRequired ? 'is-required' : 'is-optional'}">${isRequired ? 'Required' : 'Optional'}</span>
+            </div>
+          </div>
+          <p class="ui-document-card__helper">${escapeDocumentHtml(requirement.description || (isRequired ? 'Required document' : 'Optional supporting document'))}</p>
+          <div class="border-dashed ui-document-upload ${submission ? 'border-green-400 bg-green-50' : ''}">
+            ${submission ? `
+              <div class="dynamic-submission-display mb-3 rounded-lg border border-green-300 bg-white p-3">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="text-xs font-bold uppercase tracking-wide text-green-700">Uploaded</div>
+                    <a class="block truncate text-sm font-medium text-green-800 hover:underline" href="${escapeDocumentHtml(submission.download_url || '#')}" target="_blank" rel="noopener"><i class="ri-file-check-line mr-1"></i>${escapeDocumentHtml(submission.original_filename || 'Submitted document')}</a>
+                  </div>
+                  <span class="ui-status ui-status--success">Complete</span>
+                </div>
+              </div>` : ''}
+            <input id="${inputId}" type="file" name="${escapeDocumentHtml(inputName)}" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" class="ui-document-file-input">
+            <p class="ui-document-upload__hint"><i class="ri-upload-cloud-2-line"></i> ${submission ? 'Choose a file to replace the current document' : 'Choose file'} &middot; Maximum 5 MB</p>
+            <p class="ui-document-inline-error hidden" role="alert"></p>
+          </div>`;
+        const input = article.querySelector('input[type="file"]');
+        if (submission) input.dataset.existingSubmission = '1';
+        input.addEventListener('change', () => {
+          setDocumentInlineError(input, '');
+          updateRequiredDocumentsStatus();
+        });
+        grid.appendChild(article);
+      });
+      sectionsContainer.appendChild(section);
+    });
+
+    if (!requirements.length) {
+      sectionsContainer.innerHTML = '<div class="rounded-lg border border-gray-200 bg-gray-50 p-5 text-sm text-gray-600"><i class="ri-information-line mr-2"></i>This teaching load has no document requirements.</div>';
+    }
+
+    const saveUpdatesBtn = document.getElementById('saveRequirementUpdatesBtn');
+    if (saveUpdatesBtn) saveUpdatesBtn.classList.toggle('hidden', !payload.application_id);
+    updateRequiredDocumentsStatus();
+  }
+
+  async function loadDynamicApplicationRequirements(jobId, applicationId = null) {
+    const normalizedJobId = Number(jobId || 0);
+    if (!normalizedJobId) return;
+    const requestId = ++dynamicRequirementsRequest;
+    const query = applicationId
+      ? `application_id=${encodeURIComponent(applicationId)}`
+      : `job_id=${encodeURIComponent(normalizedJobId)}`;
+    try {
+      const response = await fetch(`get_application_requirements.php?${query}`, { credentials: 'same-origin', cache: 'no-store' });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) throw new Error(payload.error || 'Unable to load application requirements.');
+      if (requestId !== dynamicRequirementsRequest) return;
+      renderDynamicApplicationRequirements(payload);
+      if (!applicationId && !window.currentApplicationData) {
+        window._reusableDocumentsLoadKey = null;
+        await loadReusableDocumentsForRenewal();
+      }
+    } catch (error) {
+      console.error('Unable to load teaching-load requirements:', error);
+      showToast(error.message || 'Unable to load application requirements.', 'error');
+    }
+  }
+  window.refreshDynamicRequirements = loadDynamicApplicationRequirements;
+
   function requiresOngoingGraduateDocuments() {
     return initialEducation.some(education =>
       String(education.education_level || '').toLowerCase() === 'master' &&
@@ -4717,13 +4985,8 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function isApplicationDocumentRequired(field) {
-    const baseRequired = [
-      'application_letter', 'resume', 'letter_of_intent', 'tor',
-      'diploma', 'coe', 'seminars_trainings'
-    ];
-    return baseRequired.includes(field) || (
-      requiresOngoingGraduateDocuments() && ['certificate_of_grades', 'proof_of_enrollment'].includes(field)
-    );
+    const card = document.querySelector(`#requirementsForm .ui-document-card[data-document-field="${CSS.escape(field)}"]`);
+    return card?.dataset.required === 'true';
   }
 
   function syncRenewalDocumentVisibility(applicationType) {
@@ -4767,6 +5030,7 @@ document.addEventListener('DOMContentLoaded', function() {
       (input.files && input.files.length) ||
       (existingInput && existingInput.value) ||
       input.dataset.reusableFile ||
+      input.dataset.existingSubmission ||
       container?.querySelector('.approved-file, .reusable-document-display, .draft-file-display')
     );
   }
@@ -4775,9 +5039,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const status = document.getElementById('requiredDocumentsStatus');
     if (!status) return;
     let missingCount = 0;
-    Object.entries(applicationDocumentInputMap).forEach(([field, inputName]) => {
-      if (!isApplicationDocumentRequired(field)) return;
-      const input = document.querySelector(`#requirementsForm input[name="${inputName}"]`);
+    document.querySelectorAll('#requirementsForm .ui-document-card[data-required="true"]').forEach(card => {
+      const input = card.querySelector('input[type="file"]');
       if (!documentInputHasValue(input)) missingCount++;
     });
     status.classList.toggle('is-complete', missingCount === 0);
@@ -4798,7 +5061,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const categoryDisplay = document.getElementById('applicantCategoryDisplay');
     const notice = document.getElementById('existingDocumentNotice');
     try {
-      const response = await fetch('get_reusable_documents.php', { credentials: 'same-origin' });
+      const response = await fetch(`get_reusable_documents.php?job_id=${encodeURIComponent(context.jobId || '')}`, { credentials: 'same-origin' });
       const data = await response.json();
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Unable to check existing documents');
@@ -4835,7 +5098,7 @@ document.addEventListener('DOMContentLoaded', function() {
           const safeName = escapeDocumentHtml(fileDisplay.label);
           const safeTitle = escapeDocumentHtml(fileDisplay.title);
           const relativePath = String(fileName).replace(/^uploads[\\/]/, '').split(/[\\/]/).map(encodeURIComponent).join('/');
-          const safeUrl = `uploads/${relativePath}`;
+          const safeUrl = documentInfo.download_url || `uploads/${relativePath}`;
           return `<a href="${safeUrl}" target="_blank" rel="noopener" title="${safeTitle}" class="text-emerald-700 hover:underline"><i class="ri-file-text-line mr-1"></i>${safeName}</a>`;
         }).join('<br>');
         const currentDisplay = document.createElement('div');
@@ -5577,6 +5840,48 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   
+  const saveRequirementUpdatesBtn = document.getElementById('saveRequirementUpdatesBtn');
+  if (saveRequirementUpdatesBtn) {
+    saveRequirementUpdatesBtn.addEventListener('click', async function() {
+      const applicationId = window.currentRequirementsApplicationId
+        || window.currentApplicationData?.application_id
+        || window.currentApplicationData?.id;
+      if (!applicationId) {
+        showToast('Open an existing application before updating its documents.', 'warning');
+        return;
+      }
+      const form = document.getElementById('requirementsForm');
+      const selectedFiles = Array.from(form.querySelectorAll('.ui-document-card input[type="file"]'))
+        .some(input => input.files && input.files.length > 0);
+      if (!selectedFiles) {
+        showToast('Choose at least one document to upload or replace.', 'warning');
+        return;
+      }
+      const originalHtml = this.innerHTML;
+      this.disabled = true;
+      this.innerHTML = '<i class="ri-loader-4-line animate-spin mr-2"></i>Saving...';
+      try {
+        const formData = new FormData(form);
+        formData.set('application_id', String(applicationId));
+        const response = await fetch('upload_requirement_documents.php', {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          body: formData,
+          credentials: 'same-origin'
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error || 'Unable to update documents.');
+        showToast(result.is_complete ? 'Documents updated. All required documents are complete.' : `Documents updated. ${result.required_remaining} required document${Number(result.required_remaining) === 1 ? '' : 's'} remaining.`, 'success', 6000);
+        await loadDynamicApplicationRequirements(context.jobId || window.selectedJobId, applicationId);
+      } catch (error) {
+        showToast(error.message || 'Unable to update documents.', 'error', 6000);
+      } finally {
+        this.disabled = false;
+        this.innerHTML = originalHtml;
+      }
+    });
+  }
+
   // Intercept form submission to avoid page reload
   const requirementsForm = document.getElementById('requirementsForm');
   if (requirementsForm) {
@@ -5595,21 +5900,15 @@ document.addEventListener('DOMContentLoaded', function() {
       
       console.log('?? Validation mode:', isResubmissionMode ? 'RESUBMISSION' : 'NEW APPLICATION');
       
-      const requiredFields = [
-        { name: 'applicationLetter', label: 'Application Letter', dbField: 'application_letter' },
-        { name: 'resume_file', label: 'Resume', dbField: 'resume' },
-        { name: 'letter_of_intent', label: 'Letter of Intent', dbField: 'letter_of_intent' },
-        { name: 'transcript', label: 'Transcript of Records (TOR)', dbField: 'tor' },
-        { name: 'diploma', label: 'Diploma', dbField: 'diploma' },
-        { name: 'coe', label: 'Certificate of Employment', dbField: 'coe' },
-        { name: 'certificates[]', label: 'Seminars/Training Certificates', dbField: 'seminars_trainings' }
-      ];
-      if (requiresOngoingGraduateDocuments()) {
-        requiredFields.push(
-          { name: 'certificate_of_grades', label: 'Certificate of Grades', dbField: 'certificate_of_grades' },
-          { name: 'proof_of_enrollment', label: 'Proof of Enrollment', dbField: 'proof_of_enrollment' }
-        );
-      }
+      const requestedResubmissions = Array.isArray(window.currentResubmissionDocs) ? window.currentResubmissionDocs : [];
+      const requiredFields = Array.from(this.querySelectorAll('.ui-document-card')).filter(card => {
+        const fieldKey = card.dataset.documentField || '';
+        return card.dataset.required === 'true' || (isResubmissionMode && requestedResubmissions.includes(fieldKey));
+      }).map(card => ({
+        input: card.querySelector('input[type="file"]'),
+        label: card.querySelector('.ui-document-card__title label')?.textContent.replace('*', '').trim() || 'Required document',
+        dbField: card.dataset.documentField || ''
+      }));
       
       const missingFiles = [];
       
@@ -5622,17 +5921,17 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         }
         
-        const fileInput = this.querySelector(`input[name="${field.name}"]`);
+        const fileInput = field.input;
         
         // Check for draft input - remove brackets for proper name matching
-        const fieldNameWithoutBrackets = field.name.replace('[]', '');
+        const fieldNameWithoutBrackets = String(fileInput?.name || '').replace('[]', '');
         const draftInput = this.querySelector(`input[name="existing_${fieldNameWithoutBrackets}"]`);
         
         if (fileInput) {
           setDocumentInlineError(fileInput, '');
           const hasFile = fileInput.files && fileInput.files.length > 0;
           const hasDraft = draftInput && draftInput.value;
-          const hasReusableDocument = Boolean(fileInput.dataset.reusableFile);
+          const hasReusableDocument = Boolean(fileInput.dataset.reusableFile || fileInput.dataset.existingSubmission);
           
           console.log(`Checking ${field.label}: hasFile=${hasFile}, hasDraft=${hasDraft}`);
           
@@ -6660,23 +6959,24 @@ document.getElementById('detailDeadlineDate').textContent = 'Not specified';
 }
 
 // Populate qualifications
-document.getElementById('detailEducation').textContent = formatStructuredJobCriteria(job, 'education');
-document.getElementById('detailExperience').textContent = formatStructuredJobCriteria(job, 'experience');
-document.getElementById('detailTraining').textContent = formatStructuredJobCriteria(job, 'training');
-document.getElementById('detailEligibility').textContent = formatStructuredJobCriteria(job, 'eligibility');
+document.getElementById('detailEducation').textContent = job.education || 'Not specified';
+document.getElementById('detailExperience').textContent = job.experience || 'Not specified';
+document.getElementById('detailTraining').textContent = job.training || 'Not specified';
+document.getElementById('detailEligibility').textContent = job.eligibility || 'Not specified';
 
 // Populate job requirements
 const requirementsContainer = document.getElementById('detailJobRequirements');
-if (job.job_requirements && job.job_requirements.trim()) {
-const requirementPoints = job.job_requirements.split('\n').filter(point => point.trim().length > 0);
-requirementsContainer.innerHTML = requirementPoints.map(point => `<p>� ${point.trim()}</p>`).join('');
+const loadRequirements = Array.isArray(job.application_requirements) ? job.application_requirements : [];
+if (loadRequirements.length) {
+const requirementPoints = loadRequirements;
+requirementsContainer.innerHTML = requirementPoints.map(requirement => `<div class="flex items-start rounded-lg bg-white p-3"><i class="ri-file-text-line mr-3 mt-0.5 text-lg text-amber-600"></i><div class="flex-1"><p class="text-gray-700">${escapeDocumentHtml(requirement.requirement_name)} <span class="ml-2 text-xs font-semibold ${requirement.is_required ? 'text-red-600' : 'text-emerald-700'}">${requirement.is_required ? 'Required' : 'Optional'}</span></p>${requirement.description ? `<p class="mt-1 text-xs text-gray-500">${escapeDocumentHtml(requirement.description)}</p>` : ''}</div></div>`).join('');
 document.getElementById('requirementsSection').style.display = 'block';
 } else {
 document.getElementById('requirementsSection').style.display = 'none';
 }
 
 // Populate competency
-document.getElementById('detailCompetency').textContent = formatStructuredJobCriteria(job, 'skills');
+document.getElementById('detailCompetency').textContent = job.competency || 'Not specified';
 
 // Populate job description
 const descriptionContainer = document.getElementById('detailJobDescription');
@@ -8913,33 +9213,6 @@ function populateWizardWithApplicationData(app, data) {
 }
 
 // Show job details function
-function formatStructuredJobCriteria(job, section) {
-  const lines = [];
-  const humanize = value => String(value || '').replaceAll('_', ' ');
-  if (section === 'education') {
-    if (job.education) lines.push(job.education);
-    if (job.minimum_education_level) lines.push(`Minimum level: ${humanize(job.minimum_education_level)}`);
-    if (job.required_degree_fields) lines.push(`Required degree/course: ${job.required_degree_fields}`);
-    if (job.graduate_requirement && job.graduate_requirement !== 'none') lines.push(`Graduate qualification: ${humanize(job.graduate_requirement)}`);
-    if (job.minimum_graduate_units) lines.push(`Minimum graduate units: ${job.minimum_graduate_units}`);
-  } else if (section === 'experience') {
-    if (job.experience) lines.push(job.experience);
-    if (job.minimum_experience_years !== null && job.minimum_experience_years !== '' && job.minimum_experience_years !== undefined) lines.push(`Minimum experience: ${job.minimum_experience_years} year(s)`);
-    if (job.teaching_experience_requirement && job.teaching_experience_requirement !== 'not_required') lines.push(`Teaching experience: ${humanize(job.teaching_experience_requirement)}`);
-  } else if (section === 'training') {
-    if (job.training) lines.push(job.training);
-    if (job.required_training) lines.push(`Required training: ${job.required_training}`);
-  } else if (section === 'eligibility') {
-    if (job.eligibility) lines.push(job.eligibility);
-    if (job.required_certifications) lines.push(`Required certifications: ${job.required_certifications}`);
-    if (job.required_licenses) lines.push(`Required licenses: ${job.required_licenses}`);
-  } else if (section === 'skills') {
-    if (job.competency) lines.push(job.competency);
-    if (job.required_skills) lines.push(`Required skills: ${job.required_skills}`);
-  }
-  return lines.length ? lines.join('\n') : 'Not specified';
-}
-
 function showJobDetails(jobId) {
   console.log('?? Showing job details for ID:', jobId);
   
@@ -9072,34 +9345,30 @@ function populateJobDetails(job) {
   }
   
   // Update qualifications
-  document.getElementById('detailEducation').textContent = formatStructuredJobCriteria(job, 'education');
-  document.getElementById('detailExperience').textContent = formatStructuredJobCriteria(job, 'experience');
-  document.getElementById('detailTraining').textContent = formatStructuredJobCriteria(job, 'training');
-  document.getElementById('detailEligibility').textContent = formatStructuredJobCriteria(job, 'eligibility');
+  document.getElementById('detailEducation').textContent = job.education || 'Not specified';
+  document.getElementById('detailExperience').textContent = job.experience || 'Not specified';
+  document.getElementById('detailTraining').textContent = job.training || 'Not specified';
+  document.getElementById('detailEligibility').textContent = job.eligibility || 'Not specified';
   
   // Update job requirements - Show document requirements
   const requirementsContainer = document.getElementById('detailJobRequirements');
-  const documentRequirements = [
-    { text: 'Application Letter', required: true },
-    { text: 'Updated and Comprehensive Resume', required: true },
-    { text: 'Transcript of Record (TOR)', required: true },
-    { text: 'Diploma', required: true },
-    { text: 'Professional License', required: false },
-    { text: 'Certificate of Employment (COE)', required: true },
-    { text: 'Seminar/Training Certificates', required: true },
-    { text: 'Masteral Certificate', required: false }
-  ];
+  const documentRequirements = Array.isArray(job.application_requirements) ? job.application_requirements : [];
   
   requirementsContainer.innerHTML = documentRequirements.map(req => `
     <div class="flex items-start bg-white rounded-lg p-3">
       <i class="ri-file-text-line text-amber-600 mr-3 mt-0.5 text-lg"></i>
-      <p class="flex-1 text-gray-700">${req.text}${req.required ? ' <span class="text-red-500 text-sm">*</span>' : ' <span class="text-green-600 text-sm font-medium">(Optional)</span>'}</p>
+      <div class="flex-1"><p class="text-gray-700">${escapeDocumentHtml(req.requirement_name)}${req.is_required ? ' <span class="text-red-500 text-sm">*</span>' : ' <span class="text-green-600 text-sm font-medium">(Optional)</span>'}</p>${req.description ? `<p class="mt-1 text-xs text-gray-500">${escapeDocumentHtml(req.description)}</p>` : ''}</div>
     </div>
-  `).join('');
+  `).join('') || '<p class="text-gray-500 italic">No document requirements configured.</p>';
   
   // Update competency
   const competencyContainer = document.getElementById('detailCompetency');
-  competencyContainer.textContent = formatStructuredJobCriteria(job, 'skills');
+  if (job.competency && job.competency.trim()) {
+    const competencies = job.competency.split('\n').filter(comp => comp.trim());
+    competencyContainer.innerHTML = competencies.map(comp => `<p class="flex items-start"><i class="ri-star-fill text-amber-500 mr-2 mt-1"></i><span>${comp.trim()}</span></p>`).join('');
+  } else {
+    competencyContainer.innerHTML = '<p class="text-gray-500 italic">Not specified</p>';
+  }
   
   // Update apply button based on application status
   const applyBtn = document.getElementById('detailApplyBtn');

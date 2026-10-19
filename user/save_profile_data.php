@@ -53,16 +53,9 @@ if (!$user_id) {
     exit();
 }
 
-function invalidateCandidateRankings(mysqli $conn, int $userId): void
+function getProfileQualificationProjection(mysqli $conn, int $userId): array
 {
-    $check = $conn->query("SHOW TABLES LIKE 'candidate_rankings'");
-    if (!$check || $check->num_rows === 0) return;
-    $stmt = $conn->prepare("UPDATE candidate_rankings SET input_hash = REPEAT('0', 64), ai_status = 'stale', updated_at = NOW() WHERE applicant_id = ?");
-    if ($stmt) {
-        $stmt->bind_param('i', $userId);
-        $stmt->execute();
-        $stmt->close();
-    }
+    return nc_calculate_salary_projection($conn, $userId, ['job_type' => 'Part-time']);
 }
 
 function ensureEducationProfileColumns(mysqli $conn): void
@@ -179,9 +172,9 @@ if (isset($_POST['saveEducation'])) {
     $ed_sy = (int)($_POST['ed_sy'] ?? 0);
     $ed_ey = (int)($_POST['ed_ey'] ?? 0);
     $ed_gpa = trim($_POST['ed_gpa'] ?? '');
-    $education_level = strtolower(trim($_POST['education_level'] ?? $_POST['ed_level'] ?? 'other'));
-    $education_status = strtolower(trim($_POST['education_status'] ?? $_POST['ed_status'] ?? 'completed'));
-    $completed_units_raw = $_POST['completed_units'] ?? ($_POST['ed_completed_units'] ?? '');
+    $education_level = strtolower(trim($_POST['education_level'] ?? $_POST['ed_level'] ?? ''));
+    $education_status = strtolower(trim($_POST['education_status'] ?? $_POST['ed_status'] ?? ''));
+    $completed_units_raw = trim((string)($_POST['completed_units'] ?? ($_POST['ed_completed_units'] ?? '')));
     $completed_units = $completed_units_raw !== '' ? filter_var(
         $completed_units_raw,
         FILTER_VALIDATE_INT,
@@ -192,10 +185,12 @@ if (isset($_POST['saveEducation'])) {
         : (isset($_POST['ed_year_completed']) && $_POST['ed_year_completed'] !== '' ? (int)$_POST['ed_year_completed'] : null);
 
     if (!in_array($education_level, ['high_school', 'associate', 'bachelor', 'master', 'doctorate', 'other'], true)) {
-        $education_level = 'other';
+        echo json_encode(['success' => false, 'message' => 'Please select a valid education level.']);
+        exit();
     }
     if (!in_array($education_status, ['completed', 'ongoing'], true)) {
-        $education_status = 'completed';
+        echo json_encode(['success' => false, 'message' => 'Please select a valid education status.']);
+        exit();
     }
     if ($completed_units_raw !== '' && $completed_units === false) {
         echo json_encode(['success' => false, 'message' => "Completed Master's Units must be a whole number greater than or equal to 0."]);
@@ -229,7 +224,9 @@ if (isset($_POST['saveEducation'])) {
             $completed_units = null;
         }
     } else {
-        $completed_units = null;
+        if ($education_level !== 'master') {
+            $completed_units = null;
+        }
         $year_completed = $year_completed ?: $ed_ey;
     }
 
@@ -284,9 +281,14 @@ if (isset($_POST['saveEducation'])) {
         $stmt->bind_param("sssssiissiisii", $ed_degree, $ed_fs, $ed_ins, $education_level, $education_status, $completed_units, $year_completed, $certificate_of_grades, $proof_of_enrollment, $ed_sy, $ed_ey, $ed_gpa, $edit_id, $user_id);
 
         if ($stmt->execute()) {
-            invalidateCandidateRankings($conn, (int)$user_id);
             $response_data['id'] = $edit_id;
-            echo json_encode(['success' => true, 'message' => 'Education updated successfully', 'id' => $edit_id, 'data' => $response_data]);
+            echo json_encode([
+                'success' => true,
+                'message' => 'Education updated successfully',
+                'id' => $edit_id,
+                'data' => $response_data,
+                'qualification_projection' => getProfileQualificationProjection($conn, (int)$user_id),
+            ]);
         } else {
             error_log("Education update error: " . $stmt->error);
             echo json_encode(['success' => false, 'message' => 'Error updating education: ' . $stmt->error]);
@@ -297,11 +299,16 @@ if (isset($_POST['saveEducation'])) {
         $stmt->bind_param("isssssiissiis", $user_id, $ed_degree, $ed_fs, $ed_ins, $education_level, $education_status, $completed_units, $year_completed, $certificate_of_grades, $proof_of_enrollment, $ed_sy, $ed_ey, $ed_gpa);
 
         if ($stmt->execute()) {
-            invalidateCandidateRankings($conn, (int)$user_id);
             $new_id = $stmt->insert_id;
             $response_data['id'] = $new_id;
             error_log("SUCCESS: Education inserted with ID: " . $new_id);
-            echo json_encode(['success' => true, 'message' => 'Education added successfully', 'id' => $new_id, 'data' => $response_data]);
+            echo json_encode([
+                'success' => true,
+                'message' => 'Education added successfully',
+                'id' => $new_id,
+                'data' => $response_data,
+                'qualification_projection' => getProfileQualificationProjection($conn, (int)$user_id),
+            ]);
         } else {
             error_log("ERROR: Education insert failed: " . $stmt->error);
             echo json_encode(['success' => false, 'message' => 'Error adding education: ' . $stmt->error]);
@@ -412,7 +419,6 @@ if (isset($_POST['saveExperience'])) {
         $stmt->bind_param("ssssssisii", $job_title, $work_comp, $work_loc, $start_date_formatted, $end_date_formatted, $work_descript, $is_current, $experience_type, $edit_id, $user_id);
         
         if ($stmt->execute()) {
-            invalidateCandidateRankings($conn, (int)$user_id);
             echo json_encode(['success' => true, 'message' => 'Work experience updated successfully']);
         } else {
             error_log("Experience update error: " . $stmt->error);
@@ -426,7 +432,6 @@ if (isset($_POST['saveExperience'])) {
         $stmt->bind_param("isssssssi", $user_id, $experience_type, $job_title, $work_comp, $work_loc, $start_date_formatted, $end_date_formatted, $work_descript, $is_current);
         
         if ($stmt->execute()) {
-            invalidateCandidateRankings($conn, (int)$user_id);
             echo json_encode(['success' => true, 'message' => 'Work experience added successfully', 'id' => $stmt->insert_id]);
         } else {
             error_log("Experience insert error: " . $stmt->error);
@@ -462,7 +467,6 @@ if (isset($_POST['saveSkill'])) {
         $stmt->bind_param("ssiii", $skill_name, $skill_category, $skill_level, $edit_id, $user_id);
         
         if ($stmt->execute()) {
-            invalidateCandidateRankings($conn, (int)$user_id);
             echo json_encode(['success' => true, 'message' => 'Skill updated successfully']);
         } else {
             error_log("Skill update error: " . $stmt->error);
@@ -476,7 +480,6 @@ if (isset($_POST['saveSkill'])) {
         $stmt->bind_param("issi", $user_id, $skill_name, $skill_category, $skill_level);
         
         if ($stmt->execute()) {
-            invalidateCandidateRankings($conn, (int)$user_id);
             echo json_encode(['success' => true, 'message' => 'Skill added successfully', 'id' => $stmt->insert_id]);
         } else {
             error_log("Skill insert error: " . $stmt->error);
@@ -545,7 +548,6 @@ if (isset($_POST['saveQualification'])) {
     }
     if ($stmt->execute()) {
         $id = $editId ?: $stmt->insert_id;
-        invalidateCandidateRankings($conn, (int)$user_id);
         echo json_encode(['success' => true, 'message' => $editId ? 'Qualification updated successfully' : 'Qualification added successfully', 'id' => $id]);
     } else {
         error_log('Qualification save error: ' . $stmt->error);
@@ -574,8 +576,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         
         if ($stmt->execute()) {
             if ($stmt->affected_rows > 0) {
-                invalidateCandidateRankings($conn, (int)$user_id);
-                echo json_encode(['success' => true, 'message' => 'Education deleted successfully']);
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Education deleted successfully',
+                    'qualification_projection' => getProfileQualificationProjection($conn, (int)$user_id),
+                ]);
             } else {
                 echo json_encode(['success' => false, 'message' => 'Education record not found']);
             }
@@ -602,7 +607,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         
         if ($stmt->execute()) {
             if ($stmt->affected_rows > 0) {
-                invalidateCandidateRankings($conn, (int)$user_id);
                 echo json_encode(['success' => true, 'message' => 'Work experience deleted successfully']);
             } else {
                 echo json_encode(['success' => false, 'message' => 'Work experience not found']);
@@ -630,7 +634,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         
         if ($stmt->execute()) {
             if ($stmt->affected_rows > 0) {
-                invalidateCandidateRankings($conn, (int)$user_id);
                 echo json_encode(['success' => true, 'message' => 'Skill deleted successfully']);
             } else {
                 echo json_encode(['success' => false, 'message' => 'Skill not found']);
@@ -652,7 +655,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         $stmt = $conn->prepare('DELETE FROM user_qualifications WHERE id = ? AND user_id = ?');
         $stmt->bind_param('ii', $id, $user_id);
         if ($stmt->execute() && $stmt->affected_rows > 0) {
-            invalidateCandidateRankings($conn, (int)$user_id);
             echo json_encode(['success' => true, 'message' => 'Qualification deleted successfully']);
         } else {
             echo json_encode(['success' => false, 'message' => 'Qualification record not found']);

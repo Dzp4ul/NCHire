@@ -1,6 +1,10 @@
 <?php
 session_start();
 
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 // Check if admin is logged in
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header("Location: ../index.php");
@@ -295,9 +299,6 @@ if ($vacancy_stats_result) {
     $vacancy_stats = array_merge($vacancy_stats, $vacancy_stats_result->fetch_assoc() ?: []);
 }
 
-if (empty($_SESSION['ranking_csrf_token'])) {
-    $_SESSION['ranking_csrf_token'] = bin2hex(random_bytes(32));
-}
 $vacant_teaching_loads_query = "
     SELECT j.*, COALESCE(a.assigned_count, 0) AS assigned_instructors,
            {$vacancy_expr} AS remaining_vacancies
@@ -1316,45 +1317,6 @@ $recent_activity = $conn->query($recent_activity_query);
                     </div>
                 </section>
 
-                <!-- Job-specific candidate ranking decision support -->
-                <section class="ui-analytics-workspace">
-                    <div class="ui-analytics-workspace__header">
-                        <div>
-                            <p class="ui-eyebrow">Decision support</p>
-                            <h2>Candidate Ranking</h2>
-                            <p>Compare teaching-load requirements with the applicants assigned to that posting.</p>
-                        </div>
-                        <div class="ui-analytics-workspace__controls">
-                            <div class="ui-filter-field">
-                                <label for="rankingJobFilter" class="block text-xs font-medium text-gray-700 mb-1">Selected Job / Teaching Load</label>
-                                <select id="rankingJobFilter" onchange="loadCandidateRanking()" class="min-w-72 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-                                    <option value="">Select a posting</option>
-                                </select>
-                            </div>
-                            <button type="button" id="recalculateRankingBtn" onclick="recalculateCandidateRanking()" class="ui-button ui-button--secondary" disabled><i class="fas fa-rotate mr-2"></i>Recalculate</button>
-                        </div>
-                    </div>
-                    <div id="rankingNotice" class="px-5 pt-4 text-sm text-gray-600">Select a job posting to compare its requirements with applicants assigned to it.</div>
-                    <div class="overflow-x-auto mt-3">
-                        <table class="w-full min-w-[1050px]">
-                            <thead class="bg-gray-50"><tr>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Applicant</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Overall</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qualification</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Education</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Experience</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Skills</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cert./License</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Requirements</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
-                            </tr></thead>
-                            <tbody id="candidateRankingTableBody" class="divide-y divide-gray-200"><tr><td colspan="10" class="px-5 py-8 text-center text-gray-500">No job selected.</td></tr></tbody>
-                        </table>
-                    </div>
-                    <div class="px-5 py-4 border-t border-gray-100 text-xs text-gray-500">Decision-support only. Rankings do not automatically reject or hire applicants.</div>
-                </section>
-
                 <!-- Filter Section -->
                 <section class="ui-filter-bar" aria-label="Applicant filters">
                     <div class="ui-filter-bar__controls ui-filter-bar__controls--four">
@@ -1848,7 +1810,7 @@ $recent_activity = $conn->query($recent_activity_query);
                     <button type="button" onclick="closeCreateJobModal()" class="text-gray-400 hover:text-gray-700" aria-label="Close"><i class="fas fa-times text-xl"></i></button>
                 </header>
 
-                <div class="teaching-load-modal__body min-h-0 flex-1 overflow-y-auto px-6 py-5 space-y-8" data-ranking-editor-container>
+                <div class="teaching-load-modal__body min-h-0 flex-1 overflow-y-auto px-6 py-5 space-y-8">
                     <input type="hidden" name="title" value="Instructor">
                     <input type="hidden" name="location" value="Norzagaray College">
                     <input type="hidden" name="salary" value="">
@@ -1884,6 +1846,20 @@ $recent_activity = $conn->query($recent_activity_query);
                             <div class="md:col-span-1 lg:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Salary Grade <span class="font-normal text-gray-500">(Full-time only)</span></label><input type="text" name="salary_grade" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary" placeholder="Instructor I defaults to SG13"></div>
                         </div>
                         <div class="mt-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3"><p class="text-sm font-medium text-blue-950">Compensation Rule</p><p class="mt-1 text-sm text-blue-800">Permanent/Full-time loads use the configured Salary Grade. Part-time loads use the applicant's verified qualification rate and calculated teaching hours.</p></div>
+                    </section>
+
+                    <section class="ui-application-requirements<?php echo in_array($admin_role, ['Secretary', 'Department Head'], true) ? '' : ' hidden'; ?>" aria-labelledby="createApplicationRequirementsTitle">
+                        <div class="mb-4 flex flex-col gap-3 border-b border-gray-200 pb-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <h3 id="createApplicationRequirementsTitle" class="font-semibold text-gray-900">Application Requirements</h3>
+                                <p class="mt-1 text-sm text-gray-500">Choose the documents applicants must submit for this teaching load.</p>
+                            </div>
+                            <button type="button" class="ui-button ui-button--secondary whitespace-nowrap" onclick="addApplicationRequirement('createApplicationRequirements')">
+                                <i class="fas fa-plus" aria-hidden="true"></i> Add Requirement
+                            </button>
+                        </div>
+                        <div id="createApplicationRequirements" class="space-y-3" aria-live="polite"></div>
+                        <p class="requirement-list-error mt-2 hidden text-sm text-red-600" role="alert"></p>
                     </section>
 
                     <section>
@@ -2994,17 +2970,6 @@ $recent_activity = $conn->query($recent_activity_query);
         </div>
     </div>
 
-    <!-- Candidate Ranking Details Modal -->
-    <div id="candidateRankingDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-[70] p-4">
-        <div class="bg-white rounded-xl shadow-xl max-w-5xl w-full max-h-[92vh] overflow-y-auto">
-            <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-                <div><h2 class="text-xl font-semibold text-gray-900">Candidate Ranking Details</h2><p id="rankingDetailsSubtitle" class="text-sm text-gray-500 mt-1"></p></div>
-                <button type="button" onclick="closeCandidateRankingDetails()" class="w-9 h-9 rounded-lg hover:bg-gray-100 text-gray-500"><i class="fas fa-times"></i></button>
-            </div>
-            <div id="candidateRankingDetailsContent" class="p-6"><div class="py-16 text-center text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading ranking details...</div></div>
-        </div>
-    </div>
-
     <div id="actionLoadingModal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100] p-4" role="dialog" aria-modal="true" aria-live="polite" aria-labelledby="actionLoadingTitle" aria-describedby="actionLoadingMessage">
         <div class="bg-white rounded-lg shadow-2xl w-full max-w-sm p-8 text-center">
             <div class="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50" aria-hidden="true">
@@ -3022,7 +2987,7 @@ $recent_activity = $conn->query($recent_activity_query);
         const CURRENT_ADMIN_ROLE = '<?php echo $admin_role; ?>';
         const CURRENT_ADMIN_NAME = '<?php echo htmlspecialchars($admin_name); ?>';
         const CURRENT_ADMIN_DEPARTMENT = <?php echo json_encode($admin_department); ?>;
-        const NCHIRE_RANKING_CSRF = <?php echo json_encode($_SESSION['ranking_csrf_token']); ?>;
+        const NCHIRE_ADMIN_CSRF_TOKEN = <?php echo json_encode($_SESSION['csrf_token']); ?>;
         
         // Real-time dashboard functionality
         let refreshInterval;
@@ -4195,6 +4160,21 @@ $recent_activity = $conn->query($recent_activity_query);
                                 <p class="text-sm font-medium text-blue-900">Compensation Rule</p>
                                 <p class="text-sm text-blue-800 mt-1">Permanent/Full-time loads use the configured Salary Grade. Part-time loads use the applicant's verified qualification rate and calculated teaching hours.</p>
                             </div>
+                        </div>
+
+                        <div class="mt-6 border-t border-gray-200 pt-5 ui-application-requirements<?php echo in_array($admin_role, ['Secretary', 'Department Head'], true) ? '' : ' hidden'; ?>" aria-labelledby="editApplicationRequirementsTitle">
+                            <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <h4 id="editApplicationRequirementsTitle" class="text-sm font-semibold text-gray-900">Application Requirements</h4>
+                                    <p class="mt-1 text-sm text-gray-500">Changes are reflected on this teaching load's applicant checklist.</p>
+                                </div>
+                                <button type="button" class="ui-button ui-button--secondary whitespace-nowrap" onclick="addApplicationRequirement('editApplicationRequirements')">
+                                    <i class="fas fa-plus" aria-hidden="true"></i> Add Requirement
+                                </button>
+                            </div>
+                            <div id="editRequirementApplicantWarning" class="mb-4 hidden rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"></div>
+                            <div id="editApplicationRequirements" class="space-y-3" aria-live="polite"></div>
+                            <p class="requirement-list-error mt-2 hidden text-sm text-red-600" role="alert"></p>
                         </div>
 
                         <div class="mt-4">

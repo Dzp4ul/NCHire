@@ -2,6 +2,7 @@
 session_start();
 header('Content-Type: application/json');
 require_once __DIR__ . '/../shared/helpers/recruitment.php';
+require_once __DIR__ . '/../shared/helpers/dynamic_application_requirements.php';
 $host = "127.0.0.1";
 $user = "root";
 $pass = "";
@@ -39,6 +40,12 @@ if ($jobId) {
         $job['academic_period_label'] = nc_format_academic_period($job);
         $job['salary_projection'] = nc_calculate_salary_projection_from_education([], $job, null, $conn);
         $job['salary_display'] = $job['salary_projection']['salary_display'];
+        $job['application_requirements'] = nc_get_teaching_load_requirements($conn, (int)$job['id'], true);
+        $applicantCountStmt = $conn->prepare('SELECT COUNT(*) AS total FROM job_applicants WHERE job_id = ?');
+        $applicantCountStmt->bind_param('i', $jobId);
+        $applicantCountStmt->execute();
+        $job['applicant_count'] = (int)($applicantCountStmt->get_result()->fetch_assoc()['total'] ?? 0);
+        $applicantCountStmt->close();
         echo json_encode($job);
     } else {
         echo json_encode(["error" => "Job not found"]);
@@ -58,6 +65,7 @@ if ($jobId) {
             $row['academic_period_label'] = nc_format_academic_period($row);
             $row['salary_projection'] = nc_calculate_salary_projection_from_education([], $row, null, $conn);
             $row['salary_display'] = $row['salary_projection']['salary_display'];
+            $row['application_requirements'] = nc_get_teaching_load_requirements($conn, (int)$row['id'], true);
             $jobs[] = $row;
         }
     }

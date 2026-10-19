@@ -41,8 +41,7 @@ $profile_skill_levels = ['', 'Beginner', 'Novice', 'Intermediate', 'Advanced', '
       </div>
       <dl class="ui-profile-identity-header__facts">
         <div><dt>Profile status</dt><dd><span class="ui-status-dot"></span><?php echo $profile_h($account_status_label); ?></dd></div>
-        <div><dt>Graduate qualification</dt><dd><?php echo $profile_h($qualification_summary['title']); ?></dd></div>
-        <div><dt>Profile readiness</dt><dd><?php echo $profile_h($profile_readiness_label); ?></dd></div>
+        <div><dt>Graduate qualification</dt><dd id="profileGraduateQualification"><?php echo $profile_h($qualification_summary['title']); ?></dd></div>
       </dl>
       <button class="ui-button ui-button--secondary ui-profile-edit-basic" type="button"><i class="ri-edit-line"></i>Edit Basic Information</button>
     </section>
@@ -78,17 +77,6 @@ $profile_skill_levels = ['', 'Beginner', 'Novice', 'Intermediate', 'Advanced', '
             <div><p class="ui-eyebrow">Profile overview</p><h2>Personal Information</h2><p>Review the contact details used throughout your applications.</p></div>
             <button class="ui-button ui-button--secondary" id="editPersonalBtn" type="button"><i class="ri-edit-line"></i>Edit</button>
           </div>
-
-          <?php if (!empty($ranking_profile_missing)): ?>
-          <div class="ui-profile-notice" role="status">
-            <i class="ri-information-line" aria-hidden="true"></i>
-            <div>
-              <strong>Complete your profile</strong>
-              <p>Add <?php echo $profile_h(implode(', ', $ranking_profile_missing)); ?> to improve your qualification assessment. Missing details are never assumed.</p>
-            </div>
-            <button type="button" data-review-profile="<?php echo $profile_h($profile_review_target); ?>">Review missing information</button>
-          </div>
-          <?php endif; ?>
 
           <div class="ui-profile-overview-stats" aria-label="Profile record summary">
             <div><span>Education</span><strong><?php echo count($education_data); ?></strong><small><?php echo count($education_data) === 1 ? 'record' : 'records'; ?></small></div>
@@ -148,7 +136,7 @@ $profile_skill_levels = ['', 'Beginner', 'Novice', 'Intermediate', 'Advanced', '
                   <p><strong><?php echo $profile_h($education['institution'] ?: 'Institution not provided'); ?></strong><?php if (!empty($education['field_of_study'])): ?><span><?php echo $profile_h($education['field_of_study']); ?></span><?php endif; ?></p>
                   <p><i class="ri-calendar-line"></i><?php echo $profile_h($year_display); ?><?php if (!empty($education['gpa'])): ?><span>GPA <?php echo $profile_h($education['gpa']); ?></span><?php endif; ?></p>
                 </div>
-                <?php if ($level === 'master' && $status === 'ongoing' && $education['completed_units'] !== null && $education['completed_units'] !== ''): ?>
+                <?php if ($level === 'master' && $education['completed_units'] !== null && $education['completed_units'] !== ''): ?>
                   <div class="ui-profile-inline-fact"><span>Completed Master's Units</span><strong><?php echo $profile_h($education['completed_units']); ?> units</strong></div>
                 <?php endif; ?>
                 <?php if (!empty($education['certificate_of_grades']) || !empty($education['proof_of_enrollment'])): ?>
@@ -180,8 +168,8 @@ $profile_skill_levels = ['', 'Beginner', 'Novice', 'Intermediate', 'Advanced', '
             <?php endif; ?>
           </div>
           <div class="ui-profile-assessment">
-            <div><span>Qualification assessment</span><strong><?php echo $profile_h($qualification_summary['title']); ?></strong><p><?php echo $profile_h($qualification_summary['note']); ?></p></div>
-            <div><span>Projected compensation</span><strong><?php echo $profile_h($qualification_summary['rate']); ?><sup>*</sup></strong><p>*<?php echo $profile_h($qualification_projection['disclaimer']); ?></p></div>
+            <div><span>Qualification assessment</span><strong id="profileQualificationTitle"><?php echo $profile_h($qualification_summary['title']); ?></strong><p id="profileQualificationNote"><?php echo $profile_h($qualification_summary['note']); ?></p></div>
+            <div><span>Projected compensation</span><strong id="profileQualificationRate"><?php echo $profile_h($qualification_summary['rate']); ?><sup>*</sup></strong><p id="profileQualificationDisclaimer">*<?php echo $profile_h($qualification_projection['disclaimer']); ?></p></div>
           </div>
         </section>
 

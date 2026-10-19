@@ -195,6 +195,53 @@ if (!function_exists('nc_find_graduate_unit_rate_rule')) {
     }
 }
 
+if (!function_exists('nc_find_configured_graduate_unit_rate_rule')) {
+    function nc_find_configured_graduate_unit_rate_rule(array $configuration, string $qualificationKey, int $completedUnits): ?array
+    {
+        $rules = $configuration['graduate_unit_rate_rules'][$qualificationKey] ?? [];
+        if (!is_array($rules)) {
+            return null;
+        }
+
+        $matches = [];
+        foreach ($rules as $rule) {
+            if (!is_array($rule)) {
+                continue;
+            }
+            $minimum = filter_var($rule['minimum_units'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+            $maximum = ($rule['maximum_units'] ?? null) === null
+                ? null
+                : filter_var($rule['maximum_units'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+            $rate = $rule['hourly_rate'] ?? null;
+            if ($minimum === false || $maximum === false || !is_numeric($rate) || (float)$rate <= 0) {
+                continue;
+            }
+            if ($completedUnits >= $minimum && ($maximum === null || $completedUnits <= $maximum)) {
+                $rule['minimum_units'] = $minimum;
+                $rule['maximum_units'] = $maximum;
+                $matches[] = $rule;
+            }
+        }
+
+        if (!$matches) {
+            return null;
+        }
+        usort($matches, static fn(array $left, array $right): int => $right['minimum_units'] <=> $left['minimum_units']);
+        return $matches[0];
+    }
+}
+
+if (!function_exists('nc_normalize_completed_units')) {
+    function nc_normalize_completed_units($value): ?int
+    {
+        if ($value === null || $value === '' || is_bool($value)) {
+            return null;
+        }
+        $units = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+        return $units === false ? null : (int)$units;
+    }
+}
+
 if (!function_exists('nc_classify_education_level')) {
     function nc_classify_education_level(array $education): string
     {
@@ -448,9 +495,7 @@ if (!function_exists('nc_calculate_salary_projection_from_education')) {
         foreach ($educationRows as $row) {
             $level = $row['education_level'] ?? nc_classify_education_level($row);
             $status = strtolower(trim((string)($row['education_status'] ?? '')));
-            $units = isset($row['completed_units']) && $row['completed_units'] !== null && $row['completed_units'] !== ''
-                ? (int)$row['completed_units']
-                : null;
+            $units = nc_normalize_completed_units($row['completed_units'] ?? null);
 
             if ($level === 'doctorate' && $status === 'completed') {
                 $hasCompletedDoctorate = true;
@@ -474,14 +519,35 @@ if (!function_exists('nc_calculate_salary_projection_from_education')) {
 
         $rateConfiguration = $configuration['part_time_rates'][$qualificationKey] ?? null;
         $unitRateRule = null;
-        if ($qualificationKey === 'master_ongoing' && $ongoingMasterUnits !== null && $conn instanceof mysqli) {
-            $unitRateRule = nc_find_graduate_unit_rate_rule($conn, $qualificationKey, $ongoingMasterUnits);
+        if ($qualificationKey === 'master_ongoing' && $ongoingMasterUnits === null) {
+            $result['qualification_key'] = $qualificationKey;
+            $result['qualification'] = is_array($rateConfiguration)
+                ? (string)($rateConfiguration['label'] ?? "Master's — Ongoing")
+                : "Master's — Ongoing";
+            $result['master_status'] = 'Ongoing';
+            $result['projection_basis'] = "Rate to be determined: completed Master's units have not been validly declared.";
+            return $result;
+        }
+        if ($qualificationKey === 'master_ongoing') {
+            if ($conn instanceof mysqli) {
+                $unitRateRule = nc_find_graduate_unit_rate_rule($conn, $qualificationKey, $ongoingMasterUnits);
+            }
+            if (!$unitRateRule) {
+                $unitRateRule = nc_find_configured_graduate_unit_rate_rule($configuration, $qualificationKey, $ongoingMasterUnits);
+            }
             if ($unitRateRule) {
                 $rateConfiguration = [
-                    'label' => "Master's - Ongoing",
+                    'label' => "Master's — Ongoing",
                     'hourly_rate' => $unitRateRule['hourly_rate'],
                 ];
-                $result['graduate_unit_rate_rule_id'] = (int)$unitRateRule['id'];
+                if (isset($unitRateRule['id'])) {
+                    $result['graduate_unit_rate_rule_id'] = (int)$unitRateRule['id'];
+                }
+            } else {
+                $rateConfiguration = [
+                    'label' => "Master's — Ongoing",
+                    'hourly_rate' => null,
+                ];
             }
         }
         $rate = is_array($rateConfiguration) ? ($rateConfiguration['hourly_rate'] ?? null) : $rateConfiguration;
@@ -499,7 +565,7 @@ if (!function_exists('nc_calculate_salary_projection_from_education')) {
             ? (string)($rateConfiguration['label'] ?? ucwords(str_replace('_', ' ', $qualificationKey)))
             : ucwords(str_replace('_', ' ', $qualificationKey));
         if ($qualificationKey === 'master_ongoing' && $ongoingMasterUnits !== null) {
-            $qualification .= ' (' . $ongoingMasterUnits . ' completed units)';
+            $qualification .= ' (' . $ongoingMasterUnits . ' Units)';
         }
 
         $rateDisplay = nc_format_money($rate, $currencySymbol) . '/hour';

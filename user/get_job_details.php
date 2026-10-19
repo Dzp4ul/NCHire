@@ -3,6 +3,7 @@ session_start();
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../shared/helpers/recruitment.php';
+require_once __DIR__ . '/../shared/helpers/dynamic_application_requirements.php';
 
 $host = "127.0.0.1";
 $user = "root";
@@ -106,6 +107,7 @@ try {
             'application_id' => $application_id,
             'application_status' => $application_status,
             'salary_projection' => $salaryProjection,
+            'application_requirements' => nc_get_teaching_load_requirements($conn, (int)$job['id'], true),
         ]
     ]);
 } catch (Throwable $e) {

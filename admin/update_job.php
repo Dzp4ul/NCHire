@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../shared/helpers/recruitment.php';
+require_once __DIR__ . '/../shared/helpers/dynamic_application_requirements.php';
 $host = "127.0.0.1";
 $user = "root";
 $pass = "";
@@ -34,6 +35,16 @@ if ($id <= 0) {
     echo json_encode(['success' => false, 'message' => 'A valid teaching load ID is required.']);
     exit;
 }
+$existingJobStmt = $conn->prepare('SELECT id, department_role FROM job WHERE id = ? LIMIT 1');
+$existingJobStmt->bind_param('i', $id);
+$existingJobStmt->execute();
+$existingJob = $existingJobStmt->get_result()->fetch_assoc();
+$existingJobStmt->close();
+if (!$existingJob) {
+    http_response_code(404);
+    echo json_encode(['success' => false, 'message' => 'Teaching load not found.']);
+    exit;
+}
 $title = trim($data['job_title'] ?? '');
 $department = $data['department_role'] ?? '';
 if ($department === 'Computer Science') {
@@ -45,6 +56,52 @@ $salary= trim($data['salary_range'] ?? '');
 $deadline = trim($data['application_deadline'] ?? '');
 $desc  = trim($data['job_description'] ?? '');
 $requirements = trim($data['job_requirements'] ?? '');
+$hasApplicationRequirements = array_key_exists('application_requirements', $data);
+$applicationRequirements = null;
+$requirementChangeSummary = [];
+$applicantCount = 0;
+if ($hasApplicationRequirements) {
+    $sessionToken = (string)($_SESSION['csrf_token'] ?? '');
+    $requestToken = (string)($data['csrf_token'] ?? '');
+    if ($sessionToken === '' || $requestToken === '' || !hash_equals($sessionToken, $requestToken)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Your session token expired. Refresh the page and try again.']);
+        exit;
+    }
+    $adminRole = (string)($_SESSION['admin_role'] ?? '');
+    $adminDepartment = (string)($_SESSION['admin_department'] ?? '');
+    if (!nc_admin_can_manage_requirements($adminRole, $adminDepartment, (string)$existingJob['department_role'])
+        || !nc_admin_can_manage_requirements($adminRole, $adminDepartment, (string)$department)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Only the Secretary or the Dean for this department may manage application requirements.']);
+        exit;
+    }
+    try {
+        $applicationRequirements = nc_validate_requirement_payload($data['application_requirements']);
+    } catch (InvalidArgumentException $e) {
+        http_response_code(422);
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        exit;
+    }
+    $existingRequirements = nc_get_teaching_load_requirements($conn, $id, false);
+    $requirementChangeSummary = nc_requirements_change_summary($existingRequirements, $applicationRequirements);
+    $countStmt = $conn->prepare('SELECT COUNT(*) AS total FROM job_applicants WHERE job_id = ?');
+    $countStmt->bind_param('i', $id);
+    $countStmt->execute();
+    $applicantCount = (int)($countStmt->get_result()->fetch_assoc()['total'] ?? 0);
+    $countStmt->close();
+    if ($applicantCount > 0 && $requirementChangeSummary && empty($data['confirm_requirement_changes'])) {
+        http_response_code(409);
+        echo json_encode([
+            'success' => false,
+            'confirmation_required' => true,
+            'affected_applicants' => $applicantCount,
+            'changes' => $requirementChangeSummary,
+            'message' => 'These changes affect document completion for existing applicants. Their uploaded files and recruitment stages will be preserved.',
+        ]);
+        exit;
+    }
+}
 
 // Additional fields
 $education = trim($data['education'] ?? '');
@@ -53,20 +110,6 @@ $training = trim($data['training'] ?? '');
 $eligibility = trim($data['eligibility'] ?? '');
 $duties = trim($data['duties'] ?? '');
 $competency = trim($data['competency'] ?? '');
-$minimum_education_level = trim($data['minimum_education_level'] ?? '') ?: null;
-$required_degree_fields = trim($data['required_degree_fields'] ?? '');
-$graduate_requirement = trim($data['graduate_requirement'] ?? '') ?: null;
-$minimum_graduate_units = ($data['minimum_graduate_units'] ?? '') !== '' ? max(0, min(200, (int)$data['minimum_graduate_units'])) : null;
-$minimum_experience_years = ($data['minimum_experience_years'] ?? '') !== '' ? max(0, min(60, (float)$data['minimum_experience_years'])) : null;
-$teaching_experience_requirement = trim($data['teaching_experience_requirement'] ?? '') ?: null;
-$required_skills = trim($data['required_skills'] ?? '');
-$required_certifications = trim($data['required_certifications'] ?? '');
-$required_licenses = trim($data['required_licenses'] ?? '');
-$required_training = trim($data['required_training'] ?? '');
-$preferred_qualifications = trim($data['preferred_qualifications'] ?? '');
-if ($minimum_education_level !== null && !in_array($minimum_education_level, ['high_school','associate','bachelor','master','doctorate'], true)) $minimum_education_level = null;
-if ($graduate_requirement !== null && !in_array($graduate_requirement, ['none','preferred','master_required','doctorate_required'], true)) $graduate_requirement = null;
-if ($teaching_experience_requirement !== null && !in_array($teaching_experience_requirement, ['not_required','preferred','required'], true)) $teaching_experience_requirement = null;
 
 $subject_code = trim($data['subject_code'] ?? '');
 $subject = trim($data['subject'] ?? '');
@@ -143,21 +186,11 @@ try {
             $meta_stmt->close();
         }
     }
-    if (nc_column_exists($conn, 'job', 'minimum_education_level')) {
-        $ranking_sql = "UPDATE job SET minimum_education_level=?, required_degree_fields=?, graduate_requirement=?, minimum_graduate_units=?, minimum_experience_years=?, teaching_experience_requirement=?, required_skills=?, required_certifications=?, required_licenses=?, required_training=?, preferred_qualifications=? WHERE id=?";
-        $ranking_stmt = $conn->prepare($ranking_sql);
-        if ($ranking_stmt) {
-            $ranking_stmt->bind_param('sssidssssssi', $minimum_education_level, $required_degree_fields, $graduate_requirement, $minimum_graduate_units, $minimum_experience_years, $teaching_experience_requirement, $required_skills, $required_certifications, $required_licenses, $required_training, $preferred_qualifications, $id);
-            $ranking_stmt->execute();
-            $ranking_stmt->close();
-        }
-    }
-    if (nc_table_exists($conn, 'candidate_rankings')) {
-        $invalidate_stmt = $conn->prepare("UPDATE candidate_rankings SET input_hash=REPEAT('0',64), ai_status='stale', updated_at=NOW() WHERE job_posting_id=?");
-        if ($invalidate_stmt) {
-            $invalidate_stmt->bind_param('i', $id);
-            $invalidate_stmt->execute();
-            $invalidate_stmt->close();
+    $notifiedApplicants = 0;
+    if ($hasApplicationRequirements) {
+        $newlyRequired = nc_sync_teaching_load_requirements($conn, $id, $applicationRequirements);
+        if ($applicantCount > 0 && $newlyRequired) {
+            $notifiedApplicants = nc_notify_new_required_documents($conn, $id, $newlyRequired);
         }
     }
     // Log the activity with admin name
@@ -171,7 +204,12 @@ try {
     $stmt->close();
 
     $conn->commit();
-    echo json_encode(["success" => true]);
+    echo json_encode([
+        "success" => true,
+        'requirements_changed' => $hasApplicationRequirements,
+        'affected_applicants' => $applicantCount,
+        'applicants_notified' => $notifiedApplicants ?? 0,
+    ]);
 } catch (Throwable $e) {
     $conn->rollback();
     error_log('update_job.php error: ' . $e->getMessage());

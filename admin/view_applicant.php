@@ -3,6 +3,7 @@ session_start();
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../shared/helpers/recruitment.php';
+require_once __DIR__ . '/../shared/helpers/dynamic_application_requirements.php';
 
 if (empty($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     http_response_code(401);
@@ -110,6 +111,16 @@ if (!empty($applicant['job_id'])) {
     }
 }
 
+$requirement_completion = !empty($applicant['job_id'])
+    ? nc_requirement_completion($conn, (int)$applicant['id'], (int)$applicant['job_id'])
+    : ['requirements' => [], 'required_total' => 0, 'required_complete' => 0, 'required_remaining' => 0, 'is_complete' => true, 'missing' => []];
+foreach ($requirement_completion['requirements'] as &$requirement) {
+    if (!empty($requirement['submission']['id'])) {
+        $requirement['submission']['download_url'] = '../user/download_requirement.php?submission_id=' . (int)$requirement['submission']['id'];
+    }
+}
+unset($requirement);
+
 // Get work experience data
 $experience = [];
 if ($user_id) {
@@ -165,7 +176,14 @@ echo json_encode([
     'skills' => $skills_by_category,
     'qualifications' => $qualifications,
     'job' => $job,
-    'salary_projection' => $salary_projection
+    'salary_projection' => $salary_projection,
+    'application_requirements' => $requirement_completion['requirements'],
+    'requirements_completion' => [
+        'required_total' => $requirement_completion['required_total'],
+        'required_complete' => $requirement_completion['required_complete'],
+        'required_remaining' => $requirement_completion['required_remaining'],
+        'is_complete' => $requirement_completion['is_complete'],
+    ]
 ]);
 
 $conn->close();

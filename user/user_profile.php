@@ -438,7 +438,9 @@ function profileEducationLevelLabel(string $level): string
 
 $qualification_projection = nc_calculate_salary_projection_from_education(
     $education_data,
-    ['job_type' => 'Part-time']
+    ['job_type' => 'Part-time'],
+    null,
+    $conn
 );
 $qualification_summary = [
     'title' => $qualification_projection['qualification'],
@@ -486,44 +488,10 @@ if ($qualifications_table && $qualifications_table->num_rows > 0) {
     $qualifications_stmt->close();
 }
 
-$ranking_profile_missing = [];
-if (empty($education_data)) {
-    $ranking_profile_missing[] = 'education';
-} else {
-    foreach ($education_data as $education_row) {
-        $ongoingGraduate = ($education_row['education_status'] ?? '') === 'ongoing' && in_array(($education_row['education_level'] ?? ''), ['master', 'doctorate'], true);
-        if (empty($education_row['degree']) || empty($education_row['field_of_study']) || empty($education_row['institution']) || ($ongoingGraduate && !is_numeric($education_row['completed_units'] ?? null))) {
-            $ranking_profile_missing[] = 'complete education details';
-            break;
-        }
-    }
-}
-if (empty($experience_data)) {
-    $ranking_profile_missing[] = 'work experience';
-} else {
-    foreach ($experience_data as $experience_row) {
-        if (empty($experience_row['job_title']) || empty($experience_row['start_date']) || (empty($experience_row['is_current']) && empty($experience_row['end_date']))) {
-            $ranking_profile_missing[] = 'complete work-experience dates';
-            break;
-        }
-    }
-}
-if (empty($skills_data)) $ranking_profile_missing[] = 'skills';
-if (empty($qualifications_data)) $ranking_profile_missing[] = 'certifications, licenses, or training (when applicable)';
-
 $profile_display_name = trim(($applicant['applicant_fname'] ?? '') . ' ' . ($applicant['applicant_lname'] ?? ''));
 $profile_initials = '';
 if (!empty($applicant['applicant_fname'])) $profile_initials .= strtoupper(substr($applicant['applicant_fname'], 0, 1));
 if (!empty($applicant['applicant_lname'])) $profile_initials .= strtoupper(substr($applicant['applicant_lname'], 0, 1));
-$profile_review_target = 'education';
-foreach ($ranking_profile_missing as $missing_item) {
-    if (stripos($missing_item, 'work') !== false) { $profile_review_target = 'experience'; break; }
-    if (stripos($missing_item, 'skill') !== false) { $profile_review_target = 'skills'; break; }
-    if (stripos($missing_item, 'certification') !== false || stripos($missing_item, 'license') !== false) { $profile_review_target = 'qualifications'; break; }
-}
-$profile_readiness_label = empty($ranking_profile_missing)
-    ? 'Ready for review'
-    : count($ranking_profile_missing) . ' ' . (count($ranking_profile_missing) === 1 ? 'area' : 'areas') . ' to review';
 $account_status_label = !empty($applicant['is_verified']) ? 'Verified' : 'Verification pending';
 ?>
 <html lang="en">
@@ -1156,7 +1124,6 @@ if (document.getElementById('profileMainContent')) {
       ? `${edu.start_year || ''} – Present`
       : `${edu.start_year || ''} – ${edu.year_completed || edu.end_year || ''}`;
     const hasCompletedMastersUnits = level === 'master'
-      && status === 'ongoing'
       && edu.completed_units !== null
       && edu.completed_units !== undefined
       && edu.completed_units !== '';
@@ -1222,11 +1189,38 @@ if (document.getElementById('profileMainContent')) {
         console.log('No education data, showing empty state');
         educationList.innerHTML = `<div class="ui-profile-empty"><i class="ri-graduation-cap-line"></i><div><strong>No education added yet</strong><p>Add your academic background so NCHire can assess teaching-load qualifications.</p></div><button type="button" onclick="document.getElementById('addEducationBtn').click()">Add Education</button></div>`;
       }
+      if (result.qualification_projection) {
+        updateQualificationAssessment(result.qualification_projection);
+      }
     }
   } catch (error) {
     console.error('Error reloading education list:', error);
   }
   };
+
+  function updateQualificationAssessment(projection) {
+    if (!projection) return;
+    const title = projection.qualification || 'No applicable graduate qualification recorded';
+    const rate = projection.rate_display || 'Rate to be determined';
+    const targets = {
+      profileGraduateQualification: title,
+      profileQualificationTitle: title,
+      profileQualificationNote: projection.projection_basis || 'Rate to be determined.',
+      profileQualificationDisclaimer: `*${projection.disclaimer || 'Guide only—not the actual salary.'}`
+    };
+    Object.entries(targets).forEach(([id, value]) => {
+      const element = document.getElementById(id);
+      if (element) element.textContent = value;
+    });
+    const rateElement = document.getElementById('profileQualificationRate');
+    if (rateElement) {
+      rateElement.textContent = `Projected part-time rate: ${rate}`;
+      const marker = document.createElement('sup');
+      marker.textContent = '*';
+      rateElement.appendChild(marker);
+    }
+  }
+  window.updateQualificationAssessment = updateQualificationAssessment;
 
   // Function to reload experience list
   window.reloadExperienceList = async function() {
@@ -1383,7 +1377,9 @@ function initializeProfileModalHandlers() {
   function updateEducationGraduateFields() {
     const level = document.getElementById('education_level')?.value || 'bachelor';
     const status = document.getElementById('education_status')?.value || 'completed';
-    const isGraduateOngoing = level === 'master' && status === 'ongoing';
+    const isMasters = level === 'master';
+    const isGraduateOngoing = isMasters && status === 'ongoing';
+    const mastersUnitsGroup = document.getElementById('mastersUnitsGroup');
     const graduateDocumentsGroup = document.getElementById('graduateDocumentsGroup');
     const endYearInput = document.getElementById('ed_ey');
     const yearCompletedInput = document.getElementById('year_completed');
@@ -1391,6 +1387,7 @@ function initializeProfileModalHandlers() {
     const certificateInput = document.getElementById('certificate_of_grades');
     const proofInput = document.getElementById('proof_of_enrollment');
 
+    if (mastersUnitsGroup) mastersUnitsGroup.classList.toggle('hidden', !isMasters);
     if (graduateDocumentsGroup) graduateDocumentsGroup.classList.toggle('hidden', !isGraduateOngoing);
 
     if (endYearInput) {
@@ -1403,8 +1400,8 @@ function initializeProfileModalHandlers() {
     }
     if (completedUnitsInput) {
       completedUnitsInput.required = isGraduateOngoing;
-      completedUnitsInput.disabled = !isGraduateOngoing;
-      if (!isGraduateOngoing) completedUnitsInput.value = '';
+      completedUnitsInput.disabled = !isMasters;
+      if (!isMasters) completedUnitsInput.value = '';
     }
     if (certificateInput) certificateInput.required = isGraduateOngoing && !document.getElementById('edit_education_id')?.value;
     if (proofInput) proofInput.required = isGraduateOngoing && !document.getElementById('edit_education_id')?.value;
@@ -1647,6 +1644,9 @@ function initializeProfileModalHandlers() {
       .then(data => {
         if (data.success) {
           showToast(data.message || 'Education saved successfully.', 'success');
+          if (data.qualification_projection && typeof window.updateQualificationAssessment === 'function') {
+            window.updateQualificationAssessment(data.qualification_projection);
+          }
           educationForm.reset();
           document.getElementById('edit_education_id').value = '';
           document.getElementById('educationModalTitle').textContent = 'Add Education';
@@ -2104,13 +2104,16 @@ window.showNotification = showNotification;
         <label class="block text-sm font-medium text-gray-700 mb-2" for="ed_gpa">GPA (Optional)</label>
         <input type="text" name="ed_gpa" id="ed_gpa" placeholder="3.8/4.0" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
       </div>
-      <div id="graduateDocumentsGroup" class="hidden ui-profile-modal__supporting ui-profile-modal__wide">
-        <div class="ui-profile-modal__section-title"><span>Supporting Documents</span></div>
+      <div id="mastersUnitsGroup" class="hidden ui-profile-modal__supporting ui-profile-modal__wide">
+        <div class="ui-profile-modal__section-title"><span>Master's Progress</span></div>
         <div class="mb-4">
           <label class="block text-sm font-medium text-gray-700 mb-2" for="completed_units">Completed Master's Units</label>
           <input type="number" name="completed_units" id="completed_units" min="0" step="1" inputmode="numeric" placeholder="e.g., 24" class="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
           <p class="text-xs text-gray-500 mt-2">Enter the completed units shown in your Certificate of Grades.</p>
         </div>
+      </div>
+      <div id="graduateDocumentsGroup" class="hidden ui-profile-modal__supporting ui-profile-modal__wide">
+        <div class="ui-profile-modal__section-title"><span>Supporting Documents</span></div>
         <div class="ui-profile-modal__grid">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2" for="certificate_of_grades">Certificate of Grades</label>
@@ -2121,7 +2124,7 @@ window.showNotification = showNotification;
             <input type="file" name="proof_of_enrollment" id="proof_of_enrollment" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" class="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm">
           </div>
         </div>
-        <p class="text-xs text-gray-500 mt-3">Completed units, Certificate of Grades, and Proof of Enrollment are required for ongoing Master's education. Accepted formats: PDF, DOC, DOCX, JPG, PNG. Maximum size: 5MB per file.</p>
+        <p class="text-xs text-gray-500 mt-3">Certificate of Grades and Proof of Enrollment are required for ongoing Master's education. Accepted formats: PDF, DOC, DOCX, JPG, PNG. Maximum size: 5MB per file.</p>
       </div>
       <div class="ui-profile-modal__footer ui-profile-modal__wide">
         <button type="button" id="cancelEducationBtn" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors !rounded-button">Cancel</button>
@@ -2411,15 +2414,10 @@ function deleteEducation(id) {
     .then(data => {
       if (data.success) {
         showNotification(data.message, 'success');
-        // Remove item from DOM immediately
-        const educationItems = document.querySelectorAll('#educationList > div');
-        educationItems.forEach(item => {
-          if (item.querySelector(`button[onclick="deleteEducation(${id})"]`)) {
-            item.style.opacity = '0';
-            item.style.transform = 'translateX(-20px)';
-            setTimeout(() => item.remove(), 300);
-          }
-        });
+        if (data.qualification_projection && typeof window.updateQualificationAssessment === 'function') {
+          window.updateQualificationAssessment(data.qualification_projection);
+        }
+        if (typeof window.reloadEducationList === 'function') window.reloadEducationList();
       } else {
         showNotification('Error: ' + data.message, 'error');
       }

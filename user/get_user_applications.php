@@ -3,6 +3,8 @@ session_start();
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../shared/helpers/recruitment.php';
+require_once __DIR__ . '/../shared/helpers/application_documents.php';
+require_once __DIR__ . '/../shared/helpers/dynamic_application_requirements.php';
 
 // Enable error logging
 error_log("=== GET_USER_APPLICATIONS.PHP CALLED ===");
@@ -45,11 +47,11 @@ if (!$user_id && !$user_email) {
 try {
     if ($user_id) {
         error_log("Querying by user_id: " . $user_id);
-        $stmt = $conn->prepare("SELECT ja.*, j.job_type AS projection_job_type, j.salary_grade AS projection_salary_grade, j.salary_range AS projection_salary_range, j.teaching_hours_per_week AS projection_teaching_hours FROM job_applicants ja LEFT JOIN job j ON j.id = ja.job_id WHERE ja.user_id = ? ORDER BY ja.applied_date DESC, ja.id DESC");
+        $stmt = $conn->prepare("SELECT ja.*, j.subject_code AS course_code, j.subject_name AS course_name, j.job_title AS job_title, j.job_type AS projection_job_type, j.salary_grade AS projection_salary_grade, j.salary_range AS projection_salary_range, j.teaching_hours_per_week AS projection_teaching_hours FROM job_applicants ja LEFT JOIN job j ON j.id = ja.job_id WHERE ja.user_id = ? ORDER BY ja.applied_date DESC, ja.id DESC");
         $stmt->bind_param("i", $user_id);
     } else {
         error_log("Querying by email: " . $user_email);
-        $stmt = $conn->prepare("SELECT ja.*, j.job_type AS projection_job_type, j.salary_grade AS projection_salary_grade, j.salary_range AS projection_salary_range, j.teaching_hours_per_week AS projection_teaching_hours FROM job_applicants ja LEFT JOIN job j ON j.id = ja.job_id WHERE ja.applicant_email = ? ORDER BY ja.applied_date DESC, ja.id DESC");
+        $stmt = $conn->prepare("SELECT ja.*, j.subject_code AS course_code, j.subject_name AS course_name, j.job_title AS job_title, j.job_type AS projection_job_type, j.salary_grade AS projection_salary_grade, j.salary_range AS projection_salary_range, j.teaching_hours_per_week AS projection_teaching_hours FROM job_applicants ja LEFT JOIN job j ON j.id = ja.job_id WHERE ja.applicant_email = ? ORDER BY ja.applied_date DESC, ja.id DESC");
         $stmt->bind_param("s", $user_email);
     }
 
@@ -73,9 +75,28 @@ try {
         $projectionDetails = $projectionUserId > 0
             ? nc_calculate_salary_projection($conn, $projectionUserId, $projectionJob)
             : nc_calculate_salary_projection_from_education([], $projectionJob);
+        $attachmentCount = 0;
+        foreach (nc_application_document_definitions() as $field => $definition) {
+            $attachmentCount += count(nc_document_file_names(
+                $row[$field] ?? null,
+                (bool)($definition['multiple'] ?? false)
+            ));
+        }
+        $requirementCompletion = !empty($row['job_id'])
+            ? nc_requirement_completion($conn, (int)$row['id'], (int)$row['job_id'])
+            : ['required_total' => 0, 'required_complete' => 0, 'required_remaining' => 0, 'is_complete' => true, 'requirements' => []];
+        if (!empty($requirementCompletion['requirements'])) {
+            $attachmentCount = count(array_filter(
+                $requirementCompletion['requirements'],
+                static fn(array $requirement): bool => !empty($requirement['submission'])
+            ));
+        }
         $applications[] = [
             'id' => (int)$row['id'],
             'position' => $row['position'] ?? 'Unknown Position',
+            'course_code' => $row['course_code'] ?? null,
+            'course_name' => $row['course_name'] ?? null,
+            'job_title' => $row['job_title'] ?? null,
             'job_id' => $row['job_id'] ?? null,
             'applied_date' => $row['applied_date'],
             'applied_date_pretty' => $row['applied_date'] ? date('M d, Y', strtotime($row['applied_date'])) : null,
@@ -111,6 +132,13 @@ try {
             'salary_projection' => $row['salary_projection'] ?? null,
             'salary_projection_basis' => $row['salary_projection_basis'] ?? null,
             'salary_projection_details' => $projectionDetails,
+            'attachment_count' => $attachmentCount,
+            'requirements_completion' => [
+                'required_total' => $requirementCompletion['required_total'],
+                'required_complete' => $requirementCompletion['required_complete'],
+                'required_remaining' => $requirementCompletion['required_remaining'],
+                'is_complete' => $requirementCompletion['is_complete'],
+            ],
         ];
     }
 

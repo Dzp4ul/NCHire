@@ -85,25 +85,25 @@ try {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
 
-    // Preserve the existing approved flat ongoing-Master's rate as the broad
-    // fallback band. Administrators can split this into narrower bands later.
+    // Seed the approved ongoing-Master's unit bands for new installations.
     $salaryConfig = nc_salary_configuration();
-    $ongoingRateConfig = $salaryConfig['part_time_rates']['master_ongoing'] ?? null;
-    $ongoingRate = is_array($ongoingRateConfig) ? ($ongoingRateConfig['hourly_rate'] ?? null) : $ongoingRateConfig;
-    if (is_numeric($ongoingRate) && (float)$ongoingRate >= 0) {
+    $ongoingRateRules = $salaryConfig['graduate_unit_rate_rules']['master_ongoing'] ?? [];
+    foreach ($ongoingRateRules as $ongoingRateRule) {
         $qualificationKey = 'master_ongoing';
-        $minimumUnits = 0;
-        $sourceNote = 'Migrated from the existing NCHire ongoing Master\'s rate configuration.';
+        $minimumUnits = (int)$ongoingRateRule['minimum_units'];
+        $maximumUnits = $ongoingRateRule['maximum_units'] === null ? null : (int)$ongoingRateRule['maximum_units'];
+        $rate = (float)$ongoingRateRule['hourly_rate'];
+        $sourceNote = 'Approved NCHire ongoing Master\'s completed-unit salary band.';
         $rateStmt = $conn->prepare("
             INSERT INTO graduate_unit_rate_rules (qualification_key, minimum_units, maximum_units, hourly_rate, source_note)
-            SELECT ?, ?, NULL, ?, ?
+            SELECT ?, ?, ?, ?, ?
             WHERE NOT EXISTS (
                 SELECT 1 FROM graduate_unit_rate_rules
-                WHERE qualification_key = ? AND minimum_units = ? AND maximum_units IS NULL
+                WHERE qualification_key = ? AND minimum_units = ?
+                  AND (maximum_units = ? OR (maximum_units IS NULL AND ? IS NULL))
             )
         ");
-        $rate = (float)$ongoingRate;
-        $rateStmt->bind_param('sidssi', $qualificationKey, $minimumUnits, $rate, $sourceNote, $qualificationKey, $minimumUnits);
+        $rateStmt->bind_param('siidssiii', $qualificationKey, $minimumUnits, $maximumUnits, $rate, $sourceNote, $qualificationKey, $minimumUnits, $maximumUnits, $maximumUnits);
         if (!$rateStmt->execute()) {
             throw new RuntimeException('Failed seeding the ongoing Master\'s rate rule: ' . $rateStmt->error);
         }

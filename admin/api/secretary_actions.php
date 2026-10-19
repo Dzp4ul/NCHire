@@ -32,6 +32,7 @@ try {
         throw new Exception('Database config file not found');
     }
     require_once $db_file;
+    require_once __DIR__ . '/../../shared/helpers/dynamic_application_requirements.php';
     
     if (!isset($conn)) {
         throw new Exception('Database connection not established');
@@ -115,6 +116,20 @@ if (($application['workflow_stage'] ?? '') !== 'secretary_review') {
         'message' => 'This action is available only while the application is under Secretary review.',
     ]);
     exit();
+}
+
+if ($action === 'transfer_to_dept_head' && !empty($application['job_id'])) {
+    $completion = nc_requirement_completion($conn, (int)$application_id, (int)$application['job_id']);
+    if (!$completion['is_complete']) {
+        http_response_code(422);
+        echo json_encode([
+            'success' => false,
+            'message' => $completion['required_remaining'] . ' required document' . ($completion['required_remaining'] === 1 ? ' is' : 's are') . ' still missing. Request the documents before transferring this application.',
+            'required_remaining' => $completion['required_remaining'],
+            'missing_requirements' => array_map(static fn(array $row): string => $row['requirement_name'], $completion['missing']),
+        ]);
+        exit();
+    }
 }
 
 switch ($action) {

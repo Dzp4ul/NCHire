@@ -3,6 +3,7 @@ session_start();
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../shared/helpers/recruitment.php';
+require_once __DIR__ . '/../shared/helpers/dynamic_application_requirements.php';
 
 // Database connection
 $host = "127.0.0.1";
@@ -100,6 +101,16 @@ if (!empty($application['job_id']) && !empty($application['user_id'])) {
     }
 }
 $application['salary_projection_details'] = $salary_projection;
+$requirement_completion = !empty($application['job_id'])
+    ? nc_requirement_completion($conn, (int)$application['id'], (int)$application['job_id'])
+    : ['requirements' => [], 'required_total' => 0, 'required_complete' => 0, 'required_remaining' => 0, 'is_complete' => true, 'missing' => []];
+$application['application_requirements'] = $requirement_completion['requirements'];
+$application['requirements_completion'] = [
+    'required_total' => $requirement_completion['required_total'],
+    'required_complete' => $requirement_completion['required_complete'],
+    'required_remaining' => $requirement_completion['required_remaining'],
+    'is_complete' => $requirement_completion['is_complete'],
+];
 
 // Get skills for this application's user
 $skills = [];
@@ -120,7 +131,8 @@ echo json_encode([
     'work_experience' => $work_experience,
     'education' => $education,
     'skills' => $skills,
-    'salary_projection' => $salary_projection
+    'salary_projection' => $salary_projection,
+    'requirements_completion' => $requirement_completion
 ]);
 
 $stmt->close();
