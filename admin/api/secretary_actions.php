@@ -25,6 +25,9 @@ if ($admin_role !== 'Secretary') {
     exit();
 }
 
+require_once __DIR__ . '/../../config/auth.php';
+requireAdminApiAuth();
+
 // Try to connect to database
 try {
     $db_file = __DIR__ . '/../../config/db.php';

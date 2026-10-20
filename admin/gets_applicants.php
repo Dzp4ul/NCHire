@@ -9,7 +9,7 @@ if (empty($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true
 }
 
 // Database connection parameters
-$host = 'localhost';
+$host = '127.0.0.1';
 $dbname = 'nchire';
 $username = 'root';
 $password = '';

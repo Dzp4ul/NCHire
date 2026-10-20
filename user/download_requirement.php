@@ -40,25 +40,42 @@ if (!$authorized) {
     exit('Access denied.');
 }
 
-$filePath = trim(explode(',', (string)$document['file_path'])[0]);
-if ($document['storage_area'] === 'requirements') {
-    $base = realpath(__DIR__ . '/uploads/requirements');
-    $candidate = realpath(__DIR__ . '/uploads/requirements/' . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $filePath));
-} else {
-    $base = realpath(__DIR__ . '/uploads');
-    $legacyPath = str_replace('\\', '/', $filePath);
-    if (str_starts_with($legacyPath, 'uploads/')) {
-        $candidate = realpath(__DIR__ . '/' . str_replace('/', DIRECTORY_SEPARATOR, $legacyPath));
-    } else {
-        $candidate = realpath(__DIR__ . '/uploads/' . basename($legacyPath));
+$rawPath = trim((string)$document['file_path']);
+$pathCandidates = [$rawPath];
+$firstPath = trim(explode(',', $rawPath)[0]);
+if ($firstPath !== $rawPath) {
+    $pathCandidates[] = $firstPath;
+}
+
+$base = $document['storage_area'] === 'requirements'
+    ? realpath(__DIR__ . '/uploads/requirements')
+    : realpath(__DIR__ . '/uploads');
+$candidate = null;
+if ($base) {
+    foreach ($pathCandidates as $filePath) {
+        if ($filePath === '') {
+            continue;
+        }
+        if ($document['storage_area'] === 'requirements') {
+            $candidate = realpath(__DIR__ . '/uploads/requirements/' . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $filePath));
+        } else {
+            $legacyPath = str_replace('\\', '/', $filePath);
+            $candidate = str_starts_with($legacyPath, 'uploads/')
+                ? realpath(__DIR__ . '/' . str_replace('/', DIRECTORY_SEPARATOR, $legacyPath))
+                : realpath(__DIR__ . '/uploads/' . basename($legacyPath));
+        }
+        if ($candidate && str_starts_with($candidate, $base . DIRECTORY_SEPARATOR) && is_file($candidate)) {
+            break;
+        }
+        $candidate = null;
     }
 }
-if (!$base || !$candidate || !str_starts_with($candidate, $base . DIRECTORY_SEPARATOR) || !is_file($candidate)) {
+if (!$candidate) {
     http_response_code(404);
     exit('The stored document is unavailable.');
 }
 
-$downloadName = basename(trim(explode(',', (string)$document['original_filename'])[0]));
+$downloadName = basename(trim((string)$document['original_filename'])) ?: basename($candidate);
 $mime = function_exists('mime_content_type') ? mime_content_type($candidate) : 'application/octet-stream';
 header('Content-Type: ' . ($mime ?: 'application/octet-stream'));
 header('Content-Length: ' . filesize($candidate));

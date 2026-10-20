@@ -6,7 +6,7 @@ header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE');
 header('Access-Control-Allow-Headers: Content-Type');
 
 require_once __DIR__ . '/../../config/auth.php';
-requireAdminApiAuth(['Admin']);
+requireAdminApiAuth();
 
 // Database connection
 $host = "127.0.0.1";
@@ -21,14 +21,26 @@ if ($conn->connect_error) {
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
+$currentAdminId = (int)($_SESSION['admin_id'] ?? 0);
+$isAdmin = ($_SESSION['admin_role'] ?? '') === 'Admin';
+
+if (($method === 'POST' || $method === 'DELETE') && !$isAdmin) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Forbidden']);
+    exit;
+}
 
 switch ($method) {
     case 'GET':
-        // Fetch all admin users
+        // Admins see everyone; other roles only see themselves.
         $query = "SELECT id, full_name as name, email, role, department, profile_picture, phone, status, 
                   DATE_FORMAT(last_login, '%Y-%m-%d %h:%i %p') as lastLogin, 
                   DATE_FORMAT(created_at, '%Y-%m-%d') as createdDate 
-                  FROM admin_users ORDER BY created_at DESC";
+                  FROM admin_users";
+        if (!$isAdmin) {
+            $query .= " WHERE id = $currentAdminId";
+        }
+        $query .= " ORDER BY created_at DESC";
         $result = $conn->query($query);
         
         $users = [];
@@ -267,6 +279,12 @@ switch ($method) {
         
         if (empty($user_id)) {
             echo json_encode(['success' => false, 'message' => 'User ID is required', 'debug' => ['input' => $input, 'content_type' => $content_type]]);
+            break;
+        }
+
+        if (!$isAdmin && $user_id !== $currentAdminId) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Forbidden']);
             break;
         }
         

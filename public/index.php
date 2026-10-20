@@ -942,7 +942,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const openSignInFromForgot = document.getElementById("openSignInFromForgot");
 
   // Open Forgot Password modal from Sign In modal
-  openForgotPasswordBtn.addEventListener("click", (e) => {
+  openForgotPasswordBtn?.addEventListener("click", (e) => {
     e.preventDefault();
     document.getElementById("signInModal").classList.add("hidden");
     document.querySelector('#forgot_email').value = ''; // clear input when opening
@@ -1092,10 +1092,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const realType = input.getAttribute('data-real-type');
             const realName = input.getAttribute('data-real-name');
             
-            // Clear value first
-            input.value = '';
-            
-            // Change type and name after clearing
             setTimeout(() => {
                 if (realType) input.type = realType;
                 if (realName) input.name = realName;
@@ -1153,19 +1149,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const hasLoginError = <?php echo isset($login_error) ? 'true' : 'false'; ?>;
     const hasSignupError = <?php echo isset($signup_error) ? 'true' : 'false'; ?>;
     
-    if (!hasLoginError && !hasSignupError) {
-        // Aggressive clearing of form fields to prevent autofill
-        clearSignInFields();
-        clearSignUpFields();
-        
-        // Multiple clearing attempts with different delays
-        [50, 100, 200, 500, 1000].forEach(delay => {
-            setTimeout(() => {
-                clearSignInFields();
-                clearSignUpFields();
-            }, delay);
-        });
-    }
 
     // PASSWORD TOGGLE - Sign In
     const togglePassword = document.getElementById("togglePassword");
@@ -1310,46 +1293,8 @@ document.addEventListener("DOMContentLoaded", () => {
         
         // Only clear and reset fields if there's no error
         if (!hasLoginError) {
-            // Mark any fields with values as autofilled
-            const emailField = document.getElementById('signInEmail');
-            const passField = document.getElementById('passwordInput');
-            if (emailField && emailField.value) emailField.setAttribute('data-autofilled', 'true');
-            if (passField && passField.value) passField.setAttribute('data-autofilled', 'true');
-            
-            // Clear fields immediately
             clearSignInFields();
-        
-        // Restore types and names after multiple delays
-        setTimeout(() => {
-            clearSignInFields();
-            // Mark again if browser refilled
-            if (emailField && emailField.value) {
-                emailField.setAttribute('data-autofilled', 'true');
-                emailField.value = '';
-            }
-            if (passField && passField.value) {
-                passField.setAttribute('data-autofilled', 'true');
-                passField.value = '';
-            }
-            restoreInputTypesAndNames('#signInModal');
-        }, 100);
-        
-        setTimeout(() => {
-            clearSignInFields();
-            // Final check and mark
-            if (emailField && emailField.value) {
-                emailField.setAttribute('data-autofilled', 'true');
-                emailField.value = '';
-            }
-            if (passField && passField.value) {
-                passField.setAttribute('data-autofilled', 'true');
-                passField.value = '';
-            }
-        }, 300);
-        
-            setTimeout(() => {
-                clearSignInFields();
-            }, 500);
+            setTimeout(() => restoreInputTypesAndNames('#signInModal'), 100);
         }
     });
 
@@ -1376,46 +1321,8 @@ document.addEventListener("DOMContentLoaded", () => {
         
         // Only clear and reset fields if there's no error
         if (!hasSignupError) {
-            // Mark any fields with values as autofilled
-            const signupEmailField = document.getElementById('signUpEmailInput');
-            const signupPassField = document.getElementById('signUpPassword');
-            if (signupEmailField && signupEmailField.value) signupEmailField.setAttribute('data-autofilled', 'true');
-            if (signupPassField && signupPassField.value) signupPassField.setAttribute('data-autofilled', 'true');
-            
-            // Clear fields immediately
             clearSignUpFields();
-        
-        // Restore types and names after multiple delays
-        setTimeout(() => {
-            clearSignUpFields();
-            // Mark again if browser refilled
-            if (signupEmailField && signupEmailField.value) {
-                signupEmailField.setAttribute('data-autofilled', 'true');
-                signupEmailField.value = '';
-            }
-            if (signupPassField && signupPassField.value) {
-                signupPassField.setAttribute('data-autofilled', 'true');
-                signupPassField.value = '';
-            }
-            restoreInputTypesAndNames('#signUpModal');
-        }, 100);
-        
-        setTimeout(() => {
-            clearSignUpFields();
-            // Final check and mark
-            if (signupEmailField && signupEmailField.value) {
-                signupEmailField.setAttribute('data-autofilled', 'true');
-                signupEmailField.value = '';
-            }
-            if (signupPassField && signupPassField.value) {
-                signupPassField.setAttribute('data-autofilled', 'true');
-                signupPassField.value = '';
-            }
-        }, 300);
-        
-            setTimeout(() => {
-                clearSignUpFields();
-            }, 500);
+            setTimeout(() => restoreInputTypesAndNames('#signUpModal'), 100);
         }
     });
 

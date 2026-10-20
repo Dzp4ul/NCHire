@@ -530,6 +530,7 @@ $recent_activity = $conn->query($recent_activity_query);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="<?php echo htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8'); ?>">
     <title>NCHire Admin Dashboard</title>
     <link rel="icon" type="image/png" href="../public/assets/images/image-removebg-preview (1).png">
     <link rel="shortcut icon" type="image/png" href="../public/assets/images/image-removebg-preview (1).png">
@@ -3093,14 +3094,7 @@ $recent_activity = $conn->query($recent_activity_query);
                     // Update recent jobs and applicants
                     updateRecentTables(data.recent_jobs, data.recent_applicants);
                     
-                    // Update last updated timestamp
-                    document.getElementById('lastUpdated').textContent = `Last updated: ${new Date().toLocaleString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        hour12: true
-                    })}`;
+                    // Dashboard stats refreshed.
                 })
                 .catch(error => {
                     console.error('Error refreshing dashboard:', error);

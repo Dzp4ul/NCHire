@@ -26,6 +26,9 @@ if (empty($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true
     exit;
 }
 
+require_once __DIR__ . '/../config/auth.php';
+requireAdminApiAuth();
+
 // Get admin info from session
 $admin_name = $_SESSION['admin_name'] ?? 'Unknown Admin';
 $admin_id = $_SESSION['admin_id'] ?? null;

@@ -19,7 +19,7 @@ if (!isset($_SESSION['user_id']) && !isset($_SESSION['user_email'])) {
 }
 
 // Database connection
-$servername = "localhost";
+$servername = "127.0.0.1";
 $username = "root";
 $password = "";
 $dbname = "nchire";

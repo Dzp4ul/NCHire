@@ -6,7 +6,7 @@ require_once __DIR__ . '/../../config/auth.php';
 requireAdminApiAuth();
 
 // Database connection parameters
-$host = 'localhost';
+$host = '127.0.0.1';
 $dbname = 'nchire';
 $username = 'root';
 $password = '';

@@ -56,6 +56,19 @@ function requireAdminApiAuth($roles = []) {
         echo json_encode(['success' => false, 'error' => 'Forbidden']);
         exit();
     }
+
+    $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+    if (!in_array($method, ['GET', 'HEAD', 'OPTIONS'], true)) {
+        $token = (string)($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+        if ($token === '' && isset($_POST['csrf_token'])) {
+            $token = (string)$_POST['csrf_token'];
+        }
+        if (empty($_SESSION['csrf_token']) || !hash_equals((string)$_SESSION['csrf_token'], $token)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+            exit();
+        }
+    }
 }
 
 /**
