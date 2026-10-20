@@ -53,25 +53,37 @@ function sendEmailToAllAdmins($conn, $title, $message, $type = 'info') {
         $stmt->execute();
         $result = $stmt->get_result();
         
-        $admin_count = 0;
+        $recipients = [];
         while ($admin = $result->fetch_assoc()) {
-            // Send email to each admin
-            $success = sendAdminNotificationEmail(
-                $admin['email'],
-                $admin['full_name'],
-                $title,
-                $message,
-                $type
-            );
-            
-            if ($success) {
-                $admin_count++;
-                error_log("Email sent to admin: " . $admin['email']);
+            $email = trim((string)$admin['email']);
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                error_log("Skipping invalid admin email: $email");
+                continue;
             }
+            $recipients[] = ['email' => $email, 'name' => $admin['full_name']];
         }
         
-        error_log("Admin notification emails sent to $admin_count admins");
-    } catch (Exception $e) {
+        if (!$recipients) {
+            return;
+        }
+        
+        // One SMTP message with the remaining admins on BCC keeps the request fast.
+        $primary = array_shift($recipients);
+        $bcc = array_column($recipients, 'email');
+        $success = sendEmailNotification(
+            $primary['email'],
+            $primary['name'],
+            "NCHire Admin - $title",
+            $title,
+            $message,
+            $type,
+            $bcc
+        );
+        
+        error_log($success
+            ? "Admin notification email sent to " . (1 + count($bcc)) . " admins"
+            : "Admin notification email failed");
+    } catch (Throwable $e) {
         error_log("Error sending admin emails: " . $e->getMessage());
     }
 }

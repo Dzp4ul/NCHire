@@ -13,9 +13,10 @@ require_once __DIR__ . '/../vendor/autoload.php';
  * @param string $title Notification title
  * @param string $message Notification message
  * @param string $type Notification type (success, info, warning, danger)
+ * @param array $bcc Additional recipient addresses
  * @return bool True on success, false on failure
  */
-function sendEmailNotification($to_email, $to_name, $subject, $title, $message, $type = 'info') {
+function sendEmailNotification($to_email, $to_name, $subject, $title, $message, $type = 'info', $bcc = []) {
     $mail = new PHPMailer(true);
     
     try {
@@ -31,6 +32,9 @@ function sendEmailNotification($to_email, $to_name, $subject, $title, $message, 
         // Recipients
         $mail->setFrom('no-reply@nchire.local', 'NCHire - Norzagaray College');
         $mail->addAddress($to_email, $to_name);
+        foreach ($bcc as $bccEmail) {
+            $mail->addBCC($bccEmail);
+        }
         
         // Embed the logo image
         $logoPath = __DIR__ . '/../public/assets/images/image-removebg-preview (1).png';

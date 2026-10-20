@@ -4989,7 +4989,7 @@ document.addEventListener('DOMContentLoaded', function() {
     return card?.dataset.required === 'true';
   }
 
-  function syncRenewalDocumentVisibility(applicationType) {
+  window.syncRenewalDocumentVisibility = function(applicationType) {
     const isRenewal = String(applicationType || '').toLowerCase() === 'renewing';
     document.querySelectorAll('#step1 .renewal-only-document').forEach(card => {
       card.classList.toggle('hidden', !isRenewal);
@@ -4997,7 +4997,7 @@ document.addEventListener('DOMContentLoaded', function() {
       const input = card.querySelector('input[type="file"]');
       if (input && !isRenewal) input.value = '';
     });
-  }
+  };
 
   function setDocumentInlineError(input, message = '') {
     const error = input?.closest('.ui-document-upload')?.querySelector('.ui-document-inline-error');
