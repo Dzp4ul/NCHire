@@ -5,6 +5,11 @@
  * Can be run manually or set up as a cron job to run daily
  */
 
+if (PHP_SAPI !== 'cli') {
+    require_once __DIR__ . '/../config/auth.php';
+    requireAdminApiAuth(['Admin']);
+}
+
 // Database connection
 $host = "127.0.0.1";
 $user = "root";

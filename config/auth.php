@@ -38,6 +38,27 @@ function requireAdminAuth() {
 }
 
 /**
+ * Require admin authentication for JSON endpoints.
+ * Returns 401 when signed out, 403 when the role is not allowed.
+ */
+function requireAdminApiAuth($roles = []) {
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        session_start();
+    }
+    header('Content-Type: application/json');
+    if (!isAdminLoggedIn()) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+        exit();
+    }
+    if ($roles && !in_array($_SESSION['admin_role'] ?? '', $roles, true)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Forbidden']);
+        exit();
+    }
+}
+
+/**
  * Get current user ID
  */
 function getUserId($conn) {

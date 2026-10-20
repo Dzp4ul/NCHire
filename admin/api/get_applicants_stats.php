@@ -2,6 +2,9 @@
 session_start();
 header('Content-Type: application/json');
 
+require_once __DIR__ . '/../../config/auth.php';
+requireAdminApiAuth();
+
 // Database connection parameters
 $host = 'localhost';
 $dbname = 'nchire';

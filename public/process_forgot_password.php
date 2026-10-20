@@ -74,6 +74,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email'])) {
     // Generate temporary password (10 characters)
     $temporaryPassword = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%'), 0, 10);
     
+    // Send the email before changing the password so a mail failure cannot lock the account.
+    require_once '../shared/helpers/send_temp_password_email.php';
+    $emailResult = sendForgotPasswordEmail($email, $user_name, $temporaryPassword, $user_type);
+    
+    if (!$emailResult['success']) {
+        $_SESSION['fp_error'] = 'We could not send the reset email. Your password was not changed. Please try again later.';
+        $conn->close();
+        header('Location: forgot_password.php');
+        exit();
+    }
+    
     // Update database based on user type
     if ($table === 'admin_users') {
         // Admin users use hashed passwords
@@ -95,24 +106,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email'])) {
     }
     $stmt->close();
     
-    // Send email with temporary password
-    require_once '../shared/helpers/send_temp_password_email.php';
-    $emailResult = sendForgotPasswordEmail($email, $user_name, $temporaryPassword, $user_type);
+    $_SESSION['fp_success'] = 'A temporary password has been sent to your email address. Please check your inbox.';
     
-    if ($emailResult['success']) {
-        $_SESSION['fp_success'] = 'A temporary password has been sent to your email address. Please check your inbox.';
-        
-        // Log the password reset activity for admin users
-        if ($table === 'admin_users') {
-            $activity_stmt = $conn->prepare("INSERT INTO admin_activity (activity_type, description, user_name, created_at) VALUES (?, ?, ?, NOW())");
-            $activity_type = "password_reset";
-            $activity_desc = "$user_name requested a password reset";
-            $activity_stmt->bind_param("sss", $activity_type, $activity_desc, $user_name);
-            $activity_stmt->execute();
-            $activity_stmt->close();
-        }
-    } else {
-        $_SESSION['fp_error'] = 'Password was updated but email notification failed. Please contact support.';
+    // Log the password reset activity for admin users
+    if ($table === 'admin_users') {
+        $activity_stmt = $conn->prepare("INSERT INTO admin_activity (activity_type, description, user_name, created_at) VALUES (?, ?, ?, NOW())");
+        $activity_type = "password_reset";
+        $activity_desc = "$user_name requested a password reset";
+        $activity_stmt->bind_param("sss", $activity_type, $activity_desc, $user_name);
+        $activity_stmt->execute();
+        $activity_stmt->close();
     }
     
     $conn->close();

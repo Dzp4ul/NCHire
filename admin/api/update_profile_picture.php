@@ -4,6 +4,9 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST');
 header('Access-Control-Allow-Headers: Content-Type');
 
+require_once __DIR__ . '/../../config/auth.php';
+requireAdminApiAuth(['Admin']);
+
 // Database connection
 $host = "127.0.0.1";
 $user = "root";

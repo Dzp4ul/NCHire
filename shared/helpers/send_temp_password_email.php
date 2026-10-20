@@ -149,9 +149,9 @@ function sendForgotPasswordEmail($recipientEmail, $recipientName, $temporaryPass
         
         $mail->send();
         return ['success' => true, 'message' => 'Email sent successfully'];
-    } catch (Exception $e) {
-        error_log("Forgot Password Email Error: " . $mail->ErrorInfo);
-        return ['success' => false, 'message' => 'Email could not be sent: ' . $mail->ErrorInfo];
+    } catch (Throwable $e) {
+        error_log("Forgot Password Email Error: " . $e->getMessage());
+        return ['success' => false, 'message' => 'Email could not be sent: ' . $e->getMessage()];
     }
 }
 ?>

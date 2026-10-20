@@ -1,6 +1,9 @@
 <?php
 header('Content-Type: application/json');
 
+require_once __DIR__ . '/../config/auth.php';
+requireAdminApiAuth(['Secretary', 'Department Head', 'HR Manager', 'Recruiter']);
+
 // Database connection
 $host = "127.0.0.1";
 $user = "root";

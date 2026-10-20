@@ -111,8 +111,8 @@ function sendEmailNotification($to_email, $to_name, $subject, $title, $message, 
         $mail->send();
         error_log("Email sent successfully to: $to_email");
         return true;
-    } catch (Exception $e) {
-        error_log("Email sending failed to $to_email. Error: {$mail->ErrorInfo}");
+    } catch (Throwable $e) {
+        error_log("Email sending failed to $to_email. Error: {$e->getMessage()}");
         return false;
     }
 }

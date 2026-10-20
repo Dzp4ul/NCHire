@@ -129,9 +129,9 @@ function sendTemporaryPasswordEmail($recipientEmail, $recipientName, $temporaryP
         
         $mail->send();
         return ['success' => true, 'message' => 'Email sent successfully'];
-    } catch (Exception $e) {
-        error_log("Email Error: " . $mail->ErrorInfo);
-        return ['success' => false, 'message' => 'Email could not be sent: ' . $mail->ErrorInfo];
+    } catch (Throwable $e) {
+        error_log("Email Error: " . $e->getMessage());
+        return ['success' => false, 'message' => 'Email could not be sent: ' . $e->getMessage()];
     }
 }
 ?>

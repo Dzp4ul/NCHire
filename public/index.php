@@ -280,8 +280,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['signup_submit'])) {
                 $signup_success = "Registration initiated! Please check your email for your verification code to complete the process.";
                 $_SESSION['signup_email'] = $signup_email; // Store email for verification
                 $show_signup_form = false;
-            } catch (Exception $e) {
-                $signup_error = "Failed to send verification email. Mailer Error: {$mail->ErrorInfo}";
+            } catch (Throwable $e) {
+                $signup_error = "Failed to send verification email. Mailer Error: " . $e->getMessage();
                 // Clear the pending signup data if email fails
                 unset($_SESSION['pending_signup']);
             }
