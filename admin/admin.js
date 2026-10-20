@@ -820,7 +820,7 @@ function displayUsers(usersToDisplay) {
 function filterUsers() {
     const searchTerm = document.getElementById('userSearch')?.value.toLowerCase() || '';
     const roleFilter = document.getElementById('roleFilter')?.value || '';
-    const statusFilter = document.getElementById('statusFilter')?.value || '';
+    const statusFilter = document.getElementById('userStatusFilter')?.value || '';
     
     let filtered = allUsers.filter(user => {
         // Search filter (name or email)
@@ -830,8 +830,8 @@ function filterUsers() {
         // Role filter
         const matchesRole = !roleFilter || user.role === roleFilter;
         
-        // Status filter
-        const matchesStatus = !statusFilter || user.status === statusFilter;
+        // Status filter ("all" is the default and should not filter)
+        const matchesStatus = !statusFilter || statusFilter === 'all' || user.status === statusFilter;
         
         return matchesSearch && matchesRole && matchesStatus;
     });
@@ -855,7 +855,7 @@ function updateUserResultsCount(showing, total) {
 function clearUserFilters() {
     const searchInput = document.getElementById('userSearch');
     const roleFilter = document.getElementById('roleFilter');
-    const statusFilter = document.getElementById('statusFilter');
+    const statusFilter = document.getElementById('userStatusFilter');
     
     if (searchInput) searchInput.value = '';
     if (roleFilter) roleFilter.value = '';

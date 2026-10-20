@@ -46,6 +46,19 @@ if ($conn->connect_error) {
 }
 
 $user_id = $_SESSION['user_id'];
+
+function draftExistingValue(string $key): ?string {
+    $value = $_POST[$key] ?? null;
+    if (is_array($value)) {
+        $value = implode(',', array_filter(array_map(
+            static fn($item) => is_scalar($item) ? (string)$item : '',
+            $value
+        ), 'strlen'));
+    }
+    $value = trim((string)$value);
+    return $value === '' ? null : $value;
+}
+
 $uploadDir = __DIR__ . "/uploads/drafts/";
 $userDraftDir = $uploadDir . $user_id . "/";
 
@@ -143,7 +156,7 @@ try {
         error_log("  error: " . $_FILES['letter_of_intent']['error']);
         error_log("  size: " . $_FILES['letter_of_intent']['size']);
     } else {
-        error_log("letter_of_intent NOT in $_FILES");
+        error_log('letter_of_intent NOT in $_FILES');
     }
     
     // Check if draft already exists for this user
@@ -156,21 +169,21 @@ try {
     
     // Upload new files - ONLY save what's currently uploaded
     // Check for existing draft filenames sent from hidden inputs (already loaded drafts)
-    $application_letter = uploadDraftFile('applicationLetter', $userDraftDir, $user_id) ?? ($_POST['existing_applicationLetter'] ?? null);
-    $resume = uploadDraftFile('resume_file', $userDraftDir, $user_id) ?? ($_POST['existing_resume_file'] ?? null);
-    $tor = uploadDraftFile('transcript', $userDraftDir, $user_id) ?? ($_POST['existing_transcript'] ?? null);
-    $diploma = uploadDraftFile('diploma', $userDraftDir, $user_id) ?? ($_POST['existing_diploma'] ?? null);
-    $professional_license = uploadDraftFile('license', $userDraftDir, $user_id) ?? ($_POST['existing_license'] ?? null);
-    $coe = uploadDraftFile('coe', $userDraftDir, $user_id) ?? ($_POST['existing_coe'] ?? null);
-    $seminars_trainings = uploadDraftFile('certificates', $userDraftDir, $user_id, true) ?? ($_POST['existing_certificates'] ?? null);
-    $masteral_cert = uploadDraftFile('masteral_cert', $userDraftDir, $user_id) ?? ($_POST['existing_masteral_cert'] ?? null);
-    $certificate_of_grades = uploadDraftFile('certificate_of_grades', $userDraftDir, $user_id) ?? ($_POST['existing_certificate_of_grades'] ?? null);
-    $proof_of_enrollment = uploadDraftFile('proof_of_enrollment', $userDraftDir, $user_id) ?? ($_POST['existing_proof_of_enrollment'] ?? null);
-    $faculty_evaluation = uploadDraftFile('faculty_evaluation', $userDraftDir, $user_id) ?? ($_POST['existing_faculty_evaluation'] ?? null);
-    $letter_of_intent = uploadDraftFile('letter_of_intent', $userDraftDir, $user_id) ?? ($_POST['existing_letter_of_intent'] ?? null);
+    $application_letter = uploadDraftFile('applicationLetter', $userDraftDir, $user_id) ?? draftExistingValue('existing_applicationLetter');
+    $resume = uploadDraftFile('resume_file', $userDraftDir, $user_id) ?? draftExistingValue('existing_resume_file');
+    $tor = uploadDraftFile('transcript', $userDraftDir, $user_id) ?? draftExistingValue('existing_transcript');
+    $diploma = uploadDraftFile('diploma', $userDraftDir, $user_id) ?? draftExistingValue('existing_diploma');
+    $professional_license = uploadDraftFile('license', $userDraftDir, $user_id) ?? draftExistingValue('existing_license');
+    $coe = uploadDraftFile('coe', $userDraftDir, $user_id) ?? draftExistingValue('existing_coe');
+    $seminars_trainings = uploadDraftFile('certificates', $userDraftDir, $user_id, true) ?? draftExistingValue('existing_certificates');
+    $masteral_cert = uploadDraftFile('masteral_cert', $userDraftDir, $user_id) ?? draftExistingValue('existing_masteral_cert');
+    $certificate_of_grades = uploadDraftFile('certificate_of_grades', $userDraftDir, $user_id) ?? draftExistingValue('existing_certificate_of_grades');
+    $proof_of_enrollment = uploadDraftFile('proof_of_enrollment', $userDraftDir, $user_id) ?? draftExistingValue('existing_proof_of_enrollment');
+    $faculty_evaluation = uploadDraftFile('faculty_evaluation', $userDraftDir, $user_id) ?? draftExistingValue('existing_faculty_evaluation');
+    $letter_of_intent = uploadDraftFile('letter_of_intent', $userDraftDir, $user_id) ?? draftExistingValue('existing_letter_of_intent');
     
     error_log("letter_of_intent result after upload: " . ($letter_of_intent ?? 'NULL'));
-    error_log("existing_letter_of_intent from POST: " . ($_POST['existing_letter_of_intent'] ?? 'NOT SET'));
+    error_log("existing_letter_of_intent from POST: " . (draftExistingValue('existing_letter_of_intent') ?? 'NOT SET'));
     
     if ($existing_draft) {
         // Update existing draft - REPLACE all fields (no COALESCE to preserve old values)

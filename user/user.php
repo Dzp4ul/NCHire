@@ -5638,7 +5638,7 @@ document.addEventListener('DOMContentLoaded', function() {
           console.warn('?? Letter of Intent input has NO files selected');
         }
       } else {
-        console.error('? Letter of Intent input NOT FOUND in form');
+        console.log('Letter of Intent input is not present in this form');
       }
       
       // Submit to save_draft.php

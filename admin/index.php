@@ -1642,8 +1642,8 @@ $recent_activity = $conn->query($recent_activity_query);
                         
                         <!-- Status Filter -->
                         <div class="ui-filter-field">
-                            <label for="statusFilter">Account status</label>
-                            <select id="statusFilter" 
+                            <label for="userStatusFilter">Account status</label>
+                            <select id="userStatusFilter" 
                                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                                     onchange="filterUsers()">
                                 <option value="">All Status</option>
