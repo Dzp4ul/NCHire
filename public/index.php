@@ -22,6 +22,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login_submit'])) {
     $email = trim($_POST['email'] ?? '');
     $password = trim($_POST['password'] ?? '');
     $login_found = false;
+    $admin_password_mismatch = false;
 
     // Check admin_users table first (new admin system)
     $stmt = $conn->prepare("SELECT id, full_name, email, password, role, department, profile_picture, password_change_required, status FROM admin_users WHERE email = ?");
@@ -64,6 +65,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login_submit'])) {
                 header("Location: ../admin/index.php");
             }
             exit();
+        } else {
+            $admin_password_mismatch = true;
         }
         // If admin password wrong, continue to check applicants table
     } else {
@@ -120,7 +123,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login_submit'])) {
     
     // If no login was found in either table
     if (!$login_found && !isset($login_error)) {
-        $login_error = "Email not found.";
+        $login_error = $admin_password_mismatch ? "Invalid password." : "Email not found.";
     }
 }
 

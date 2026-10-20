@@ -8444,6 +8444,8 @@ function loadJobs(page = 1, filters = {}) {
       } else {
         if (noJobsMessage) noJobsMessage.classList.remove('hidden');
         if (paginationContainer) paginationContainer.style.display = 'none';
+        const jobResultsSummary = document.getElementById('jobResultsSummary');
+        if (jobResultsSummary) jobResultsSummary.textContent = '0 opportunities';
       }
     })
     .catch(error => {

@@ -2491,6 +2491,8 @@ async function viewApplicantDetails(applicantId) {
         if (data.success) {
             const applicant = data.applicant;
             const job = data.job || {};
+            applicant.remaining_vacancies = job.remaining_vacancies;
+            applicant.available_sections = job.available_sections;
             const stageLabel = String(applicant.workflow_stage || applicant.status || 'Under Review')
                 .replaceAll('_', ' ')
                 .replace(/\b\w/g, character => character.toUpperCase());
@@ -3135,6 +3137,14 @@ function updateActionButtons(status, applicant = null) {
     
     // Check if psychological exam receipt has been uploaded
     const hasPsychReceipt = applicant && applicant.psych_exam_receipt;
+    const hasAvailableSection = !applicant || Number(applicant.remaining_vacancies ?? applicant.available_sections ?? 1) > 0;
+    const canMarkPassed = Boolean(hasPsychReceipt) && hasAvailableSection;
+    const passBlockReason = !hasPsychReceipt
+        ? 'Waiting for psychological exam receipt'
+        : (!hasAvailableSection ? 'No available section remains for this teaching load' : '');
+    const passBlockDetail = !hasPsychReceipt
+        ? 'The applicant must upload the psychological exam receipt before the application can be marked as passed.'
+        : (!hasAvailableSection ? 'This teaching load has no remaining section. Increase the available sections before marking the applicant as passed.' : '');
     
     // CHECK IF APPLICATION IS CANCELLED
     const applicationStatus = applicant && applicant.status ? applicant.status.toLowerCase() : '';
@@ -3270,10 +3280,10 @@ function updateActionButtons(status, applicant = null) {
             hireBtn.classList.remove('hidden');
             
             // If no psych receipt, disable and show warning
-            if (!hasPsychReceipt) {
+            if (!canMarkPassed) {
                 hireBtn.disabled = true;
                 hireBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                hireBtn.title = 'Waiting for psychological exam receipt';
+                hireBtn.title = passBlockReason;
                 
                 // Add yellow indicator message
                 if (actionButtonsContainer && !actionButtonsContainer.querySelector('.psych-indicator')) {
@@ -3283,9 +3293,9 @@ function updateActionButtons(status, applicant = null) {
                         <div class="flex items-start gap-3">
                             <i class="fas fa-hourglass-half text-yellow-600 mt-1"></i>
                             <div>
-                                <h4 class="font-semibold text-yellow-900 text-sm">Waiting for Psychological Exam Receipt</h4>
+                                <h4 class="font-semibold text-yellow-900 text-sm">${passBlockReason}</h4>
                                 <p class="text-xs text-yellow-700 mt-1">
-                                    The applicant needs to take the psychological examination and upload the receipt before you can mark the application as passed.
+                                    ${passBlockDetail}
                                 </p>
                             </div>
                         </div>
@@ -3311,10 +3321,10 @@ function updateActionButtons(status, applicant = null) {
         if (hireBtn) {
             hireBtn.classList.remove('hidden');
 
-            if (!hasPsychReceipt) {
+            if (!canMarkPassed) {
                 hireBtn.disabled = true;
                 hireBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                hireBtn.title = 'Waiting for psychological exam receipt';
+                hireBtn.title = passBlockReason;
 
                 if (actionButtonsContainer && !actionButtonsContainer.querySelector('.psych-indicator')) {
                     const indicatorDiv = document.createElement('div');
@@ -3323,9 +3333,9 @@ function updateActionButtons(status, applicant = null) {
                         <div class="flex items-start gap-3">
                             <i class="fas fa-hourglass-half text-yellow-600 mt-1"></i>
                             <div>
-                                <h4 class="font-semibold text-yellow-900 text-sm">Waiting for Psychological Exam Receipt</h4>
+                                <h4 class="font-semibold text-yellow-900 text-sm">${passBlockReason}</h4>
                                 <p class="text-xs text-yellow-700 mt-1">
-                                    The applicant must upload the psychological exam receipt before the application can be marked as passed.
+                                    ${passBlockDetail}
                                 </p>
                             </div>
                         </div>
@@ -3400,7 +3410,7 @@ function updateActionButtons(status, applicant = null) {
             break;
         case 'Demo Passed':
             // After demo passed, check if psych receipt uploaded before showing pass button
-            if (hasPsychReceipt) {
+            if (canMarkPassed) {
                 if (hireBtn) hireBtn.classList.remove('hidden');
             } else {
                 // Show message that receipt is required
@@ -3412,8 +3422,8 @@ function updateActionButtons(status, applicant = null) {
                         <div class="flex items-start gap-3">
                             <i class="fas fa-exclamation-triangle text-yellow-600 mt-1"></i>
                             <div>
-                                <h4 class="font-semibold text-yellow-900 text-sm">Psychological Exam Receipt Required</h4>
-                                <p class="text-xs text-yellow-700 mt-1">The applicant must upload their psychological exam receipt before you can mark the application as passed.</p>
+                                <h4 class="font-semibold text-yellow-900 text-sm">${passBlockReason}</h4>
+                                <p class="text-xs text-yellow-700 mt-1">${passBlockDetail}</p>
                             </div>
                         </div>
                     `;
@@ -3424,7 +3434,7 @@ function updateActionButtons(status, applicant = null) {
             break;
         case 'Psychological Exam':
             // User uploaded receipt, admin reviews and can pass or reject
-            if (hasPsychReceipt) {
+            if (canMarkPassed) {
                 if (hireBtn) hireBtn.classList.remove('hidden');
             } else {
                 // Show message that receipt is required
@@ -3436,8 +3446,8 @@ function updateActionButtons(status, applicant = null) {
                         <div class="flex items-start gap-3">
                             <i class="fas fa-exclamation-triangle text-yellow-600 mt-1"></i>
                             <div>
-                                <h4 class="font-semibold text-yellow-900 text-sm">Psychological Exam Receipt Required</h4>
-                                <p class="text-xs text-yellow-700 mt-1">The applicant must upload their psychological exam receipt before you can mark the application as passed.</p>
+                                <h4 class="font-semibold text-yellow-900 text-sm">${passBlockReason}</h4>
+                                <p class="text-xs text-yellow-700 mt-1">${passBlockDetail}</p>
                             </div>
                         </div>
                     `;
