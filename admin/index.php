@@ -1418,117 +1418,224 @@ $recent_activity = $conn->query($recent_activity_query);
             </div>
 
             <!-- Applicant Details Section -->
-            <div id="applicantDetailsSection" class="section hidden ui-page-stack">
-                <nav class="ui-breadcrumb" aria-label="Breadcrumb">
-                    <span>Recruitment</span>
+            <div id="applicantDetailsSection" class="section hidden applicant-review-page">
+                <nav class="ui-breadcrumb applicant-review-page__breadcrumb" aria-label="Breadcrumb">
+                    <button onclick="showSection('applicants')" type="button">Applicants</button>
                     <i class="fas fa-chevron-right" aria-hidden="true"></i>
-                    <span>Applicants</span>
-                    <i class="fas fa-chevron-right" aria-hidden="true"></i>
-                    <span aria-current="page">Applicant Details</span>
+                    <span aria-current="page">Application review</span>
                 </nav>
 
-                <button onclick="showSection('applicants')" class="ui-back-link" type="button">
+                <button onclick="showSection('applicants')" class="ui-back-link applicant-review-page__back" type="button">
                     <i class="fas fa-arrow-left" aria-hidden="true"></i>
-                    <span>Back to Applicants</span>
+                    <span>Back to applicants</span>
                 </button>
 
-                <header class="ui-page-header">
-                    <div class="ui-page-header__main">
-                        <p class="ui-eyebrow">Application review</p>
-                        <h1 id="applicantReviewName" class="ui-page-title">Applicant Review</h1>
-                        <p id="applicantReviewPosition" class="ui-page-description">Review the applicant profile, supporting credentials, and recruitment progress.</p>
+                <section class="applicant-review-hero" aria-labelledby="applicantReviewName">
+                    <div class="applicant-review-hero__identity">
+                        <div id="applicantReviewAvatar" class="applicant-review-avatar" aria-hidden="true">AR</div>
+                        <div class="applicant-review-hero__copy">
+                            <div class="applicant-review-hero__title-row">
+                                <h1 id="applicantReviewName">Applicant Review</h1>
+                                <div id="actionStatusBadge" aria-live="polite"></div>
+                            </div>
+                            <p id="applicantReviewPosition" class="applicant-review-hero__position">Teaching load application</p>
+                            <div class="applicant-review-hero__meta" aria-label="Applicant contact information">
+                                <span><i class="fas fa-envelope" aria-hidden="true"></i><span id="applicantReviewEmail">Email unavailable</span></span>
+                                <span><i class="fas fa-phone" aria-hidden="true"></i><span id="applicantReviewPhone">Phone unavailable</span></span>
+                                <span><i class="fas fa-hashtag" aria-hidden="true"></i><span id="applicantReviewId">Application</span></span>
+                            </div>
+                            <div class="applicant-review-hero__secondary">
+                                <span id="applicantReviewDepartment">Department not assigned</span>
+                                <span aria-hidden="true">•</span>
+                                <span id="applicantReviewSubmitted">Submission date unavailable</span>
+                                <span id="actionStageBadge" aria-live="polite"></span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="ui-page-header__actions" aria-live="polite"><div id="actionStatusBadge"></div><div id="actionStageBadge"></div></div>
-                </header>
 
-                <div class="ui-detail-layout ui-applicant-layout">
-                    <div class="ui-detail-main">
-                        <section class="ui-content-section">
-                            <div class="ui-section-header">
-                                <p class="ui-eyebrow">Applicant summary</p>
-                                <h2>Personal &amp; Application Information</h2>
+                    <div class="applicant-review-completion" aria-label="Requirements completion">
+                        <div class="applicant-review-completion__heading">
+                            <div>
+                                <span>Requirements completion</span>
+                                <strong id="requirementsCompletionLabel">0 of 0 submitted</strong>
                             </div>
-                            <div id="personalInfo" class="ui-definition-grid">
-                                <!-- Personal info will be loaded here -->
+                            <b id="requirementsCompletionPercent">0%</b>
+                        </div>
+                        <div class="applicant-review-progress" aria-hidden="true"><span id="requirementsCompletionBar"></span></div>
+                        <div id="requirementsCompletionMessage" class="applicant-review-completion__message">
+                            <i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i>
+                            Loading submitted requirements…
+                        </div>
+                    </div>
+                </section>
+
+                <nav class="applicant-review-tabs" aria-label="Applicant detail sections">
+                    <button type="button" data-applicant-tab="overview" onclick="switchApplicantDetailTab('overview', this)"><i class="fas fa-user" aria-hidden="true"></i>Overview</button>
+                    <button type="button" data-applicant-tab="requirements" onclick="switchApplicantDetailTab('requirements', this)" class="is-active"><i class="fas fa-folder-open" aria-hidden="true"></i>Requirements <span id="requirementsTabCount">0</span></button>
+                    <button type="button" data-applicant-tab="recruitment" onclick="switchApplicantDetailTab('recruitment', this)"><i class="fas fa-route" aria-hidden="true"></i>Recruitment</button>
+                    <button type="button" data-applicant-tab="decision" onclick="switchApplicantDetailTab('decision', this)"><i class="fas fa-gavel" aria-hidden="true"></i>Decision</button>
+                </nav>
+
+                <div class="applicant-review-panels">
+                    <section id="applicantOverviewPanel" class="applicant-review-panel hidden" data-applicant-panel="overview" aria-label="Applicant overview">
+                        <div class="applicant-overview-grid">
+                            <div class="applicant-overview-column">
+                                <section class="applicant-card">
+                                    <div class="applicant-card__header"><div><p>Applicant summary</p><h2>Personal &amp; application information</h2></div></div>
+                                    <div id="personalInfo" class="ui-definition-grid"><!-- Personal info will be loaded here --></div>
+                                </section>
+
+                                <section class="applicant-card">
+                                    <div class="applicant-card__header"><div><p>Qualifications &amp; education</p><h2>Education</h2></div></div>
+                                    <div id="educationInfo" class="ui-record-list"><!-- Education info will be loaded here --></div>
+                                </section>
+
+                                <section class="applicant-card">
+                                    <div class="applicant-card__header"><div><p>Employment history</p><h2>Work experience</h2></div></div>
+                                    <div id="experienceInfo" class="ui-record-list"><!-- Experience info will be loaded here --></div>
+                                </section>
                             </div>
-                        </section>
 
-                        <section class="ui-content-section">
-                            <div class="ui-section-header">
-                                <p class="ui-eyebrow">Compensation assessment</p>
-                                <h2>Projected Compensation</h2>
+                            <aside class="applicant-overview-column applicant-overview-column--aside">
+                                <section class="applicant-card applicant-card--accent">
+                                    <div class="applicant-card__header"><div><p>Compensation assessment</p><h2>Projected compensation</h2></div><i class="fas fa-calculator" aria-hidden="true"></i></div>
+                                    <div id="salaryProjectionInfo" class="applicant-summary-stack"><p class="text-gray-500 italic">Salary projection will be loaded here.</p></div>
+                                </section>
+
+                                <section class="applicant-card">
+                                    <div class="applicant-card__header"><div><p>Capabilities</p><h2>Skills</h2></div></div>
+                                    <div id="skillsInfo" class="ui-record-list"><!-- Skills info will be loaded here --></div>
+                                </section>
+
+                                <section class="applicant-card">
+                                    <div class="applicant-card__header"><div><p>Additional credentials</p><h2>Certifications, licenses &amp; training</h2></div></div>
+                                    <div id="qualificationsInfo" class="ui-record-list"><p class="text-gray-500 italic">No structured qualifications provided</p></div>
+                                </section>
+                            </aside>
+                        </div>
+                    </section>
+
+                    <section id="applicantRequirementsPanel" class="applicant-review-panel is-active" data-applicant-panel="requirements" aria-label="Submitted requirements">
+                        <div class="requirements-workspace">
+                            <aside class="requirements-browser" aria-label="Submitted document list">
+                                <div class="requirements-browser__header">
+                                    <div>
+                                        <p>Application files</p>
+                                        <h2>Submitted documents <span id="submittedDocumentsCount">(0)</span></h2>
+                                    </div>
+                                    <label class="requirements-sort">
+                                        <span class="sr-only">Sort documents</span>
+                                        <i class="fas fa-arrow-down-wide-short" aria-hidden="true"></i>
+                                        <select id="requirementsSort" onchange="sortApplicantDocuments(this.value)">
+                                            <option value="requirement">Required order</option>
+                                            <option value="name">Name</option>
+                                            <option value="newest">Newest</option>
+                                        </select>
+                                    </label>
+                                </div>
+                                <div class="requirements-filters" aria-label="Filter documents">
+                                    <button type="button" class="is-active" data-document-filter="all" onclick="filterApplicantDocuments('all', this)">All documents</button>
+                                    <button type="button" data-document-filter="submitted" onclick="filterApplicantDocuments('submitted', this)"><span class="requirements-filter-dot requirements-filter-dot--success"></span>Submitted</button>
+                                    <button type="button" data-document-filter="attention" onclick="filterApplicantDocuments('attention', this)"><span class="requirements-filter-dot requirements-filter-dot--warning"></span>Needs review</button>
+                                </div>
+                                <div id="documentsGrid" class="requirements-document-list"><!-- Documents will be loaded here --></div>
+                            </aside>
+
+                            <section class="document-reviewer" aria-live="polite">
+                                <div id="documentReviewerEmpty" class="document-reviewer__empty">
+                                    <i class="fas fa-file-circle-check" aria-hidden="true"></i>
+                                    <h2>Select a document to review</h2>
+                                    <p>Choose a submitted requirement from the list to preview its contents and file details.</p>
+                                </div>
+                                <div id="documentReviewerContent" class="document-reviewer__content hidden">
+                                    <header class="document-reviewer__header">
+                                        <div>
+                                            <h2 id="selectedDocumentTitle">Document</h2>
+                                            <p id="selectedDocumentFilename">Filename</p>
+                                        </div>
+                                        <span id="selectedDocumentStatus" class="ui-status ui-status--success"><i class="fas fa-check-circle" aria-hidden="true"></i>Submitted</span>
+                                    </header>
+                                    <div class="document-preview-toolbar" aria-label="Document preview controls">
+                                        <span id="selectedDocumentPage">Preview</span>
+                                        <div>
+                                            <button type="button" onclick="resizeApplicantDocumentPreview(-10)" aria-label="Zoom out"><i class="fas fa-minus" aria-hidden="true"></i></button>
+                                            <strong id="documentPreviewZoom">100%</strong>
+                                            <button type="button" onclick="resizeApplicantDocumentPreview(10)" aria-label="Zoom in"><i class="fas fa-plus" aria-hidden="true"></i></button>
+                                            <button type="button" onclick="openSelectedApplicantDocument()" aria-label="Open document fullscreen"><i class="fas fa-expand" aria-hidden="true"></i></button>
+                                        </div>
+                                    </div>
+                                    <div id="selectedDocumentPreview" class="document-preview-canvas"></div>
+                                    <dl class="document-reviewer__details">
+                                        <div><dt>File name</dt><dd id="selectedDocumentDetailName">—</dd></div>
+                                        <div><dt>File type</dt><dd id="selectedDocumentDetailType">—</dd></div>
+                                        <div><dt>Version</dt><dd id="selectedDocumentDetailVersion">—</dd></div>
+                                        <div><dt>Date uploaded</dt><dd id="selectedDocumentDetailDate">—</dd></div>
+                                    </dl>
+                                    <div class="document-reviewer__actions">
+                                        <button type="button" class="ui-button ui-button--secondary" onclick="openSelectedApplicantDocument()"><i class="fas fa-expand" aria-hidden="true"></i>View fullscreen</button>
+                                        <a id="selectedDocumentDownload" class="ui-button ui-button--secondary" href="#" download><i class="fas fa-download" aria-hidden="true"></i>Download</a>
+                                        <button type="button" class="ui-button ui-button--warning" onclick="requestSelectedDocumentResubmission()"><i class="fas fa-rotate" aria-hidden="true"></i>Request resubmission</button>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                    </section>
+
+                    <section id="applicantRecruitmentPanel" class="applicant-review-panel hidden" data-applicant-panel="recruitment" aria-label="Recruitment progress">
+                        <section class="applicant-card">
+                            <div class="applicant-card__header">
+                                <div><p>Recruitment progress</p><h2>Application process</h2><span>Review the schedule, evidence, and outcome recorded at every stage.</span></div>
                             </div>
-                            <div id="salaryProjectionInfo" class="ui-definition-grid">
-                                <p class="text-gray-500 italic">Salary projection will be loaded here.</p>
-                            </div>
-                        </section>
-
-                        <section class="ui-content-section">
-                            <div class="ui-section-header"><p class="ui-eyebrow">Qualifications &amp; education</p><h2>Education</h2></div>
-                            <div id="educationInfo" class="ui-record-list"><!-- Education info will be loaded here --></div>
-                        </section>
-
-                        <section class="ui-content-section">
-                            <div class="ui-section-header"><p class="ui-eyebrow">Employment history</p><h2>Work Experience</h2></div>
-                            <div id="experienceInfo" class="ui-record-list"><!-- Experience info will be loaded here --></div>
-                        </section>
-
-                        <section class="ui-content-section">
-                            <div class="ui-section-header"><p class="ui-eyebrow">Capabilities</p><h2>Skills</h2></div>
-                            <div id="skillsInfo" class="ui-record-list"><!-- Skills info will be loaded here --></div>
-                        </section>
-
-                        <section class="ui-content-section">
-                            <div class="ui-section-header"><p class="ui-eyebrow">Additional credentials</p><h2>Certifications, Licenses &amp; Training</h2></div>
-                            <div id="qualificationsInfo" class="ui-record-list"><p class="text-gray-500 italic">No structured qualifications provided</p></div>
-                        </section>
-
-                        <section class="ui-content-section">
-                            <div class="ui-section-header"><p class="ui-eyebrow">Application files</p><h2>Submitted Requirements</h2></div>
-                            <div id="documentsGrid" class="ui-document-list"><!-- Documents will be loaded here --></div>
-                        </section>
-                        <section class="ui-content-section">
-                            <div class="ui-section-header"><p class="ui-eyebrow">Recruitment progress</p><h2>Application Process</h2><p>Review the recorded schedule and outcome for each completed stage.</p></div>
-                            <div class="ui-review-stage-grid">
+                            <div class="recruitment-stage-intro"><i class="fas fa-circle-info" aria-hidden="true"></i><p>Stage information is read-only here. Use the Decision tab for the actions currently available to your role.</p></div>
+                            <div class="ui-review-stage-grid applicant-stage-grid">
                                 <section id="interviewInfo" class="ui-stage-panel" style="display: none;">
-                                    <div class="ui-section-header ui-section-header--compact"><p class="ui-eyebrow">Stage 2</p><h3>Interview</h3></div>
+                                    <div class="applicant-stage-number">2</div>
+                                    <div class="ui-section-header ui-section-header--compact"><p class="ui-eyebrow">Candidate screening</p><h3>Interview</h3></div>
                                     <div id="interviewDetails" class="ui-summary-list"><!-- Interview details will be loaded here --></div>
                                 </section>
                                 <section id="demoInfo" class="ui-stage-panel" style="display: none;">
-                                    <div class="ui-section-header ui-section-header--compact"><p class="ui-eyebrow">Stage 3</p><h3>Demo Teaching</h3></div>
+                                    <div class="applicant-stage-number">3</div>
+                                    <div class="ui-section-header ui-section-header--compact"><p class="ui-eyebrow">Teaching assessment</p><h3>Demo teaching</h3></div>
                                     <div id="demoDetails" class="ui-summary-list"><!-- Demo details will be loaded here --></div>
                                 </section>
                                 <section id="psychReceiptInfo" class="ui-stage-panel" style="display: none;">
-                                    <div class="ui-section-header ui-section-header--compact"><p class="ui-eyebrow">Stage 4</p><h3>Psychological Exam</h3></div>
+                                    <div class="applicant-stage-number">4</div>
+                                    <div class="ui-section-header ui-section-header--compact"><p class="ui-eyebrow">Pre-employment</p><h3>Psychological exam</h3></div>
                                     <div id="psychReceiptDetails" class="ui-summary-list"><!-- Receipt details will be loaded here --></div>
                                 </section>
                                 <section id="initialHiringInfo" class="ui-stage-panel" style="display: none;">
-                                    <div class="ui-section-header ui-section-header--compact"><p class="ui-eyebrow">Stage 5</p><h3>Initial Hiring</h3></div>
+                                    <div class="applicant-stage-number">5</div>
+                                    <div class="ui-section-header ui-section-header--compact"><p class="ui-eyebrow">Final outcome</p><h3>Hiring decision</h3></div>
                                     <div id="initialHiringDetails" class="ui-summary-list"><!-- Hiring details will be loaded here --></div>
                                 </section>
                             </div>
                         </section>
+                    </section>
 
-                        <section class="ui-content-section ui-decision-section" aria-labelledby="applicationDecisionTitle">
-                            <div class="ui-section-header">
-                                <p class="ui-eyebrow">Decision &amp; actions</p>
-                                <h2 id="applicationDecisionTitle">Application Decision</h2>
-                                <p>You have reviewed the applicant's profile, qualifications, submitted requirements, and recruitment progress. Available actions reflect the current stage and your role.</p>
+                    <section id="applicantDecisionPanel" class="applicant-review-panel hidden" data-applicant-panel="decision" aria-label="Application decision">
+                        <section class="applicant-card applicant-decision-card" aria-labelledby="applicationDecisionTitle">
+                            <div class="applicant-decision-card__copy">
+                                <div class="applicant-decision-card__icon"><i class="fas fa-clipboard-check" aria-hidden="true"></i></div>
+                                <div>
+                                    <p>Decision &amp; actions</p>
+                                    <h2 id="applicationDecisionTitle">Complete this review</h2>
+                                    <span>Confirm the applicant's profile, submitted requirements, and recorded recruitment progress before continuing. Available actions reflect the current stage and your role.</span>
+                                </div>
                             </div>
-                            <div id="actionButtons" class="ui-decision-actions">
-                                <button id="transferToDeptHeadBtn" onclick="openTransferModal()" class="ui-button ui-button--primary hidden"><i class="fas fa-share"></i>Transfer to Dean</button>
-                                <button id="scheduleBtn" onclick="openScheduleModal()" class="ui-button ui-button--primary"><i class="fas fa-calendar-alt"></i>Schedule Interview</button>
-                                <button id="approveInterviewBtn" onclick="openApproveInterviewModal()" class="ui-button ui-button--primary hidden"><i class="fas fa-user-check"></i>Approve Interview</button>
-                                <button id="rescheduleInterviewBtn" onclick="openRescheduleInterviewModal()" class="ui-button ui-button--secondary hidden"><i class="fas fa-calendar-edit"></i>Reschedule Interview</button>
-                                <button id="scheduleDemoBtn" onclick="openDemoScheduleModal()" class="ui-button ui-button--primary hidden"><i class="fas fa-chalkboard-teacher"></i>Schedule Demo Teaching</button>
-                                <button id="approveDemoBtn" onclick="openApproveDemoModal()" class="ui-button ui-button--primary hidden"><i class="fas fa-check-double"></i>Approve Demo Teaching</button>
-                                <button id="rescheduleDemoBtn" onclick="openRescheduleDemoModal()" class="ui-button ui-button--secondary hidden"><i class="fas fa-calendar-edit"></i>Reschedule Demo Teaching</button>
-                                <button id="hireBtn" onclick="openHireModal()" class="ui-button ui-button--primary hidden"><i class="fas fa-check-circle"></i>Mark Application Passed</button>
-                                <button id="resubmitBtn" onclick="openResubmitModal()" class="ui-button ui-button--secondary"><i class="fas fa-redo"></i>Request Resubmission</button>
-                                <button id="rejectBtn" onclick="openRejectModal()" class="ui-button ui-button--danger"><i class="fas fa-times"></i>Reject Application</button>
+                            <div id="actionButtons" class="ui-decision-actions applicant-decision-card__actions">
+                                <button id="transferToDeptHeadBtn" onclick="openTransferModal()" class="ui-button ui-button--primary hidden"><i class="fas fa-share" aria-hidden="true"></i>Transfer to Dean</button>
+                                <button id="scheduleBtn" onclick="openScheduleModal()" class="ui-button ui-button--primary"><i class="fas fa-calendar-alt" aria-hidden="true"></i>Schedule interview</button>
+                                <button id="approveInterviewBtn" onclick="openApproveInterviewModal()" class="ui-button ui-button--primary hidden"><i class="fas fa-user-check" aria-hidden="true"></i>Approve interview</button>
+                                <button id="rescheduleInterviewBtn" onclick="openRescheduleInterviewModal()" class="ui-button ui-button--secondary hidden"><i class="fas fa-calendar-edit" aria-hidden="true"></i>Reschedule interview</button>
+                                <button id="scheduleDemoBtn" onclick="openDemoScheduleModal()" class="ui-button ui-button--primary hidden"><i class="fas fa-chalkboard-teacher" aria-hidden="true"></i>Schedule demo teaching</button>
+                                <button id="approveDemoBtn" onclick="openApproveDemoModal()" class="ui-button ui-button--primary hidden"><i class="fas fa-check-double" aria-hidden="true"></i>Approve demo teaching</button>
+                                <button id="rescheduleDemoBtn" onclick="openRescheduleDemoModal()" class="ui-button ui-button--secondary hidden"><i class="fas fa-calendar-edit" aria-hidden="true"></i>Reschedule demo teaching</button>
+                                <button id="hireBtn" onclick="openHireModal()" class="ui-button ui-button--primary hidden"><i class="fas fa-check-circle" aria-hidden="true"></i>Mark application passed</button>
+                                <button id="resubmitBtn" onclick="openResubmitModal()" class="ui-button ui-button--secondary"><i class="fas fa-redo" aria-hidden="true"></i>Request resubmission</button>
+                                <button id="rejectBtn" onclick="openRejectModal()" class="ui-button ui-button--danger"><i class="fas fa-times" aria-hidden="true"></i>Reject application</button>
                             </div>
                         </section>
-                    </div>
+                    </section>
                 </div>
             </div>
 

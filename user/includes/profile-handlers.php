@@ -4,6 +4,8 @@
  * Handles saving profile data
  */
 
+require_once __DIR__ . '/../../shared/helpers/recruitment.php';
+
 function handlePersonalInfoSave($conn, $user_id, $post_data) {
     if (empty($post_data['applicant_fname']) || empty($post_data['applicant_lname']) || empty($post_data['applicant_email'])) {
         return ['success' => false, 'message' => 'Please fill in all required fields.'];
@@ -20,20 +22,31 @@ function handlePersonalInfoSave($conn, $user_id, $post_data) {
         return ['success' => false, 'message' => 'Invalid phone number format. Must be 11 digits starting with 09.'];
     }
 
+    $conn->begin_transaction();
     $sql = "UPDATE applicants SET first_name = ?, last_name = ?, applicant_email = ?, contact_number = ?, address = ? WHERE id = ?";
     $stmt = $conn->prepare($sql);
     
     if (!$stmt) {
+        $conn->rollback();
         return ['success' => false, 'message' => 'Database error: ' . $conn->error];
     }
 
     $stmt->bind_param("sssssi", $fname, $lname, $email, $phone, $address, $user_id);
 
-    if ($stmt->execute()) {
+    if ($stmt->execute() && nc_sync_applicant_identity(
+        $conn,
+        (int)$user_id,
+        $fname,
+        $lname,
+        $email,
+        $phone
+    )) {
+        $conn->commit();
         $stmt->close();
         return ['success' => true, 'message' => 'Personal information updated successfully.'];
     } else {
         $error = $stmt->error;
+        $conn->rollback();
         $stmt->close();
         return ['success' => false, 'message' => 'Error updating: ' . $error];
     }

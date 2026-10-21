@@ -130,6 +130,67 @@ test.describe('application submission and cross-role recruitment workflow', () =
     await expect(applicationsSection).toContainText('Cancelled');
   });
 
+  test('secretary resubmission opens Requirements and accepts the requested replacement', async ({ page }) => {
+    await login(page, accounts.secretary);
+    let token = await csrfToken(page);
+    const requestResubmission = await page.request.post('admin/process_applicant_action.php', {
+      headers: { 'X-CSRF-Token': token },
+      form: {
+        action: 'request_resubmission',
+        applicant_id: '1',
+        documents: JSON.stringify(['application_letter']),
+        notes: 'Please upload a clearer application letter.',
+      },
+    });
+    expect(requestResubmission.status()).toBe(200);
+    expect(await requestResubmission.json()).toMatchObject({ success: true });
+
+    await login(page, accounts.pipeline);
+    token = await page.locator('#requirementsCsrfToken').getAttribute('value') || '';
+
+    const emptyReplacement = await page.request.post('user/user.php', {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      multipart: {
+        submit_application: '1',
+        ajax_submit: '1',
+        csrf_token: token,
+        job_id: '1',
+        job_title: 'E2E CS 101 - Web Systems',
+        is_resubmission: '1',
+        resubmit_application_id: '1',
+      },
+    });
+    expect(emptyReplacement.status()).toBe(422);
+    expect(await emptyReplacement.json()).toMatchObject({ success: false });
+
+    await page.evaluate(() => (window as typeof window & { viewExistingApplication: (id: number) => Promise<void> }).viewExistingApplication(1));
+    const wizard = page.locator('#applicationWizard');
+    await expect(wizard).toBeVisible();
+    await expect(wizard.locator('#step1')).toBeVisible();
+    await expect(wizard.locator('#step2')).toBeHidden();
+    await expect(wizard.locator('#wizardStepLabel')).toContainText('Document Resubmission Required');
+    await expect(wizard.locator('#step1 .resubmission-notice')).toContainText('Please upload a clearer application letter.');
+
+    const requestedCard = wizard.locator('.ui-document-card[data-document-field="application_letter"]');
+    const requestedInput = requestedCard.locator('input[type="file"]');
+    await expect(requestedInput).toBeVisible();
+    await expect(requestedInput).toBeEnabled();
+    await expect(wizard.getByRole('button', { name: 'Resubmit Documents' })).toBeVisible();
+
+    await wizard.getByRole('button', { name: 'Resubmit Documents' }).click();
+    await expect(requestedCard.locator('.ui-document-inline-error')).toContainText('required document');
+
+    await requestedInput.setInputFiles(pdfPath);
+    await wizard.getByRole('button', { name: 'Resubmit Documents' }).click();
+    await expect(page.locator('body')).toContainText('Documents resubmitted successfully!');
+    await expect(wizard.locator('#wizardStepLabel')).toContainText('Resubmitted Documents Under Review');
+    await expect(wizard.locator('#step1 .resubmission-notice')).toHaveCount(0);
+
+    const application = await (await page.request.get('user/get_application_details.php?id=1')).json();
+    expect(application.application).toMatchObject({ status: 'Resubmitted', workflow_stage: 'secretary_review' });
+    expect(application.application.resubmission_documents).toBeNull();
+  });
+
   test('Secretary, Dean, and applicant complete the full review-to-assignment workflow', async ({ page }) => {
     await login(page, accounts.secretary);
     let token = await csrfToken(page);

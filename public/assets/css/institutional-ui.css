@@ -5806,6 +5806,1058 @@ body.gt-app {
     }
 }
 
+/* Applicant review workspace -------------------------------------------------
+ * The reviewer opens on evidence first, while profile and workflow context stay
+ * available as lightweight tabs. These rules are intentionally scoped to the
+ * admin applicant view so the shared institutional surfaces remain unchanged.
+ */
+.applicant-review-page {
+    --review-blue: #173f96;
+    --review-blue-bright: #2563eb;
+    --review-ink: #10213f;
+    --review-muted: #61708a;
+    --review-line: #dfe6ef;
+    --review-soft: #f6f8fb;
+    width: 100%;
+    padding-bottom: 40px;
+}
+
+.applicant-review-page__breadcrumb {
+    margin-bottom: 12px;
+}
+
+.applicant-review-page__breadcrumb button {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--review-muted);
+    cursor: pointer;
+}
+
+.applicant-review-page__breadcrumb button:hover {
+    color: var(--review-blue);
+}
+
+.applicant-review-page__back {
+    margin-bottom: 14px;
+}
+
+.applicant-review-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(330px, 0.85fr);
+    gap: clamp(28px, 4vw, 64px);
+    align-items: center;
+    padding: clamp(22px, 2.5vw, 32px);
+    border: 1px solid var(--review-line);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 5px 20px rgb(15 35 70 / 0.05);
+}
+
+.applicant-review-hero__identity {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 20px;
+}
+
+.applicant-review-avatar {
+    display: grid;
+    flex: 0 0 74px;
+    width: 74px;
+    height: 74px;
+    place-items: center;
+    overflow: hidden;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    background: #e8eefb;
+    box-shadow: 0 0 0 1px #d9e2f0, 0 5px 14px rgb(30 58 138 / 0.12);
+    color: var(--review-blue);
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
+
+.applicant-review-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.applicant-review-hero__copy {
+    min-width: 0;
+}
+
+.applicant-review-hero__title-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.applicant-review-hero__title-row h1 {
+    margin: 0;
+    color: var(--review-ink);
+    font-size: clamp(1.45rem, 2.3vw, 2rem);
+    font-weight: 750;
+    letter-spacing: -0.035em;
+    line-height: 1.15;
+}
+
+.applicant-review-hero__title-row .ui-status,
+.document-reviewer__header .ui-status {
+    gap: 5px;
+    padding: 6px 10px;
+    font-size: 0.69rem;
+}
+
+.applicant-review-hero__title-row #actionStatusBadge > span {
+    gap: 5px;
+    padding: 6px 10px;
+    border-width: 0;
+    font-size: 0.69rem;
+    font-weight: 750;
+}
+
+.applicant-review-hero__position {
+    margin: 7px 0 0;
+    color: var(--review-blue);
+    font-size: 0.92rem;
+    font-weight: 650;
+}
+
+.applicant-review-hero__meta,
+.applicant-review-hero__secondary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+    margin-top: 12px;
+    color: var(--review-muted);
+    font-size: 0.78rem;
+}
+
+.applicant-review-hero__meta > span {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    gap: 7px;
+}
+
+.applicant-review-hero__meta i {
+    width: 14px;
+    color: #7b8ba5;
+    text-align: center;
+}
+
+.applicant-review-hero__secondary {
+    gap: 7px;
+    margin-top: 9px;
+    font-size: 0.74rem;
+}
+
+.applicant-review-hero__secondary #actionStageBadge {
+    margin-left: 2px;
+}
+
+.applicant-review-completion {
+    min-width: 0;
+    padding-left: clamp(24px, 3.5vw, 50px);
+    border-left: 1px solid var(--review-line);
+}
+
+.applicant-review-completion__heading > div:first-child,
+.applicant-review-completion__heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.applicant-review-completion__heading > div:first-child {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.applicant-review-completion__heading span {
+    color: var(--review-ink);
+    font-size: 0.88rem;
+    font-weight: 750;
+}
+
+.applicant-review-completion__heading strong,
+.applicant-review-completion__heading b {
+    color: var(--review-blue);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.applicant-review-progress {
+    overflow: hidden;
+    height: 9px;
+    margin-top: 13px;
+    border-radius: 999px;
+    background: #e8edf4;
+}
+
+.applicant-review-progress span {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: #22b573;
+    transition: width 300ms ease;
+}
+
+.applicant-review-completion__message {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 13px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--ui-success-bg);
+    color: var(--ui-success);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.applicant-review-completion__message.is-incomplete {
+    background: var(--ui-warning-bg);
+    color: var(--ui-warning);
+}
+
+.applicant-review-tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    overflow-x: auto;
+    margin-top: 18px;
+    padding: 5px;
+    border: 1px solid var(--review-line);
+    border-radius: 11px;
+    background: #fff;
+    scrollbar-width: thin;
+}
+
+.applicant-review-tabs button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    gap: 8px;
+    min-height: 40px;
+    padding: 9px 16px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #56657d;
+    font-size: 0.82rem;
+    font-weight: 650;
+    transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.applicant-review-tabs button:hover {
+    background: #f5f8fd;
+    color: var(--review-blue);
+}
+
+.applicant-review-tabs button.is-active {
+    background: #edf4ff;
+    box-shadow: inset 0 0 0 1px #d9e8ff;
+    color: var(--review-blue);
+}
+
+.applicant-review-tabs button span {
+    display: inline-grid;
+    min-width: 22px;
+    height: 22px;
+    place-items: center;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: rgb(23 63 150 / 0.08);
+    font-size: 0.68rem;
+}
+
+.applicant-review-panels {
+    margin-top: 18px;
+}
+
+.applicant-review-panel.is-active {
+    display: block;
+}
+
+.applicant-overview-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.75fr);
+    gap: 18px;
+    align-items: start;
+}
+
+.applicant-overview-column {
+    display: grid;
+    min-width: 0;
+    gap: 18px;
+}
+
+.applicant-overview-column--aside {
+    position: sticky;
+    top: 94px;
+}
+
+.applicant-card {
+    overflow: hidden;
+    padding: 22px;
+    border: 1px solid var(--review-line);
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 2px 9px rgb(15 35 70 / 0.035);
+}
+
+.applicant-card--accent {
+    border-top: 3px solid var(--review-blue);
+}
+
+.applicant-card__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 16px;
+}
+
+.applicant-card__header p,
+.applicant-decision-card__copy p,
+.requirements-browser__header p {
+    margin: 0 0 4px;
+    color: var(--review-blue);
+    font-size: 0.67rem;
+    font-weight: 750;
+    letter-spacing: 0.075em;
+    text-transform: uppercase;
+}
+
+.applicant-card__header h2,
+.requirements-browser__header h2,
+.document-reviewer__header h2,
+.applicant-decision-card__copy h2 {
+    margin: 0;
+    color: var(--review-ink);
+    font-size: 1.05rem;
+    font-weight: 750;
+    letter-spacing: -0.015em;
+}
+
+.applicant-card__header > i {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    place-items: center;
+    border-radius: 9px;
+    background: #edf4ff;
+    color: var(--review-blue);
+}
+
+.applicant-card__header span {
+    display: block;
+    margin-top: 5px;
+    color: var(--review-muted);
+    font-size: 0.8rem;
+}
+
+.applicant-review-page .ui-definition-grid > div {
+    padding: 13px 0;
+}
+
+.applicant-review-page .ui-definition-grid label,
+.applicant-summary-stack label {
+    color: var(--review-muted) !important;
+    font-size: 0.67rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.045em;
+    text-transform: uppercase;
+}
+
+.applicant-review-page .ui-definition-grid p {
+    margin-top: 4px;
+    color: var(--review-ink) !important;
+    font-size: 0.85rem;
+}
+
+.applicant-summary-stack {
+    display: grid;
+    gap: 0;
+}
+
+.applicant-summary-stack > div {
+    padding: 13px 0 !important;
+    border-top: 1px solid var(--review-line) !important;
+}
+
+.applicant-summary-stack > div:first-child {
+    border-top: 0 !important;
+}
+
+.applicant-summary-stack > div:last-child[class*="bg-blue"] {
+    margin-top: 8px;
+    padding: 13px !important;
+    border: 1px solid #d8e7fb !important;
+    border-radius: 8px;
+}
+
+.applicant-review-page .ui-record-list > div {
+    padding: 14px 0 !important;
+}
+
+.applicant-review-page .ui-record-list h3 {
+    color: var(--review-ink);
+    font-size: 0.88rem;
+}
+
+.requirements-workspace {
+    display: grid;
+    grid-template-columns: minmax(350px, 0.88fr) minmax(500px, 1.25fr);
+    min-height: 630px;
+    overflow: hidden;
+    border: 1px solid var(--review-line);
+    border-radius: 13px;
+    background: #fff;
+    box-shadow: 0 4px 18px rgb(15 35 70 / 0.045);
+}
+
+.requirements-browser {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    border-right: 1px solid var(--review-line);
+}
+
+.requirements-browser__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px;
+    border-bottom: 1px solid var(--review-line);
+}
+
+.requirements-browser__header h2 span {
+    color: var(--review-muted);
+    font-weight: 600;
+}
+
+.requirements-sort {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+}
+
+.requirements-sort i {
+    position: absolute;
+    left: 10px;
+    color: var(--review-blue);
+    font-size: 0.72rem;
+    pointer-events: none;
+}
+
+.requirements-sort select {
+    min-height: 36px;
+    padding: 7px 25px 7px 28px;
+    border: 1px solid var(--review-line);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--review-ink);
+    font-size: 0.72rem;
+    font-weight: 650;
+}
+
+.requirements-filters {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 11px 20px;
+    border-bottom: 1px solid var(--review-line);
+    background: #fbfcfe;
+}
+
+.requirements-filters button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 6px 10px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--review-muted);
+    font-size: 0.69rem;
+    font-weight: 650;
+}
+
+.requirements-filters button:hover,
+.requirements-filters button.is-active {
+    border-color: #d8e6fa;
+    background: #edf4ff;
+    color: var(--review-blue);
+}
+
+.requirements-filter-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+}
+
+.requirements-filter-dot--success { background: #20b26b; }
+.requirements-filter-dot--warning { background: #f59e0b; }
+
+.requirements-document-list {
+    display: grid;
+    align-content: start;
+    gap: 8px;
+    overflow-y: auto;
+    max-height: 720px;
+    padding: 12px;
+}
+
+.requirements-document-item {
+    display: grid;
+    grid-template-columns: 70px minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid var(--review-line);
+    border-radius: 9px;
+    background: #fff;
+    color: inherit;
+    text-align: left;
+    transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+
+button.requirements-document-item {
+    width: 100%;
+    cursor: pointer;
+}
+
+.requirements-document-item:hover {
+    border-color: #b9cff1;
+    background: #fbfdff;
+}
+
+.requirements-document-item.is-selected {
+    border-color: var(--review-blue-bright);
+    background: #f3f7ff;
+    box-shadow: 0 0 0 1px var(--review-blue-bright);
+}
+
+.requirements-document-item--missing {
+    background: #fffcf4;
+}
+
+.requirements-document-thumb {
+    display: grid;
+    width: 70px;
+    height: 48px;
+    place-items: center;
+    overflow: hidden;
+    border: 1px solid #dbe3ed;
+    border-radius: 6px;
+    background: #f4f6f9;
+    color: #9a5b14;
+    font-size: 1.25rem;
+}
+
+.requirements-document-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.requirements-document-thumb--pdf {
+    background: #fff3f1;
+    color: #c2413b;
+}
+
+.requirements-document-copy {
+    min-width: 0;
+}
+
+.requirements-document-copy strong {
+    display: block;
+    overflow: hidden;
+    color: var(--review-ink);
+    font-size: 0.77rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.requirements-document-copy > span {
+    display: block;
+    overflow: hidden;
+    margin-top: 5px;
+    color: var(--review-muted);
+    font-size: 0.66rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.requirements-document-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px 11px;
+    margin-top: 7px;
+    color: #718096;
+    font-size: 0.61rem;
+}
+
+.requirements-document-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.requirements-document-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 8px;
+    border-radius: 999px;
+    background: var(--ui-success-bg);
+    color: var(--ui-success);
+    font-size: 0.61rem;
+    font-weight: 750;
+    white-space: nowrap;
+}
+
+.requirements-document-state--attention {
+    background: var(--ui-warning-bg);
+    color: var(--ui-warning);
+}
+
+.requirements-document-state--neutral {
+    background: #eef2f7;
+    color: var(--review-muted);
+}
+
+.requirements-document-chevron {
+    color: #8fa0b7;
+    font-size: 0.68rem;
+}
+
+.requirements-document-empty {
+    padding: 36px 20px;
+    color: var(--review-muted);
+    text-align: center;
+    font-size: 0.8rem;
+}
+
+.document-reviewer {
+    display: flex;
+    min-width: 0;
+    min-height: 630px;
+    flex-direction: column;
+    background: #fff;
+}
+
+.document-reviewer__empty {
+    display: grid;
+    flex: 1;
+    place-content: center;
+    justify-items: center;
+    min-height: 520px;
+    padding: 40px;
+    color: var(--review-muted);
+    text-align: center;
+}
+
+.document-reviewer__empty i {
+    margin-bottom: 14px;
+    color: #b7c4d6;
+    font-size: 2.3rem;
+}
+
+.document-reviewer__empty h2 {
+    margin: 0;
+    color: var(--review-ink);
+    font-size: 1rem;
+}
+
+.document-reviewer__empty p {
+    max-width: 390px;
+    margin: 7px 0 0;
+    font-size: 0.8rem;
+    line-height: 1.55;
+}
+
+.document-reviewer__content {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+}
+
+.document-reviewer__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 18px 20px 13px;
+}
+
+.document-reviewer__header > div {
+    min-width: 0;
+}
+
+.document-reviewer__header p {
+    overflow: hidden;
+    margin: 4px 0 0;
+    color: var(--review-muted);
+    font-size: 0.68rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.document-preview-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 38px;
+    padding: 5px 12px;
+    background: #30343a;
+    color: #fff;
+    font-size: 0.68rem;
+}
+
+.document-preview-toolbar > div {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.document-preview-toolbar button {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: #fff;
+}
+
+.document-preview-toolbar button:hover {
+    background: rgb(255 255 255 / 0.12);
+}
+
+.document-preview-toolbar strong {
+    min-width: 48px;
+    text-align: center;
+}
+
+.document-preview-canvas {
+    display: grid;
+    overflow: auto;
+    height: clamp(310px, 40vw, 470px);
+    place-items: start center;
+    padding: 18px;
+    background: #3e4349;
+}
+
+.document-preview-canvas iframe,
+.document-preview-canvas img {
+    width: var(--document-preview-width, 100%);
+    max-width: none;
+    min-height: 100%;
+    border: 0;
+    background: #fff;
+    box-shadow: 0 3px 12px rgb(0 0 0 / 0.28);
+}
+
+.document-preview-canvas img {
+    height: auto;
+    min-height: 0;
+}
+
+.document-preview-placeholder {
+    display: grid;
+    width: min(100%, 440px);
+    min-height: 250px;
+    place-content: center;
+    justify-items: center;
+    padding: 34px;
+    background: #fff;
+    color: var(--review-muted);
+    text-align: center;
+}
+
+.document-preview-placeholder i {
+    margin-bottom: 12px;
+    color: #94a3b8;
+    font-size: 2.7rem;
+}
+
+.document-preview-placeholder strong {
+    color: var(--review-ink);
+    font-size: 0.88rem;
+}
+
+.document-preview-placeholder p {
+    margin: 6px 0 0;
+    font-size: 0.73rem;
+}
+
+.document-reviewer__details {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 24px;
+    margin: 0;
+    padding: 14px 20px;
+    border-top: 1px solid var(--review-line);
+}
+
+.document-reviewer__details div {
+    display: grid;
+    grid-template-columns: 90px minmax(0, 1fr);
+    gap: 8px;
+}
+
+.document-reviewer__details dt {
+    color: var(--review-muted);
+    font-size: 0.66rem;
+    font-weight: 650;
+}
+
+.document-reviewer__details dd {
+    overflow: hidden;
+    margin: 0;
+    color: var(--review-ink);
+    font-size: 0.66rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.document-reviewer__actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: auto;
+    padding: 12px 20px 16px;
+    border-top: 1px solid var(--review-line);
+}
+
+.document-reviewer__actions .ui-button {
+    min-height: 36px;
+    padding: 7px 12px;
+    font-size: 0.72rem;
+}
+
+.ui-button--warning {
+    border-color: var(--ui-warning-border) !important;
+    background: var(--ui-warning-bg) !important;
+    color: var(--ui-warning) !important;
+}
+
+.recruitment-stage-intro {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0 0 18px;
+    padding: 12px 14px;
+    border: 1px solid #d9e7fa;
+    border-radius: 8px;
+    background: #f4f8ff;
+    color: #315488;
+    font-size: 0.78rem;
+}
+
+.recruitment-stage-intro p { margin: 0; }
+
+.applicant-stage-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.applicant-stage-grid .ui-stage-panel {
+    position: relative;
+    padding: 20px !important;
+    border-top: 3px solid #dbe7f7;
+    background: #fbfcfe;
+}
+
+.applicant-stage-number {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    margin-bottom: 14px;
+    place-items: center;
+    border-radius: 50%;
+    background: #e9f1ff;
+    color: var(--review-blue);
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+.applicant-decision-card {
+    display: grid;
+    grid-template-columns: minmax(280px, 0.85fr) minmax(400px, 1.15fr);
+    gap: 34px;
+    align-items: center;
+    padding: clamp(26px, 4vw, 44px);
+    border-top: 4px solid var(--review-blue);
+}
+
+.applicant-decision-card__copy {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.applicant-decision-card__icon {
+    display: grid;
+    flex: 0 0 48px;
+    width: 48px;
+    height: 48px;
+    place-items: center;
+    border-radius: 11px;
+    background: #eaf2ff;
+    color: var(--review-blue);
+    font-size: 1.15rem;
+}
+
+.applicant-decision-card__copy span {
+    display: block;
+    margin-top: 9px;
+    color: var(--review-muted);
+    font-size: 0.82rem;
+    line-height: 1.6;
+}
+
+.applicant-decision-card__actions {
+    justify-content: flex-end;
+}
+
+@media (max-width: 1280px) {
+    .requirements-workspace {
+        grid-template-columns: minmax(320px, 0.8fr) minmax(430px, 1.2fr);
+    }
+
+    .applicant-stage-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 1080px) {
+    .applicant-review-hero,
+    .applicant-overview-grid,
+    .applicant-decision-card {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .applicant-review-completion {
+        padding: 20px 0 0;
+        border-top: 1px solid var(--review-line);
+        border-left: 0;
+    }
+
+    .applicant-overview-column--aside {
+        position: static;
+    }
+
+    .requirements-workspace {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .requirements-browser {
+        border-right: 0;
+        border-bottom: 1px solid var(--review-line);
+    }
+
+    .requirements-document-list {
+        max-height: 390px;
+    }
+
+    .applicant-decision-card__actions {
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 700px) {
+    .applicant-review-hero {
+        padding: 18px;
+    }
+
+    .applicant-review-hero__identity {
+        align-items: flex-start;
+    }
+
+    .applicant-review-avatar {
+        flex-basis: 58px;
+        width: 58px;
+        height: 58px;
+    }
+
+    .applicant-review-hero__meta {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 7px;
+    }
+
+    .applicant-review-tabs button {
+        padding-inline: 12px;
+    }
+
+    .applicant-card,
+    .applicant-decision-card {
+        padding: 18px;
+    }
+
+    .requirements-browser__header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .requirements-sort,
+    .requirements-sort select {
+        width: 100%;
+    }
+
+    .requirements-document-item {
+        grid-template-columns: 54px minmax(0, 1fr) auto;
+        gap: 9px;
+    }
+
+    .requirements-document-thumb {
+        width: 54px;
+        height: 46px;
+    }
+
+    .requirements-document-state {
+        width: 24px;
+        height: 24px;
+        justify-content: center;
+        padding: 0;
+    }
+
+    .requirements-document-state span,
+    .requirements-document-chevron {
+        display: none;
+    }
+
+    .document-reviewer__details,
+    .applicant-stage-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .document-reviewer__actions .ui-button {
+        flex: 1 1 calc(50% - 8px);
+    }
+}
+
 /* 2026 applicant workspace redesign: bounded canvases, stronger type, compact records. */
 .gt-user-shell #mainContent {
     width: 100%;

@@ -4,10 +4,10 @@
       "C:\\Program Files\\nodejs\\node.exe",
       "C:\\xampp\\htdocs\\FinalResearch - Copy\\node_modules\\@playwright\\test\\cli.js",
       "test",
-      "tests/e2e/profile-salary.spec.ts",
+      "tests/e2e/application-workflow.spec.ts",
       "--project=chromium-desktop",
-      "-g",
-      "work experience|credential cards"
+      "--grep",
+      "secretary resubmission"
     ],
     "configFile": "C:\\xampp\\htdocs\\FinalResearch - Copy\\playwright.config.ts",
     "rootDir": "C:/xampp/htdocs/FinalResearch - Copy/tests/e2e",
@@ -197,8 +197,8 @@
         "CODEX_CI": "1",
         "CODEX_INTERNAL_ORIGINATOR_OVERRIDE": "codex_vscode",
         "CODEX_PERMISSION_PROFILE": ":danger-full-access",
-        "CODEX_SESSION_ID": "01a15f26-9203-7f13-bd26-88b8ef0572ce",
-        "CODEX_THREAD_ID": "01a15f26-9203-7f13-bd26-88b8ef0572ce",
+        "CODEX_SESSION_ID": "01a15f4d-a9d0-7012-b1e7-56262c1ea1e7",
+        "CODEX_THREAD_ID": "01a15f4d-a9d0-7012-b1e7-56262c1ea1e7",
         "CODEX_VERSION": "0.162.0-alpha.17.2",
         "COLOR": "0",
         "COLORTERM": "",
@@ -301,20 +301,20 @@
   },
   "suites": [
     {
-      "title": "profile-salary.spec.ts",
-      "file": "profile-salary.spec.ts",
+      "title": "application-workflow.spec.ts",
+      "file": "application-workflow.spec.ts",
       "column": 0,
       "line": 0,
       "specs": [],
       "suites": [
         {
-          "title": "applicant profile CRUD and salary projection",
-          "file": "profile-salary.spec.ts",
-          "line": 4,
+          "title": "application submission and cross-role recruitment workflow",
+          "file": "application-workflow.spec.ts",
+          "line": 9,
           "column": 6,
           "specs": [
             {
-              "title": "work experience, skill, and qualification records support add and delete",
+              "title": "secretary resubmission opens Requirements and accepts the requested replacement",
               "ok": true,
               "tags": [],
               "tests": [
@@ -324,8 +324,8 @@
                     {
                       "type": "serial",
                       "location": {
-                        "file": "C:\\xampp\\htdocs\\FinalResearch - Copy\\tests\\e2e\\profile-salary.spec.ts",
-                        "line": 4,
+                        "file": "C:\\xampp\\htdocs\\FinalResearch - Copy\\tests\\e2e\\application-workflow.spec.ts",
+                        "line": 9,
                         "column": 6
                       }
                     }
@@ -338,18 +338,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 6366,
+                      "duration": 4725,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-10-21T15:57:16.479Z",
+                      "startTime": "2026-10-21T16:41:35.892Z",
                       "annotations": [
                         {
                           "type": "serial",
                           "location": {
-                            "file": "C:\\xampp\\htdocs\\FinalResearch - Copy\\tests\\e2e\\profile-salary.spec.ts",
-                            "line": 4,
+                            "file": "C:\\xampp\\htdocs\\FinalResearch - Copy\\tests\\e2e\\application-workflow.spec.ts",
+                            "line": 9,
                             "column": 6
                           }
                         }
@@ -360,61 +360,9 @@
                   "status": "expected"
                 }
               ],
-              "id": "841eac97529272886456-2951446cb6f1d466d9a9",
-              "file": "profile-salary.spec.ts",
-              "line": 131,
-              "column": 7
-            },
-            {
-              "title": "credential cards stay inside a mobile viewport",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 45000,
-                  "annotations": [
-                    {
-                      "type": "serial",
-                      "location": {
-                        "file": "C:\\xampp\\htdocs\\FinalResearch - Copy\\tests\\e2e\\profile-salary.spec.ts",
-                        "line": 4,
-                        "column": 6
-                      }
-                    }
-                  ],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium-desktop",
-                  "projectName": "chromium-desktop",
-                  "results": [
-                    {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 2371,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-10-21T15:57:23.418Z",
-                      "annotations": [
-                        {
-                          "type": "serial",
-                          "location": {
-                            "file": "C:\\xampp\\htdocs\\FinalResearch - Copy\\tests\\e2e\\profile-salary.spec.ts",
-                            "line": 4,
-                            "column": 6
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "expected"
-                }
-              ],
-              "id": "841eac97529272886456-108577c795bb89f2e511",
-              "file": "profile-salary.spec.ts",
-              "line": 177,
+              "id": "add1d158100cfb6cf67c-696cbc7945510357cd91",
+              "file": "application-workflow.spec.ts",
+              "line": 133,
               "column": 7
             }
           ]
@@ -424,9 +372,9 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-10-21T15:57:13.619Z",
-    "duration": 12642.719000000001,
-    "expected": 2,
+    "startTime": "2026-10-21T16:41:34.108Z",
+    "duration": 7390.406,
+    "expected": 1,
     "skipped": 0,
     "unexpected": 0,
     "flaky": 0

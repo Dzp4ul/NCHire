@@ -30,9 +30,10 @@ if (!$user_id) {
     exit;
 }
 
-// Fetch application details with first_name and last_name from applicants table
+// Fetch application details with the account profile as the current identity.
 $stmt = $conn->prepare("
-    SELECT ja.*, a.first_name, a.last_name, a.address 
+    SELECT ja.*, a.first_name, a.last_name, a.applicant_email AS current_email,
+           a.contact_number AS current_contact_number, a.address AS current_address
     FROM job_applicants ja 
     LEFT JOIN applicants a ON ja.user_id = a.id 
     WHERE ja.id = ? AND ja.user_id = ?
@@ -47,6 +48,22 @@ if ($result->num_rows === 0) {
 }
 
 $application = $result->fetch_assoc();
+
+$current_name = trim(($application['first_name'] ?? '') . ' ' . ($application['last_name'] ?? ''));
+if ($current_name !== '') {
+    $application['full_name'] = $current_name;
+    $application['applicant_name'] = $application['first_name'];
+}
+if (!empty($application['current_email'])) {
+    $application['applicant_email'] = $application['current_email'];
+}
+if (!empty($application['current_contact_number'])) {
+    $application['contact_num'] = $application['current_contact_number'];
+}
+if (!empty($application['current_address'])) {
+    $application['address'] = $application['current_address'];
+}
+unset($application['current_email'], $application['current_contact_number'], $application['current_address']);
 
 // If first_name and last_name are not available from applicants table, try to split full_name
 if (empty($application['first_name']) && !empty($application['full_name'])) {

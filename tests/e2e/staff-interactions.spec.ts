@@ -57,7 +57,20 @@ test.describe('staff interactive controls', () => {
     await applicants.locator('tr').filter({ hasText: 'Casey Pipeline' }).first()
       .getByRole('button', { name: 'View Details' }).click();
     await expect(page.locator('#applicantDetailsSection')).toBeVisible();
+    await expect(page.locator('[data-applicant-tab="requirements"]')).toHaveClass(/is-active/);
+    await expect(page.locator('#documentReviewerContent')).toBeVisible();
+    await expect(page.locator('#selectedDocumentTitle')).toContainText('Application Letter');
+
+    await page.locator('[data-applicant-tab="overview"]').click();
+    await expect(page.locator('#applicantOverviewPanel')).toBeVisible();
     await expect(page.locator('#personalInfo')).toContainText('Casey');
+
+    await page.locator('[data-applicant-tab="recruitment"]').click();
+    await expect(page.locator('#applicantRecruitmentPanel')).toBeVisible();
+    await page.locator('[data-applicant-tab="decision"]').click();
+    await expect(page.locator('#applicantDecisionPanel')).toBeVisible();
+    await expect(page.locator('#actionButtons')).toBeVisible();
+
     await page.getByRole('button', { name: 'Back to Applicants' }).click();
     await expect(page.locator('#applicantsSection')).toBeVisible();
 

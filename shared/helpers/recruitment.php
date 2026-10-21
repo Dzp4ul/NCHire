@@ -46,6 +46,41 @@ if (!function_exists('nc_table_exists')) {
     }
 }
 
+if (!function_exists('nc_sync_applicant_identity')) {
+    /**
+     * Keep the identity copied onto submitted applications in sync with the
+     * applicant's account profile. Staff workflows still use these columns
+     * for notifications and exports, so updating only `applicants` leaves old
+     * applications displaying and messaging the applicant's previous name.
+     */
+    function nc_sync_applicant_identity(
+        mysqli $conn,
+        int $userId,
+        string $firstName,
+        string $lastName,
+        string $email,
+        string $contactNumber
+    ): bool {
+        $fullName = trim($firstName . ' ' . $lastName);
+        $stmt = $conn->prepare("
+            UPDATE job_applicants
+            SET applicant_name = ?,
+                full_name = ?,
+                applicant_email = ?,
+                contact_num = ?
+            WHERE user_id = ?
+        ");
+        if (!$stmt) {
+            return false;
+        }
+
+        $stmt->bind_param('ssssi', $firstName, $fullName, $email, $contactNumber, $userId);
+        $success = $stmt->execute();
+        $stmt->close();
+        return $success;
+    }
+}
+
 if (!function_exists('nc_current_academic_year')) {
     function nc_current_academic_year(): string
     {

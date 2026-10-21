@@ -35,8 +35,8 @@ if ($admin_role === 'Admin') {
 if ($admin_role === 'Secretary') {
     $query = "SELECT 
                 ja.id,
-                ja.full_name,
-                ja.applicant_email,
+                COALESCE(NULLIF(TRIM(CONCAT_WS(' ', a.first_name, a.last_name)), ''), ja.full_name) AS full_name,
+                COALESCE(NULLIF(a.applicant_email, ''), ja.applicant_email) AS applicant_email,
                 ja.position,
                 ja.applied_date,
                 ja.rejected_date,
@@ -63,8 +63,8 @@ if ($admin_role === 'Secretary') {
 } elseif (($admin_role === 'Department Head' || $admin_role === 'HR Manager' || $admin_role === 'Recruiter') && !empty($admin_department)) {
     $query = "SELECT 
                 ja.id,
-                ja.full_name,
-                ja.applicant_email,
+                COALESCE(NULLIF(TRIM(CONCAT_WS(' ', a.first_name, a.last_name)), ''), ja.full_name) AS full_name,
+                COALESCE(NULLIF(a.applicant_email, ''), ja.applicant_email) AS applicant_email,
                 ja.position,
                 ja.applied_date,
                 ja.rejected_date,

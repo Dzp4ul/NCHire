@@ -353,7 +353,9 @@ if (isset($_POST['savePersonal'])) {
         }
     }
     
-    // Update applicants table with correct column names
+    // Update the account and every submitted application as one operation so
+    // applicant, secretary, and dean views all use the same identity.
+    $conn->begin_transaction();
     $sql = "UPDATE applicants SET 
             first_name = ?, 
             last_name = ?, 
@@ -364,7 +366,15 @@ if (isset($_POST['savePersonal'])) {
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("sssssi", $first_name, $last_name, $email, $phone, $address, $user_id);
     
-    if ($stmt->execute()) {
+    if ($stmt->execute() && nc_sync_applicant_identity(
+        $conn,
+        (int)$user_id,
+        $first_name,
+        $last_name,
+        $email,
+        $phone
+    )) {
+        $conn->commit();
         error_log("SUCCESS: Personal information updated for user_id: $user_id");
         
         // Update session data
@@ -379,8 +389,10 @@ if (isset($_POST['savePersonal'])) {
             'message' => 'Personal information saved successfully'
         ]);
     } else {
-        error_log("ERROR: Failed to update personal information: " . $stmt->error);
-        echo json_encode(['success' => false, 'message' => 'Error saving personal information: ' . $stmt->error]);
+        $save_error = $stmt->error ?: $conn->error;
+        $conn->rollback();
+        error_log("ERROR: Failed to update personal information: " . $save_error);
+        echo json_encode(['success' => false, 'message' => 'Error saving personal information: ' . $save_error]);
     }
     $stmt->close();
     error_log("=== PERSONAL INFO SAVE END ===");

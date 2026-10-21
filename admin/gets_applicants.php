@@ -39,12 +39,12 @@ try {
         $sql = "
             SELECT 
                 ja.id, 
-                ja.full_name, 
+                COALESCE(NULLIF(TRIM(CONCAT_WS(' ', a.first_name, a.last_name)), ''), ja.full_name) AS full_name,
                 ja.position, 
                 ja.applied_date, 
                 ja.status, 
-                ja.applicant_email, 
-                ja.contact_num,
+                COALESCE(NULLIF(a.applicant_email, ''), ja.applicant_email) AS applicant_email,
+                COALESCE(NULLIF(a.contact_number, ''), ja.contact_num) AS contact_num,
                 ja.job_id,
                 ja.assigned_to_department,
                 ja.workflow_stage,
@@ -76,12 +76,12 @@ try {
         $sql = "
             SELECT 
                 ja.id, 
-                ja.full_name, 
+                COALESCE(NULLIF(TRIM(CONCAT_WS(' ', a.first_name, a.last_name)), ''), ja.full_name) AS full_name,
                 ja.position, 
                 ja.applied_date, 
                 ja.status, 
-                ja.applicant_email, 
-                ja.contact_num,
+                COALESCE(NULLIF(a.applicant_email, ''), ja.applicant_email) AS applicant_email,
+                COALESCE(NULLIF(a.contact_number, ''), ja.contact_num) AS contact_num,
                 ja.job_id,
                 ja.assigned_to_department,
                 ja.workflow_stage,
@@ -109,12 +109,12 @@ try {
         $sql = "
             SELECT 
                 ja.id, 
-                ja.full_name, 
+                COALESCE(NULLIF(TRIM(CONCAT_WS(' ', a.first_name, a.last_name)), ''), ja.full_name) AS full_name,
                 ja.position, 
                 ja.applied_date, 
                 ja.status, 
-                ja.applicant_email, 
-                ja.contact_num,
+                COALESCE(NULLIF(a.applicant_email, ''), ja.applicant_email) AS applicant_email,
+                COALESCE(NULLIF(a.contact_number, ''), ja.contact_num) AS contact_num,
                 ja.job_id,
                 ja.assigned_to_department,
                 ja.workflow_stage,

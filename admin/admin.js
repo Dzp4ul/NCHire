@@ -2461,6 +2461,237 @@ async function loadDashboardData() {
 
 // Global variable to store current applicant data
 let currentApplicantData = null;
+let currentApplicantDocuments = [];
+let currentApplicantDocumentFilter = 'all';
+let currentApplicantDocumentSort = 'requirement';
+let currentSelectedApplicantDocument = null;
+let applicantDocumentPreviewZoom = 100;
+
+function switchApplicantDetailTab(tabName, trigger = null) {
+    const workspace = document.getElementById('applicantDetailsSection');
+    if (!workspace) return;
+
+    workspace.querySelectorAll('[data-applicant-panel]').forEach(panel => {
+        const isActive = panel.dataset.applicantPanel === tabName;
+        panel.classList.toggle('hidden', !isActive);
+        panel.classList.toggle('is-active', isActive);
+    });
+
+    workspace.querySelectorAll('[data-applicant-tab]').forEach(button => {
+        const isActive = button.dataset.applicantTab === tabName;
+        button.classList.toggle('is-active', isActive);
+        button.setAttribute('aria-current', isActive ? 'page' : 'false');
+    });
+
+    if (trigger) trigger.blur();
+}
+
+function getApplicantDocumentExtension(fileName) {
+    const cleanName = String(fileName || '').split('?')[0];
+    return cleanName.includes('.') ? cleanName.split('.').pop().toLowerCase() : 'file';
+}
+
+function formatApplicantDocumentDate(value) {
+    if (!value) return 'Date not recorded';
+    const parsed = new Date(String(value).replace(' ', 'T'));
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+    });
+}
+
+function updateRequirementsCompletion(completion, documents) {
+    const requiredDocuments = documents.filter(document => document.required);
+    const fallbackTotal = requiredDocuments.length;
+    const fallbackComplete = requiredDocuments.filter(document => document.submitted).length;
+    const total = Number(completion?.required_total ?? fallbackTotal) || fallbackTotal;
+    const complete = Math.min(total, Number(completion?.required_complete ?? fallbackComplete) || fallbackComplete);
+    const percent = total > 0 ? Math.round((complete / total) * 100) : 100;
+    const isComplete = total === 0 || complete >= total;
+    const submittedCount = documents.filter(document => document.submitted).length;
+
+    const label = document.getElementById('requirementsCompletionLabel');
+    const percentLabel = document.getElementById('requirementsCompletionPercent');
+    const bar = document.getElementById('requirementsCompletionBar');
+    const message = document.getElementById('requirementsCompletionMessage');
+    const tabCount = document.getElementById('requirementsTabCount');
+    const submittedLabel = document.getElementById('submittedDocumentsCount');
+
+    if (label) label.textContent = `${complete} of ${total} required submitted`;
+    if (percentLabel) percentLabel.textContent = `${percent}%`;
+    if (bar) bar.style.width = `${percent}%`;
+    if (tabCount) tabCount.textContent = submittedCount;
+    if (submittedLabel) submittedLabel.textContent = `(${submittedCount})`;
+    if (message) {
+        message.classList.toggle('is-incomplete', !isComplete);
+        message.innerHTML = isComplete
+            ? '<i class="fas fa-check-circle" aria-hidden="true"></i>All required documents have been submitted.'
+            : `<i class="fas fa-triangle-exclamation" aria-hidden="true"></i>${Math.max(total - complete, 0)} required document${total - complete === 1 ? '' : 's'} still need attention.`;
+    }
+}
+
+function filterApplicantDocuments(filterName, trigger = null) {
+    currentApplicantDocumentFilter = filterName;
+    document.querySelectorAll('[data-document-filter]').forEach(button => {
+        button.classList.toggle('is-active', button.dataset.documentFilter === filterName);
+    });
+    renderApplicantDocumentList();
+    if (trigger) trigger.blur();
+}
+
+function sortApplicantDocuments(sortName) {
+    currentApplicantDocumentSort = sortName;
+    renderApplicantDocumentList();
+}
+
+function getVisibleApplicantDocuments() {
+    const visible = currentApplicantDocuments.filter(document => {
+        if (currentApplicantDocumentFilter === 'submitted') return document.submitted && !document.needsAttention;
+        if (currentApplicantDocumentFilter === 'attention') return document.needsAttention;
+        return true;
+    });
+
+    return visible.sort((left, right) => {
+        if (currentApplicantDocumentSort === 'name') return left.label.localeCompare(right.label);
+        if (currentApplicantDocumentSort === 'newest') {
+            return new Date(right.uploadedAt || 0).getTime() - new Date(left.uploadedAt || 0).getTime();
+        }
+        return left.order - right.order;
+    });
+}
+
+function renderApplicantDocumentList() {
+    const container = document.getElementById('documentsGrid');
+    if (!container) return;
+
+    const documents = getVisibleApplicantDocuments();
+    if (documents.length === 0) {
+        container.innerHTML = '<div class="requirements-document-empty"><i class="fas fa-folder-open mb-2" aria-hidden="true"></i><br>No documents match this filter.</div>';
+        return;
+    }
+
+    container.innerHTML = documents.map(document => {
+        const stateLabel = document.submitted
+            ? (document.needsAttention ? 'Needs review' : 'Submitted')
+            : (document.required ? 'Missing' : 'Optional');
+        const stateClass = document.needsAttention
+            ? ' requirements-document-state--attention'
+            : (!document.submitted ? ' requirements-document-state--neutral' : '');
+        const thumb = document.isImage && document.url
+            ? `<img src="${escapeAdminHtml(document.url)}" alt="">`
+            : `<i class="fas ${document.isPdf ? 'fa-file-pdf' : document.submitted ? 'fa-file-lines' : 'fa-file-circle-exclamation'}" aria-hidden="true"></i>`;
+        const typeClass = document.isPdf ? ' requirements-document-thumb--pdf' : '';
+        const uploadedMeta = document.submitted
+            ? `<span><i class="fas fa-file" aria-hidden="true"></i>${escapeAdminHtml(document.extension.toUpperCase())}</span><span><i class="fas fa-calendar" aria-hidden="true"></i>${escapeAdminHtml(formatApplicantDocumentDate(document.uploadedAt))}</span>`
+            : `<span>${document.required ? 'Required document' : 'Optional document'}</span>`;
+        const selectedClass = currentSelectedApplicantDocument?.key === document.key ? ' is-selected' : '';
+        const missingClass = document.submitted ? '' : ' requirements-document-item--missing';
+        const element = document.submitted ? 'button' : 'div';
+        const buttonAttribute = document.submitted ? ' type="button"' : '';
+
+        return `<${element}${buttonAttribute} class="requirements-document-item${selectedClass}${missingClass}" data-document-key="${escapeAdminHtml(document.key)}">
+            <span class="requirements-document-thumb${typeClass}">${thumb}</span>
+            <span class="requirements-document-copy">
+                <strong>${escapeAdminHtml(document.label)}</strong>
+                <span>${document.submitted ? escapeAdminHtml(document.fileName) : 'No file submitted'}</span>
+                <span class="requirements-document-meta">${uploadedMeta}</span>
+            </span>
+            <span>
+                <span class="requirements-document-state${stateClass}"><i class="fas ${document.submitted && !document.needsAttention ? 'fa-check-circle' : document.required || document.needsAttention ? 'fa-circle-exclamation' : 'fa-circle-minus'}" aria-hidden="true"></i><span>${stateLabel}</span></span>
+                ${document.submitted ? '<i class="fas fa-chevron-right requirements-document-chevron ml-2" aria-hidden="true"></i>' : ''}
+            </span>
+        </${element}>`;
+    }).join('');
+
+    container.querySelectorAll('button[data-document-key]').forEach(button => {
+        button.addEventListener('click', () => selectApplicantDocument(button.dataset.documentKey));
+    });
+
+    const selectedIsVisible = documents.some(document => document.submitted && document.key === currentSelectedApplicantDocument?.key);
+    if (!selectedIsVisible) {
+        const firstSubmitted = documents.find(document => document.submitted);
+        if (firstSubmitted) selectApplicantDocument(firstSubmitted.key, false);
+    }
+}
+
+function selectApplicantDocument(documentKey, rerenderList = true) {
+    const selected = currentApplicantDocuments.find(document => document.key === documentKey && document.submitted);
+    if (!selected) return;
+
+    currentSelectedApplicantDocument = selected;
+    applicantDocumentPreviewZoom = 100;
+
+    if (rerenderList) {
+        document.querySelectorAll('.requirements-document-item').forEach(item => {
+            item.classList.toggle('is-selected', item.dataset.documentKey === documentKey);
+        });
+    }
+
+    const empty = document.getElementById('documentReviewerEmpty');
+    const content = document.getElementById('documentReviewerContent');
+    if (empty) empty.classList.add('hidden');
+    if (content) content.classList.remove('hidden');
+
+    document.getElementById('selectedDocumentTitle').textContent = selected.label;
+    document.getElementById('selectedDocumentFilename').textContent = selected.fileName;
+    document.getElementById('selectedDocumentDetailName').textContent = selected.fileName;
+    document.getElementById('selectedDocumentDetailType').textContent = selected.extension.toUpperCase();
+    document.getElementById('selectedDocumentDetailVersion').textContent = `Version ${selected.version}`;
+    document.getElementById('selectedDocumentDetailDate').textContent = formatApplicantDocumentDate(selected.uploadedAt);
+    document.getElementById('selectedDocumentPage').textContent = selected.isPdf ? 'PDF preview' : selected.isImage ? 'Image preview' : 'File preview';
+
+    const status = document.getElementById('selectedDocumentStatus');
+    if (status) {
+        status.className = `ui-status ${selected.needsAttention ? 'ui-status--warning' : 'ui-status--success'}`;
+        status.innerHTML = selected.needsAttention
+            ? '<i class="fas fa-circle-exclamation" aria-hidden="true"></i>Needs review'
+            : '<i class="fas fa-check-circle" aria-hidden="true"></i>Submitted';
+    }
+
+    const download = document.getElementById('selectedDocumentDownload');
+    if (download) {
+        download.href = selected.url;
+        download.setAttribute('download', selected.fileName);
+    }
+
+    const preview = document.getElementById('selectedDocumentPreview');
+    if (preview) {
+        preview.style.setProperty('--document-preview-width', '100%');
+        if (selected.isImage) {
+            preview.innerHTML = `<img src="${escapeAdminHtml(selected.url)}" alt="Preview of ${escapeAdminHtml(selected.label)}">`;
+        } else if (selected.isPdf) {
+            preview.innerHTML = `<iframe src="${escapeAdminHtml(selected.url)}#toolbar=0&navpanes=0" title="Preview of ${escapeAdminHtml(selected.label)}"></iframe>`;
+        } else {
+            preview.innerHTML = `<div class="document-preview-placeholder"><i class="fas fa-file-lines" aria-hidden="true"></i><strong>Preview unavailable for ${escapeAdminHtml(selected.extension.toUpperCase())} files</strong><p>Open the document in a new tab or download it to review its contents.</p></div>`;
+        }
+    }
+
+    const zoom = document.getElementById('documentPreviewZoom');
+    if (zoom) zoom.textContent = '100%';
+}
+
+function resizeApplicantDocumentPreview(change) {
+    if (!currentSelectedApplicantDocument) return;
+    applicantDocumentPreviewZoom = Math.min(160, Math.max(60, applicantDocumentPreviewZoom + change));
+    const preview = document.getElementById('selectedDocumentPreview');
+    const label = document.getElementById('documentPreviewZoom');
+    if (preview) preview.style.setProperty('--document-preview-width', `${applicantDocumentPreviewZoom}%`);
+    if (label) label.textContent = `${applicantDocumentPreviewZoom}%`;
+}
+
+function openSelectedApplicantDocument() {
+    if (!currentSelectedApplicantDocument) return;
+    viewDocument(currentSelectedApplicantDocument.url, currentSelectedApplicantDocument.label, currentSelectedApplicantDocument.isImage);
+}
+
+function requestSelectedDocumentResubmission() {
+    if (!currentSelectedApplicantDocument) return;
+    openResubmitModal(currentSelectedApplicantDocument.field);
+}
 
 // View Applicant Details Function
 async function viewApplicantDetails(applicantId) {
@@ -2501,7 +2732,27 @@ async function viewApplicantDetails(applicantId) {
             const stageBadge = document.getElementById('actionStageBadge');
             if (reviewName) reviewName.textContent = applicant.full_name || 'Applicant Review';
             if (reviewPosition) reviewPosition.textContent = job.teaching_load_title || applicant.position || 'Teaching load application';
-            if (stageBadge) stageBadge.innerHTML = `<span class="ui-status ui-status--neutral">Current stage: ${escapeAdminHtml(stageLabel)}</span>`;
+            if (stageBadge) stageBadge.innerHTML = `<span class="ui-status ui-status--neutral">Stage: ${escapeAdminHtml(stageLabel)}</span>`;
+
+            const reviewEmail = document.getElementById('applicantReviewEmail');
+            const reviewPhone = document.getElementById('applicantReviewPhone');
+            const reviewId = document.getElementById('applicantReviewId');
+            const reviewDepartment = document.getElementById('applicantReviewDepartment');
+            const reviewSubmitted = document.getElementById('applicantReviewSubmitted');
+            const reviewAvatar = document.getElementById('applicantReviewAvatar');
+            if (reviewEmail) reviewEmail.textContent = applicant.applicant_email || 'Email unavailable';
+            if (reviewPhone) reviewPhone.textContent = applicant.contact_num || 'Phone unavailable';
+            if (reviewId) reviewId.textContent = `APP-${String(applicant.id || applicantId).padStart(5, '0')}`;
+            if (reviewDepartment) reviewDepartment.textContent = applicant.assigned_to_department || job.department_role || 'Department not assigned';
+            if (reviewSubmitted) reviewSubmitted.textContent = applicant.applied_date ? `Submitted ${formatDate(applicant.applied_date)}` : 'Submission date unavailable';
+            if (reviewAvatar) {
+                if (applicant.profile_picture) {
+                    const profileFile = encodeURIComponent(String(applicant.profile_picture).split(/[\\/]/).pop());
+                    reviewAvatar.innerHTML = `<img src="../user/uploads/profile_pictures/${profileFile}" alt="${escapeAdminHtml(applicant.full_name || 'Applicant')}">`;
+                } else {
+                    reviewAvatar.textContent = getInitials(applicant.full_name || 'Applicant').slice(0, 2).toUpperCase();
+                }
+            }
             
             // Update status badge in Actions section
             const statusBadgeHTML = getStatusBadge(applicant.status);
@@ -2713,20 +2964,19 @@ async function viewApplicantDetails(applicantId) {
             }
             
             // Update documents grid
-            const documentsGrid = document.getElementById('documentsGrid');
             const legacyDocuments = [
-                { field: 'application_letter', label: 'Application Letter' },
-                { field: 'letter_of_intent', label: 'Letter of Intent' },
-                { field: 'resume', label: 'Updated and Comprehensive Resume' },
-                { field: 'tor', label: 'Transcript of Record (TOR)' },
-                { field: 'diploma', label: 'Diploma' },
-                { field: 'professional_license', label: 'Professional License' },
-                { field: 'coe', label: 'Certificate of Employment (COE)' },
-                { field: 'seminars_trainings', label: 'Seminar/Training Certificates' },
-                { field: 'masteral_cert', label: 'Masteral Certificate' },
-                { field: 'certificate_of_grades', label: 'Certificate of Grades (COG)' },
-                { field: 'proof_of_enrollment', label: 'Proof of Enrollment' },
-                { field: 'faculty_evaluation', label: 'Faculty Evaluation (Optional - Renewal)' }
+                { field: 'application_letter', label: 'Application Letter', required: true },
+                { field: 'letter_of_intent', label: 'Letter of Intent', required: true },
+                { field: 'resume', label: 'Updated and Comprehensive Resume', required: true },
+                { field: 'tor', label: 'Transcript of Record (TOR)', required: true },
+                { field: 'diploma', label: 'Diploma', required: true },
+                { field: 'professional_license', label: 'Professional License', required: true },
+                { field: 'coe', label: 'Certificate of Employment (COE)', required: true },
+                { field: 'seminars_trainings', label: 'Seminar/Training Certificates', required: false },
+                { field: 'masteral_cert', label: 'Masteral Certificate', required: false },
+                { field: 'certificate_of_grades', label: 'Certificate of Grades (COG)', required: false },
+                { field: 'proof_of_enrollment', label: 'Proof of Enrollment', required: false },
+                { field: 'faculty_evaluation', label: 'Faculty Evaluation (Optional - Renewal)', required: false }
             ];
             const documents = Array.isArray(data.application_requirements) && data.application_requirements.length
                 ? data.application_requirements.map(requirement => ({
@@ -2736,73 +2986,46 @@ async function viewApplicantDetails(applicantId) {
                     submission: requirement.submission || null
                 }))
                 : legacyDocuments;
-            
-            console.log('📄 Document files from database:');
-            console.log('  Application Letter:', applicant.application_letter);
-            console.log('  Letter of Intent:', applicant.letter_of_intent);
-            console.log('  Resume:', applicant.resume);
-            console.log('  TOR:', applicant.tor);
-            console.log('  Diploma:', applicant.diploma);
-            console.log('  Professional License:', applicant.professional_license);
-            console.log('  COE:', applicant.coe);
-            console.log('  Seminars/Trainings:', applicant.seminars_trainings);
-            console.log('  Masteral Cert:', applicant.masteral_cert);
-            console.log('  Certificate of Grades:', applicant.certificate_of_grades);
-            console.log('  Proof of Enrollment:', applicant.proof_of_enrollment);
-            
-            let documentsHTML = '';
-            documents.forEach(doc => {
-                const fileName = doc.submission?.original_filename || applicant[doc.field];
-                if (fileName) {
-                    const documentUrl = doc.submission?.download_url || getApplicantUploadUrl(fileName);
-                    const fileExtension = fileName.split('.').pop().toLowerCase();
-                    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileExtension);
-                    const isPdf = fileExtension === 'pdf';
-                    
-                    documentsHTML += `
-                        <div class="border border-gray-200 rounded-lg p-4">
-                            <div class="flex items-center justify-between mb-2">
-                                <h3 class="font-medium text-gray-900">${escapeAdminHtml(doc.label)}</h3>
-                                <div class="flex items-center gap-2">
-                                    <button data-document-url="${escapeAdminHtml(documentUrl)}" data-document-label="${escapeAdminHtml(doc.label)}" data-document-image="${isImage ? '1' : '0'}" onclick="viewDocument(this.dataset.documentUrl, this.dataset.documentLabel, this.dataset.documentImage === '1')"
-                                            class="text-blue-600 hover:text-blue-800 text-sm">
-                                        <i class="fas fa-eye"></i> View
-                                    </button>
-                                    <a href="${escapeAdminHtml(documentUrl)}"
-                                       download 
-                                       class="text-green-600 hover:text-green-800 text-sm">
-                                        <i class="fas fa-download"></i> Download
-                                    </a>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-2 text-gray-600 text-sm">
-                                <i class="fas ${isImage ? 'fa-image' : isPdf ? 'fa-file-pdf' : 'fa-file-alt'}"></i>
-                                <span class="truncate">${escapeAdminHtml(fileName)}</span>
-                            </div>
-                            <div class="mt-2 flex flex-wrap gap-2">
-                                <span class="ui-status ui-status--success">Submitted</span>
-                                ${String(applicant.resubmission_documents || '').includes(doc.field) ? '<span class="ui-status ui-status--warning">Resubmission requested</span>' : ''}
-                            </div>
-                            ${isImage ? `
-                                <div class="mt-3">
-                                    <img src="${escapeAdminHtml(documentUrl)}"
-                                         alt="${escapeAdminHtml(doc.label)}"
-                                         class="w-full h-32 object-cover rounded border cursor-pointer"
-                                         data-document-url="${escapeAdminHtml(documentUrl)}" data-document-label="${escapeAdminHtml(doc.label)}" onclick="viewDocument(this.dataset.documentUrl, this.dataset.documentLabel, true)">
-                                </div>
-                            ` : ''}
-                        </div>
-                    `;
-                } else if (doc.required) {
-                    documentsHTML += `<div class="rounded-lg border border-amber-200 bg-amber-50 p-4"><div class="flex items-center justify-between gap-3"><h3 class="font-medium text-gray-900">${escapeAdminHtml(doc.label)}</h3><span class="ui-status ui-status--warning">Missing required document</span></div></div>`;
-                }
+            currentApplicantDocuments = documents.map((document, index) => {
+                const fileName = document.submission?.original_filename || applicant[document.field] || '';
+                const extension = getApplicantDocumentExtension(fileName);
+                const submitted = Boolean(fileName);
+                const resubmissionFields = String(applicant.resubmission_documents || '').split(',').map(value => value.trim());
+                return {
+                    key: String(document.submission?.id || document.field || index),
+                    field: document.field,
+                    label: document.label || 'Application document',
+                    required: Boolean(document.required),
+                    submission: document.submission || null,
+                    fileName,
+                    extension,
+                    submitted,
+                    needsAttention: (Boolean(document.required) && !submitted) || resubmissionFields.includes(document.field),
+                    isImage: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(extension),
+                    isPdf: extension === 'pdf',
+                    url: submitted ? (document.submission?.download_url || getApplicantUploadUrl(fileName)) : '',
+                    uploadedAt: document.submission?.uploaded_at || applicant.applied_date || '',
+                    version: Number(document.submission?.version_number || 1),
+                    order: index
+                };
             });
-            
-            if (documentsHTML === '') {
-                documentsHTML = '<p class="text-gray-500 text-center py-4">No documents submitted</p>';
+
+            currentApplicantDocumentFilter = 'all';
+            currentApplicantDocumentSort = 'requirement';
+            currentSelectedApplicantDocument = currentApplicantDocuments.find(document => document.submitted) || null;
+            document.querySelectorAll('[data-document-filter]').forEach(button => {
+                button.classList.toggle('is-active', button.dataset.documentFilter === 'all');
+            });
+            const sortSelect = document.getElementById('requirementsSort');
+            if (sortSelect) sortSelect.value = 'requirement';
+            updateRequirementsCompletion(data.requirements_completion, currentApplicantDocuments);
+            renderApplicantDocumentList();
+            if (currentSelectedApplicantDocument) {
+                selectApplicantDocument(currentSelectedApplicantDocument.key, false);
+            } else {
+                document.getElementById('documentReviewerEmpty')?.classList.remove('hidden');
+                document.getElementById('documentReviewerContent')?.classList.add('hidden');
             }
-            
-            documentsGrid.innerHTML = documentsHTML;
             
             // Update interview information if available
             const interviewInfo = document.getElementById('interviewInfo');
@@ -3000,6 +3223,7 @@ async function viewApplicantDetails(applicantId) {
             });
             const applicantDetailsSection = document.getElementById('applicantDetailsSection');
             applicantDetailsSection.classList.remove('hidden');
+            switchApplicantDetailTab('requirements');
             resetWorkspacePosition(applicantDetailsSection);
             
         } else {
@@ -3022,6 +3246,10 @@ function getStatusBadge(status) {
     let icon = '';
     
     switch(status) {
+        case 'Submitted':
+            colorClass = 'bg-green-100 text-green-800';
+            icon = '<i class="fas fa-check-circle mr-1"></i>';
+            break;
         case 'Pending':
             colorClass = 'bg-yellow-100 text-yellow-800';
             icon = '<i class="fas fa-clock mr-1"></i>';
@@ -3506,25 +3734,20 @@ function closeScheduleModal() {
     document.getElementById('scheduleForm').reset();
 }
 
-function openResubmitModal() {
+function openResubmitModal(preselectedField = '') {
     // Get the document checkboxes container
     const checkboxContainer = document.getElementById('documentCheckboxes');
-    
-    // Define all possible documents with their labels
-    const allDocuments = [
-        { field: 'application_letter', label: 'Application Letter' },
-        { field: 'letter_of_intent', label: 'Letter of Intent' },
-        { field: 'resume', label: 'Updated and Comprehensive Resume' },
-        { field: 'tor', label: 'Transcript of Record (TOR)' },
-        { field: 'diploma', label: 'Diploma' },
-        { field: 'professional_license', label: 'Professional License' },
-        { field: 'coe', label: 'Certificate of Employment (COE)' },
-        { field: 'seminars_trainings', label: 'Seminar/Training Certificates' },
-        { field: 'masteral_cert', label: 'Masteral Certificate' },
-        { field: 'certificate_of_grades', label: 'Certificate of Grades (COG)' },
-        { field: 'proof_of_enrollment', label: 'Proof of Enrollment' },
-        { field: 'faculty_evaluation', label: 'Faculty Evaluation (Optional - Renewal)' }
+    const fallbackDocuments = [
+        { field: 'application_letter', label: 'Application Letter' }, { field: 'letter_of_intent', label: 'Letter of Intent' },
+        { field: 'resume', label: 'Updated and Comprehensive Resume' }, { field: 'tor', label: 'Transcript of Record (TOR)' },
+        { field: 'diploma', label: 'Diploma' }, { field: 'professional_license', label: 'Professional License' },
+        { field: 'coe', label: 'Certificate of Employment (COE)' }, { field: 'seminars_trainings', label: 'Seminar/Training Certificates' },
+        { field: 'masteral_cert', label: 'Masteral Certificate' }, { field: 'certificate_of_grades', label: 'Certificate of Grades (COG)' },
+        { field: 'proof_of_enrollment', label: 'Proof of Enrollment' }, { field: 'faculty_evaluation', label: 'Faculty Evaluation (Optional - Renewal)' }
     ];
+    const allDocuments = currentApplicantDocuments.length
+        ? currentApplicantDocuments.filter(document => document.submitted)
+        : fallbackDocuments.filter(document => currentApplicantData && currentApplicantData[document.field]);
     
     // Clear existing checkboxes
     checkboxContainer.innerHTML = '';
@@ -3532,20 +3755,20 @@ function openResubmitModal() {
     // Only show checkboxes for documents that were uploaded
     let uploadedCount = 0;
     allDocuments.forEach(doc => {
-        // Check if this document was uploaded by the applicant
-        if (currentApplicantData && currentApplicantData[doc.field]) {
-            uploadedCount++;
-            
-            // Create checkbox HTML
-            const label = document.createElement('label');
-            label.className = 'flex items-center';
-            label.innerHTML = `
-                <input type="checkbox" name="resubmit_documents" value="${doc.field}" 
-                       class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                <span class="ml-2 text-sm text-gray-700">${doc.label}</span>
-            `;
-            checkboxContainer.appendChild(label);
-        }
+        uploadedCount++;
+        const label = document.createElement('label');
+        label.className = 'flex items-center';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.name = 'resubmit_documents';
+        checkbox.value = doc.field;
+        checkbox.checked = doc.field === preselectedField;
+        checkbox.className = 'rounded border-gray-300 text-blue-600 focus:ring-blue-500';
+        const text = document.createElement('span');
+        text.className = 'ml-2 text-sm text-gray-700';
+        text.textContent = doc.label;
+        label.append(checkbox, text);
+        checkboxContainer.appendChild(label);
     });
     
     // Show message if no documents were uploaded

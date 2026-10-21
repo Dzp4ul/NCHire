@@ -961,13 +961,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         error_log("RESUBMISSION DETECTED: App ID = $resubmit_app_id, User ID = $user_id");
         
         // First, get the existing file data and job_id
-        $existing_stmt = $conn->prepare("SELECT job_id, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, certificate_of_grades, proof_of_enrollment, faculty_evaluation, letter_of_intent FROM job_applicants WHERE id = ? AND user_id = ?");
+        $existing_stmt = $conn->prepare("SELECT job_id, status, workflow_stage, resubmission_documents, application_letter, resume, tor, diploma, professional_license, coe, seminars_trainings, masteral_cert, certificate_of_grades, proof_of_enrollment, faculty_evaluation, letter_of_intent FROM job_applicants WHERE id = ? AND user_id = ?");
         $existing_stmt->bind_param("ii", $resubmit_app_id, $user_id);
         $existing_stmt->execute();
         $existing_result = $existing_stmt->get_result();
         
         if ($existing_result->num_rows > 0) {
             $existing_data = $existing_result->fetch_assoc();
+
+            $requested_resubmissions = nc_parse_document_list($existing_data['resubmission_documents'] ?? null);
+            $document_definitions = nc_application_document_definitions();
+            $missing_replacements = [];
+            foreach ($requested_resubmissions as $requested_document) {
+                if (!array_key_exists($requested_document, $document_definitions) || empty($fresh_document_values[$requested_document])) {
+                    $missing_replacements[] = $document_definitions[$requested_document]['label'] ?? ucwords(str_replace('_', ' ', $requested_document));
+                }
+            }
+
+            if (($existing_data['status'] ?? '') !== 'Resubmission Required' || empty($requested_resubmissions)) {
+                $error_message = 'This application does not have an active document resubmission request.';
+            } elseif (!empty($missing_replacements)) {
+                $error_message = 'Please upload a new file for: ' . implode(', ', $missing_replacements) . '.';
+            }
+
+            if (!empty($error_message)) {
+                foreach (array_merge($secured_legacy_upload_paths, $dynamic_requirement_upload_paths) as $storedPath) {
+                    if (is_file($storedPath)) @unlink($storedPath);
+                }
+                $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+                $is_ajax = $is_ajax || (isset($_POST['ajax_submit']) && $_POST['ajax_submit'] == '1');
+                if ($is_ajax) {
+                    while (ob_get_level()) { ob_end_clean(); }
+                    http_response_code(422);
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'error' => $error_message, 'message' => $error_message]);
+                    exit();
+                }
+                $_SESSION['application_error'] = $error_message;
+                header("Location: " . $_SERVER['PHP_SELF']);
+                exit();
+            }
             
             // Get job_id from existing application
             $job_id = $existing_data['job_id'];
@@ -1032,14 +1065,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
                 status = 'Resubmitted',
                 resubmission_documents = NULL,
                 resubmission_notes = NULL
-                WHERE id = ? AND user_id = ?");
+                WHERE id = ? AND user_id = ? AND status = 'Resubmission Required'");
             
             $update_stmt->bind_param("ssssssssssssii",
                 $application_letter, $resume, $tor, $diploma, 
                 $professional_license, $coe, $seminars_trainings, $masteral_cert, $certificate_of_grades, $proof_of_enrollment, $faculty_evaluation, $letter_of_intent,
                 $resubmit_app_id, $user_id);
             
-            if ($update_stmt->execute()) {
+            if ($update_stmt->execute() && $update_stmt->affected_rows === 1) {
                 $affected_rows = $update_stmt->affected_rows;
                 error_log("RESUBMISSION SUCCESS: Updated application $resubmit_app_id (affected rows: $affected_rows)");
                 error_log("Updated files - AL: " . ($application_letter ? basename($application_letter) : "NULL") . 
@@ -1091,7 +1124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
                 $_SESSION['application_success'] = "Documents resubmitted successfully! Your application is now under review.";
                 $_SESSION['applied_job_id'] = $job_id;
                 $_SESSION['new_application_id'] = $application_id;
-                $_SESSION['show_workflow_step'] = 3;
+                $_SESSION['show_workflow_step'] = 1;
                 
                 $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
                            strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
@@ -2781,6 +2814,88 @@ document.addEventListener('DOMContentLoaded', function() {
   let isViewMode = false; // Track if wizard is in view-only mode
   let globalResubmissionDocs = []; // Store resubmission docs globally
 
+  function parseApplicationResubmissionDocuments(app) {
+    if (String(app?.status || '').toLowerCase() !== 'resubmission required') return [];
+    const rawDocuments = app?.resubmission_documents;
+    if (Array.isArray(rawDocuments)) {
+      return rawDocuments.map(documentName => String(documentName).trim()).filter(Boolean);
+    }
+    if (!rawDocuments) return [];
+    try {
+      const parsed = JSON.parse(rawDocuments);
+      if (Array.isArray(parsed)) {
+        return parsed.map(documentName => String(documentName).trim()).filter(Boolean);
+      }
+    } catch (error) {
+      // Older records used a comma-separated list instead of JSON.
+    }
+    return String(rawDocuments).split(',').map(documentName => documentName.trim()).filter(Boolean);
+  }
+
+  function isActiveDocumentResubmission(app, documents = null) {
+    const requestedDocuments = Array.isArray(documents)
+      ? documents
+      : parseApplicationResubmissionDocuments(app);
+    return String(app?.status || '').toLowerCase() === 'resubmission required' && requestedDocuments.length > 0;
+  }
+
+  function getApplicationWorkflowStep(app) {
+    const status = String(app?.status || '').toLowerCase();
+    const workflowStage = String(app?.workflow_stage || '').toLowerCase();
+
+    // A requested replacement is still part of Requirements review. A freshly
+    // resubmitted application also remains here until the Secretary transfers it.
+    if (status === 'resubmission required' || (status === 'resubmitted' && workflowStage === 'secretary_review')) {
+      return 1;
+    }
+    if (status.includes('initially hired') || status.includes('hired')) return 5;
+    if (app?.psych_exam_receipt || (status.includes('demo') && status.includes('passed'))) return 4;
+    if (status.includes('demo') || app?.demo_date || (status.includes('interview') && status.includes('passed'))) return 3;
+    return 2;
+  }
+
+  function configureResubmissionForm(app, documents) {
+    const form = document.getElementById('requirementsForm');
+    if (!form) return;
+
+    form.querySelectorAll('input[name="is_resubmission"], input[name="resubmit_application_id"]').forEach(input => input.remove());
+    if (!isActiveDocumentResubmission(app, documents)) return;
+
+    const modeInput = document.createElement('input');
+    modeInput.type = 'hidden';
+    modeInput.name = 'is_resubmission';
+    modeInput.value = '1';
+    form.appendChild(modeInput);
+
+    const applicationInput = document.createElement('input');
+    applicationInput.type = 'hidden';
+    applicationInput.name = 'resubmit_application_id';
+    applicationInput.value = app.application_id || app.id;
+    form.appendChild(applicationInput);
+  }
+
+  function resetDocumentResubmissionUi() {
+    const requirementsStep = document.getElementById('step1');
+    if (!requirementsStep) return;
+    requirementsStep.querySelectorAll('.resubmission-notice').forEach(notice => notice.remove());
+
+    const heading = requirementsStep.querySelector('.ui-wizard-step-header h2');
+    if (heading) {
+      heading.textContent = 'Application Requirements';
+      heading.className = 'text-lg font-bold text-gray-900 mb-2';
+    }
+    const description = requirementsStep.querySelector('.ui-wizard-step-header > p:last-child');
+    if (description) {
+      description.innerHTML = 'Upload the required documents for your application. Files marked with <span class="text-red-600" aria-hidden="true">*</span> are required.';
+      description.className = 'text-gray-600 mb-4';
+    }
+    const submitButton = requirementsStep.querySelector('button[type="submit"]');
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.innerHTML = '<i class="ri-send-plane-line mr-2"></i>Submit Application';
+    }
+  }
+
   // Prefill from PHP-provided profile data when available
   const initialProfile = <?php echo json_encode([
     'first_name' => $user_profile_data['first_name'] ?? '',
@@ -3719,7 +3834,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Update step label to show actual progress, not viewing step
     const labels = {
-      1: 'Step 1 of 5: Submit Requirements',
+      1: isActiveDocumentResubmission(window.currentApplicationData, window.currentResubmissionDocs)
+        ? 'Step 1 of 5: Document Resubmission Required'
+        : (String(window.currentApplicationData?.status || '').toLowerCase() === 'resubmitted'
+          ? 'Step 1 of 5: Resubmitted Documents Under Review'
+          : 'Step 1 of 5: Submit Requirements'),
       2: window.currentApplicationData?.interview_date ? 'Step 2 of 5: Interview Scheduled' : 'Step 2 of 5: Waiting for Interview Schedule',
       3: window.currentApplicationData?.demo_date ? 'Step 3 of 5: Demo Teaching Scheduled' : 'Step 3 of 5: Waiting for Demo Teaching Schedule',
       4: 'Step 4 of 5: Psychological Examination',
@@ -3817,24 +3936,10 @@ document.addEventListener('DOMContentLoaded', function() {
       
       const app = data.application;
       console.log('? Application loaded successfully:', app);
+      resetDocumentResubmissionUi();
       
-      // Determine current workflow step
-      let workflowStep = 2;
       const status = (app.status || '').toLowerCase();
-      
-      if (status.includes('initially hired') || status.includes('hired')) {
-        workflowStep = 5;
-      } else if (app.psych_exam_receipt) {
-        workflowStep = 4;
-      } else if (status.includes('demo') && status.includes('passed')) {
-        workflowStep = 4;
-      } else if (status.includes('demo') || app.demo_date) {
-        workflowStep = 3;
-      } else if (status.includes('interview') && status.includes('passed')) {
-        workflowStep = 3;
-      } else if (status.includes('interview') || app.interview_date) {
-        workflowStep = 2;
-      }
+      const workflowStep = getApplicationWorkflowStep(app);
       
       console.log('Opening wizard at step:', workflowStep);
       
@@ -3927,25 +4032,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
       
-      // Parse resubmission documents if status is "Resubmission Required"
-      let resubmissionDocs = [];
-      if (app.status === 'Resubmission Required' && app.resubmission_documents) {
-        console.log('?? Resubmission required - parsing documents:', app.resubmission_documents);
-        try {
-          if (Array.isArray(app.resubmission_documents)) {
-            resubmissionDocs = app.resubmission_documents;
-          } else {
-            resubmissionDocs = JSON.parse(app.resubmission_documents);
-          }
-        } catch (e) {
-          console.log('?? JSON parse failed, trying CSV format...');
-          resubmissionDocs = app.resubmission_documents.split(',').map(doc => doc.trim());
-        }
-        console.log('? Parsed resubmission docs:', resubmissionDocs);
-        globalResubmissionDocs = resubmissionDocs;
-        window.globalResubmissionDocs = resubmissionDocs;
-        window.currentResubmissionDocs = resubmissionDocs;
-      }
+      const resubmissionDocs = parseApplicationResubmissionDocuments(app);
+      globalResubmissionDocs = resubmissionDocs;
+      window.globalResubmissionDocs = resubmissionDocs;
+      window.currentResubmissionDocs = resubmissionDocs;
+      configureResubmissionForm(app, resubmissionDocs);
       
       // Show wizard in view mode
       showWizard(true);
@@ -3975,8 +4066,8 @@ document.addEventListener('DOMContentLoaded', function() {
       // Show resubmission notice and enable file inputs if applicable
       if (app.status === 'Resubmission Required' && resubmissionDocs.length > 0) {
         setTimeout(() => {
-          const step2 = document.getElementById('step2');
-          if (step2 && !step2.querySelector('.resubmission-notice')) {
+          const requirementsStep = document.getElementById('step1');
+          if (requirementsStep && !requirementsStep.querySelector('.resubmission-notice')) {
             const docLabels = {
               'application_letter': 'Application Letter',
               'resume': 'Resume',
@@ -3993,7 +4084,7 @@ document.addEventListener('DOMContentLoaded', function() {
             };
             
             const requestedDocsList = resubmissionDocs.map(doc => 
-              `<li class="flex items-center"><i class="ri-file-text-line mr-2 text-orange-600"></i>${docLabels[doc] || doc}</li>`
+              `<li class="flex items-center"><i class="ri-file-text-line mr-2 text-orange-600"></i>${escapeDocumentHtml(docLabels[doc] || doc)}</li>`
             ).join('');
             
             const notice = document.createElement('div');
@@ -4002,60 +4093,36 @@ document.addEventListener('DOMContentLoaded', function() {
               <div class="flex items-start">
                 <i class="ri-alert-line text-orange-600 text-2xl mr-4 mt-0.5"></i>
                 <div class="flex-1">
-                  <h3 class="font-bold text-orange-900 mb-2 text-lg">?? Document Resubmission Required</h3>
-                  <p class="text-sm text-orange-800 mb-3">The admin has requested you to resubmit the following ${resubmissionDocs.length} document(s):</p>
+                  <h3 class="font-bold text-orange-900 mb-2 text-lg">Document Resubmission Required</h3>
+                  <p class="text-sm text-orange-800 mb-3">The Secretary has requested you to resubmit the following ${resubmissionDocs.length} document(s):</p>
                   <ul class="space-y-1 text-sm text-orange-900 font-medium mb-3">
                     ${requestedDocsList}
                   </ul>
                   ${app.resubmission_notes ? `
                     <div class="mt-3 p-3 bg-white bg-opacity-60 rounded-lg border border-orange-300">
-                      <p class="text-xs text-orange-700 font-semibold mb-1">?? Reason from Admin:</p>
-                      <p class="text-sm text-orange-800 italic">${app.resubmission_notes}</p>
+                      <p class="text-xs text-orange-700 font-semibold mb-1">Reason from the Secretary:</p>
+                      <p class="text-sm text-orange-800 italic">${escapeDocumentHtml(app.resubmission_notes)}</p>
                     </div>
                   ` : ''}
                 </div>
               </div>
             `;
-            const firstChild = step2.querySelector('h2');
+            const firstChild = requirementsStep.querySelector('h2');
             if (firstChild) {
               firstChild.parentNode.insertBefore(notice, firstChild.nextSibling);
             }
           }
           
-          // Enable the submit button for resubmission
-          const submitBtn = step2.querySelector('button[type="submit"]');
+          // Enable the submit button for resubmission.
+          const submitBtn = requirementsStep?.querySelector('button[type="submit"]');
           if (submitBtn) {
-            submitBtn.style.display = isViewMode ? 'none' : 'flex';
-            submitBtn.disabled = isViewMode;
-            if (!isViewMode) {
-              submitBtn.textContent = 'Resubmit Files';
-              console.log('? Enabled submit button for resubmission');
-            }
+            submitBtn.style.display = 'flex';
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="ri-upload-cloud-2-line mr-2"></i>Resubmit Documents';
+            console.log('? Enabled submit button for resubmission');
           }
           
-          // Add resubmission hidden fields
-          const form = document.getElementById('requirementsForm');
-          if (form) {
-            let resubmitInput = form.querySelector('input[name="is_resubmission"]');
-            if (!resubmitInput) {
-              resubmitInput = document.createElement('input');
-              resubmitInput.type = 'hidden';
-              resubmitInput.name = 'is_resubmission';
-              resubmitInput.value = '1';
-              form.appendChild(resubmitInput);
-            }
-            
-            let appIdInput = form.querySelector('input[name="resubmit_application_id"]');
-            if (!appIdInput) {
-              appIdInput = document.createElement('input');
-              appIdInput.type = 'hidden';
-              appIdInput.name = 'resubmit_application_id';
-              appIdInput.value = app.application_id || app.id;
-              form.appendChild(appIdInput);
-            }
-            
-            console.log('? Added resubmission hidden fields');
-          }
+          window.updateStep2ForResubmission(resubmissionDocs.length);
         }, 500);
       }
       
@@ -4315,9 +4382,10 @@ document.addEventListener('DOMContentLoaded', function() {
         input.style.cursor = 'not-allowed';
       });
       
-      // Disable file inputs in step 2 (already submitted requirements)
+      // Disable already-submitted Requirement inputs (the current wizard keeps
+      // document uploads in step 1).
       // EXCEPT for documents that need resubmission
-      wizStep2.querySelectorAll('input[type="file"]').forEach(input => {
+      wizStep1?.querySelectorAll('input[type="file"]').forEach(input => {
         // Check if this input is in the resubmission list
         const inputName = input.getAttribute('name');
         const docInputMap = {
@@ -4349,12 +4417,21 @@ document.addEventListener('DOMContentLoaded', function() {
             parent.style.cursor = 'not-allowed';
           }
         } else {
+          input.removeAttribute('disabled');
+          input.style.opacity = '';
+          input.style.cursor = '';
+          input.classList.remove('hidden');
+          const parent = input.parentElement;
+          if (parent) {
+            parent.style.opacity = '1';
+            parent.style.cursor = '';
+          }
           console.log(`Skipping disable for ${inputName} - needs resubmission`);
         }
       });
       
-      // Disable checkboxes in step 2
-      wizStep2.querySelectorAll('input[type="checkbox"]').forEach(input => {
+      // Disable any Requirement checkboxes in read-only mode.
+      wizStep1?.querySelectorAll('input[type="checkbox"]').forEach(input => {
         input.setAttribute('disabled', 'disabled');
         input.style.cursor = 'not-allowed';
       });
@@ -4377,6 +4454,20 @@ document.addEventListener('DOMContentLoaded', function() {
       if (step1NextBtn) {
         step1NextBtn.classList.remove('hidden');
         step1NextBtn.style.display = 'flex';
+      }
+    }
+
+    if (isActiveDocumentResubmission(window.currentApplicationData, globalResubmissionDocs) && wizStep1) {
+      const resubmitButton = wizStep1.querySelector('button[type="submit"]');
+      if (resubmitButton) {
+        resubmitButton.style.display = 'flex';
+        resubmitButton.disabled = false;
+        resubmitButton.innerHTML = '<i class="ri-upload-cloud-2-line mr-2"></i>Resubmit Documents';
+      }
+      const nextButton = document.getElementById('step1NextBtn');
+      if (nextButton) {
+        nextButton.classList.add('hidden');
+        nextButton.style.display = 'none';
       }
     }
     
@@ -4789,16 +4880,15 @@ document.addEventListener('DOMContentLoaded', function() {
     if (countBadge) countBadge.textContent = initialEducation.length.toString();
   }
 
-  // Helper function to hide all document upload sections in step 2 (GLOBAL)
+  // Helper function to hide all document upload sections in Requirements (GLOBAL)
   window.hideAllDocumentSections = function() {
     console.log('?? Hiding all document sections...');
     
-    // Find all document upload sections in step 2
-    const step2 = document.getElementById('step2');
-    if (!step2) return;
+    const requirementsStep = document.getElementById('step1');
+    if (!requirementsStep) return;
     
     // Hide Primary Documents section
-    const primaryDocsGrid = step2.querySelector('.grid.md\\:grid-cols-2');
+    const primaryDocsGrid = requirementsStep.querySelector('.grid.md\\:grid-cols-2');
     if (primaryDocsGrid && primaryDocsGrid.closest('.p-4')) {
       // Hide the entire primary documents container but keep the main card visible
       const allSpaceSections = primaryDocsGrid.querySelectorAll('.space-y-2');
@@ -4809,7 +4899,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Hide all category sections (Educational Documents, Professional Documents, Additional Certificates)
-    const categorySections = step2.querySelectorAll('.border-t.pt-3');
+    const categorySections = requirementsStep.querySelectorAll('.border-t.pt-3');
     categorySections.forEach(section => {
       section.style.display = 'none';
       section.classList.add('hidden');
@@ -4818,13 +4908,14 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('? All document sections hidden');
   };
 
-  // Helper function to update step 2 UI for resubmission mode (GLOBAL)
+  // Retain the public function name for older callers, but update the current
+  // Requirements screen (step 1 in the five-stage wizard).
   window.updateStep2ForResubmission = function(docCount) {
-    const step2 = document.getElementById('step2');
-    if (!step2) return;
+    const requirementsStep = document.getElementById('step1');
+    if (!requirementsStep) return;
     
-    const heading = step2.querySelector('h2');
-    const description = step2.querySelector('p');
+    const heading = requirementsStep.querySelector('.ui-wizard-step-header h2');
+    const description = requirementsStep.querySelector('.ui-wizard-step-header > p:last-child');
     
     if (heading) {
       heading.textContent = `Resubmit Required Documents (${docCount})`;
@@ -4832,11 +4923,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     if (description) {
-      description.textContent = `Please upload only the ${docCount} document(s) requested by the admin below. Other approved documents are not shown.`;
+      description.textContent = `Please upload only the ${docCount} document(s) requested by the Secretary below. Other approved documents remain unchanged.`;
       description.className = 'text-orange-800 mb-4 font-medium';
     }
     
-    console.log('? Step 2 UI updated for resubmission mode');
+    console.log('? Requirements UI updated for resubmission mode');
   };
 
   window.escapeDocumentHtml = function(value) {
@@ -4906,6 +4997,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const inputName = requirement.input_name || `requirement_file_${requirement.id}`;
         const inputId = `document_requirement_${requirement.id}`;
         const fieldKey = requirement.legacy_document_type || requirement.requirement_key || `requirement_${requirement.id}`;
+        const needsResubmission = isActiveDocumentResubmission(window.currentApplicationData, window.currentResubmissionDocs)
+          && window.currentResubmissionDocs.includes(fieldKey);
+        const inputLocked = isViewMode && !needsResubmission;
         const article = document.createElement('article');
         article.className = 'space-y-2 ui-document-card';
         article.dataset.documentField = fieldKey;
@@ -4920,19 +5014,19 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
           </div>
           <p class="ui-document-card__helper">${escapeDocumentHtml(requirement.description || (isRequired ? 'Required document' : 'Optional supporting document'))}</p>
-          <div class="border-dashed ui-document-upload ${submission ? 'border-green-400 bg-green-50' : ''}">
+          <div class="border-dashed ui-document-upload ${needsResubmission ? 'border-orange-400 bg-orange-50' : (submission ? 'border-green-400 bg-green-50' : '')}">
             ${submission ? `
-              <div class="dynamic-submission-display mb-3 rounded-lg border border-green-300 bg-white p-3">
+              <div class="dynamic-submission-display mb-3 rounded-lg border ${needsResubmission ? 'border-orange-300' : 'border-green-300'} bg-white p-3">
                 <div class="flex items-start justify-between gap-3">
                   <div class="dynamic-submission-display__details min-w-0">
-                    <div class="text-xs font-bold uppercase tracking-wide text-green-700">Uploaded</div>
-                    <a class="dynamic-submission-display__file block truncate text-sm font-medium text-green-800 hover:underline" href="${escapeDocumentHtml(submission.download_url || '#')}" target="_blank" rel="noopener" title="${escapeDocumentHtml(submission.original_filename || 'Submitted document')}"><i class="ri-file-check-line mr-1"></i>${escapeDocumentHtml(submission.original_filename || 'Submitted document')}</a>
+                    <div class="text-xs font-bold uppercase tracking-wide ${needsResubmission ? 'text-orange-700' : 'text-green-700'}">${needsResubmission ? 'Previous file - replacement required' : 'Uploaded'}</div>
+                    <a class="dynamic-submission-display__file block truncate text-sm font-medium ${needsResubmission ? 'text-orange-800' : 'text-green-800'} hover:underline" href="${escapeDocumentHtml(submission.download_url || '#')}" target="_blank" rel="noopener" title="${escapeDocumentHtml(submission.original_filename || 'Submitted document')}"><i class="ri-file-check-line mr-1"></i>${escapeDocumentHtml(submission.original_filename || 'Submitted document')}</a>
                   </div>
-                  <span class="ui-status ui-status--success">Complete</span>
+                  <span class="ui-status ${needsResubmission ? 'ui-status--warning' : 'ui-status--success'}">${needsResubmission ? 'Replace' : 'Complete'}</span>
                 </div>
               </div>` : ''}
-            <input id="${inputId}" type="file" name="${escapeDocumentHtml(inputName)}" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" class="ui-document-file-input${isViewMode ? ' hidden' : ''}"${isViewMode ? ' disabled' : ''}>
-            <p class="ui-document-upload__hint${isViewMode ? ' hidden' : ''}"><i class="ri-upload-cloud-2-line"></i> ${submission ? 'Choose a file to replace the current document' : 'Choose file'} &middot; Maximum 5 MB</p>
+            <input id="${inputId}" type="file" name="${escapeDocumentHtml(inputName)}" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" class="ui-document-file-input${inputLocked ? ' hidden' : ''}"${inputLocked ? ' disabled' : ''}>
+            <p class="ui-document-upload__hint${inputLocked ? ' hidden' : ''}"><i class="ri-upload-cloud-2-line"></i> ${submission ? 'Choose a file to replace the current document' : 'Choose file'} &middot; Maximum 5 MB</p>
             <p class="ui-document-inline-error hidden" role="alert"></p>
           </div>`;
         const input = article.querySelector('input[type="file"]');
@@ -5941,7 +6035,10 @@ document.addEventListener('DOMContentLoaded', function() {
           
           console.log(`Checking ${field.label}: hasFile=${hasFile}, hasDraft=${hasDraft}`);
           
-          if (!hasFile && !hasDraft && !hasReusableDocument) {
+          const hasAcceptedFile = isResubmissionMode
+            ? hasFile
+            : (hasFile || hasDraft || hasReusableDocument);
+          if (!hasAcceptedFile) {
             missingFiles.push(field.label);
             setDocumentInlineError(fileInput, 'Please upload this required document.');
           }
@@ -6018,6 +6115,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Check if successful
         if (data.success) {
           console.log('? Upload successful! Application ID:', data.application_id);
+          const completedResubmission = data.is_resubmission === true;
           
           // Show success notification
           const successNotif = document.createElement('div');
@@ -6025,11 +6123,17 @@ document.addEventListener('DOMContentLoaded', function() {
           successNotif.innerHTML = `
             <div class='flex items-center'>
               <i class='ri-check-line mr-2'></i>
-              <span>Application submitted successfully!</span>
+              <span>${completedResubmission ? 'Documents resubmitted successfully! Your application is under Secretary review.' : 'Application submitted successfully!'}</span>
             </div>
           `;
           document.body.appendChild(successNotif);
           setTimeout(() => successNotif.remove(), 5000);
+
+          if (completedResubmission) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            await window.viewExistingApplication(data.application_id);
+            return;
+          }
           
           // Hide the Load Saved Documents section after successful submission
           const loadDraftSection = document.getElementById('loadDraftSection');
@@ -6055,7 +6159,8 @@ document.addEventListener('DOMContentLoaded', function() {
           console.log('Applications data:', appsData);
           
           if (appsData.success && appsData.applications && appsData.applications.length > 0) {
-            const newApp = appsData.applications[0]; // Most recent application
+            const newApp = appsData.applications.find(application => Number(application.id || application.application_id) === Number(data.application_id))
+              || appsData.applications[0];
             console.log('Loaded new application:', newApp);
             console.log('Application files:', {
               application_letter: newApp.application_letter,
@@ -6528,8 +6633,9 @@ document.addEventListener('DOMContentLoaded', function() {
           container.classList.remove('border-gray-300', 'border-green-400', 'bg-green-50', 'hover:border-blue-400');
           container.classList.add('border-orange-400', 'bg-orange-50');
           
-          // Replacement controls are available only outside read-only progress views.
-          const allowReplacement = !isViewMode;
+          // A resubmission is intentionally opened from the progress view, but
+          // the specifically requested document must remain editable there.
+          const allowReplacement = isActiveDocumentResubmission(app, requestedResubmissions);
           input.disabled = !allowReplacement;
           input.required = false;
           input.style.display = allowReplacement ? 'block' : 'none';
@@ -8732,6 +8838,13 @@ function attachJobEventListeners() {
         }
         
         console.log('Opening existing application:', applicationId);
+
+        // All entry points use the same loader so resubmission state, editable
+        // document controls, and workflow positioning cannot drift apart.
+        if (typeof window.viewExistingApplication === 'function') {
+          await window.viewExistingApplication(applicationId);
+          return;
+        }
         
         // CRITICAL: Clear ALL previous application data before loading new one
         console.log('Clearing previous application data before loading...');
@@ -9420,6 +9533,11 @@ function populateJobDetails(job) {
       
       if (applicationId) {
         console.log('?? Opening existing application:', applicationId);
+
+        if (typeof window.viewExistingApplication === 'function') {
+          await window.viewExistingApplication(applicationId);
+          return;
+        }
         
         // Clear previous data
         window._lastLoadedAppId = null;

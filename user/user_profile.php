@@ -288,7 +288,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['savePersonal'])) {
                 exit();
             }
 
-            // Use prepared statement for security
+            // Save the account and synchronize the identity copied onto prior
+            // applications so staff do not keep seeing an old name.
+            $conn->begin_transaction();
             $sql_update = "UPDATE applicants SET 
                            first_name = ?, 
                            last_name = ?, 
@@ -301,14 +303,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['savePersonal'])) {
             if ($stmt_update) {
                 $stmt_update->bind_param("sssssi", $fname, $lname, $email, $phone, $address, $user_id);
                 
-                if ($stmt_update->execute()) {
+                if ($stmt_update->execute() && nc_sync_applicant_identity(
+                    $conn,
+                    (int)$user_id,
+                    $fname,
+                    $lname,
+                    $email,
+                    $phone
+                )) {
+                    $conn->commit();
                     $success_message = "Personal information updated successfully.";
                     // Also update session data
                     $_SESSION['first_name'] = $fname;
                     $_SESSION['user_email'] = $email;
                 } else {
-                    $error_message = "Error updating personal information: " . $stmt_update->error;
-                    error_log("Personal info update error: " . $stmt_update->error);
+                    $update_error = $stmt_update->error ?: $conn->error;
+                    $conn->rollback();
+                    $error_message = "Error updating personal information: " . $update_error;
+                    error_log("Personal info update error: " . $update_error);
                 }
                 $stmt_update->close();
             } else {

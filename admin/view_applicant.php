@@ -31,8 +31,20 @@ if (empty($applicant_id)) {
     exit;
 }
 
-// Get applicant details
-$stmt = $conn->prepare("SELECT * FROM job_applicants WHERE id = ?");
+// The account profile is the current identity; job_applicants keeps a copy for
+// applications that are no longer linked to an account.
+$stmt = $conn->prepare("
+    SELECT ja.*,
+           a.first_name AS current_first_name,
+           a.last_name AS current_last_name,
+           a.applicant_email AS current_email,
+           a.contact_number AS current_contact_number,
+           a.address AS current_address,
+           a.profile_picture AS current_profile_picture
+    FROM job_applicants ja
+    LEFT JOIN applicants a ON a.id = ja.user_id
+    WHERE ja.id = ?
+");
 $stmt->bind_param("i", $applicant_id);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -43,6 +55,32 @@ if ($result->num_rows === 0) {
 }
 
 $applicant = $result->fetch_assoc();
+
+$current_name = trim(($applicant['current_first_name'] ?? '') . ' ' . ($applicant['current_last_name'] ?? ''));
+if ($current_name !== '') {
+    $applicant['full_name'] = $current_name;
+    $applicant['applicant_name'] = $applicant['current_first_name'];
+}
+if (!empty($applicant['current_email'])) {
+    $applicant['applicant_email'] = $applicant['current_email'];
+}
+if (!empty($applicant['current_contact_number'])) {
+    $applicant['contact_num'] = $applicant['current_contact_number'];
+}
+if (!empty($applicant['current_address'])) {
+    $applicant['address'] = $applicant['current_address'];
+}
+if (!empty($applicant['current_profile_picture'])) {
+    $applicant['profile_picture'] = $applicant['current_profile_picture'];
+}
+unset(
+    $applicant['current_first_name'],
+    $applicant['current_last_name'],
+    $applicant['current_email'],
+    $applicant['current_contact_number'],
+    $applicant['current_address'],
+    $applicant['current_profile_picture']
+);
 
 $role = $_SESSION['admin_role'] ?? '';
 $department = $_SESSION['admin_department'] ?? '';

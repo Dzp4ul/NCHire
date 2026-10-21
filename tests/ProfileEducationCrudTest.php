@@ -11,6 +11,7 @@ $passed = 0;
 $failed = 0;
 $userId = 0;
 $educationId = 0;
+$applicationId = 0;
 $baseUrl = rtrim((string)(getenv('NCHIRE_TEST_BASE_URL') ?: 'http://localhost/FinalResearch%20-%20Copy'), '/') . '/user';
 
 function profile_crud_check(bool $condition, string $message): void
@@ -84,6 +85,46 @@ try {
     $_SESSION['user_id'] = $userId;
     $_SESSION['user_email'] = $email;
     session_write_close();
+
+    $application = $conn->prepare("
+        INSERT INTO job_applicants
+            (applicant_name, position, applied_date, status, full_name, applicant_email, contact_num, user_id, letter_of_intent)
+        VALUES
+            ('Legacy', 'Profile identity sync test', CURDATE(), 'Submitted', 'Legacy Name', ?, '09000000000', ?, 'test-only-letter.pdf')
+    ");
+    $application->bind_param('si', $email, $userId);
+    if (!$application->execute()) {
+        throw new RuntimeException('Unable to create the identity-sync application: ' . $application->error);
+    }
+    $applicationId = (int)$application->insert_id;
+    $application->close();
+
+    $personal = profile_crud_request(
+        $baseUrl . '/save_profile_data.php',
+        $sessionId,
+        'POST',
+        [
+            'savePersonal' => '1',
+            'applicant_fname' => 'Updated',
+            'applicant_lname' => 'Applicant',
+            'applicant_email' => $email,
+            'applicant_num' => '09171234567',
+            'applicant_address' => 'Test Address',
+        ]
+    );
+    $syncedApplication = $conn->query("
+        SELECT applicant_name, full_name, applicant_email, contact_num
+        FROM job_applicants
+        WHERE id = {$applicationId}
+    ")->fetch_assoc();
+    profile_crud_check(
+        !empty($personal['success'])
+        && ($syncedApplication['applicant_name'] ?? '') === 'Updated'
+        && ($syncedApplication['full_name'] ?? '') === 'Updated Applicant'
+        && ($syncedApplication['applicant_email'] ?? '') === $email
+        && ($syncedApplication['contact_num'] ?? '') === '09171234567',
+        'editing account identity synchronizes previously submitted applications'
+    );
 
     $invalid = profile_crud_request(
         $baseUrl . '/save_profile_data.php',
@@ -204,6 +245,9 @@ try {
     echo 'FAIL: CRUD integration exception: ' . $e->getMessage() . "\n";
 } finally {
     if ($userId > 0) {
+        if ($applicationId > 0) {
+            $conn->query("DELETE FROM job_applicants WHERE id = {$applicationId} AND user_id = {$userId}");
+        }
         if ($educationId > 0) {
             $conn->query("DELETE FROM user_education WHERE id = {$educationId} AND user_id = {$userId}");
         }
