@@ -4025,10 +4025,12 @@ document.addEventListener('DOMContentLoaded', function() {
           // Enable the submit button for resubmission
           const submitBtn = step2.querySelector('button[type="submit"]');
           if (submitBtn) {
-            submitBtn.style.display = 'flex';
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Resubmit Files';
-            console.log('? Enabled submit button for resubmission');
+            submitBtn.style.display = isViewMode ? 'none' : 'flex';
+            submitBtn.disabled = isViewMode;
+            if (!isViewMode) {
+              submitBtn.textContent = 'Resubmit Files';
+              console.log('? Enabled submit button for resubmission');
+            }
           }
           
           // Add resubmission hidden fields
@@ -4922,15 +4924,15 @@ document.addEventListener('DOMContentLoaded', function() {
             ${submission ? `
               <div class="dynamic-submission-display mb-3 rounded-lg border border-green-300 bg-white p-3">
                 <div class="flex items-start justify-between gap-3">
-                  <div class="min-w-0">
+                  <div class="dynamic-submission-display__details min-w-0">
                     <div class="text-xs font-bold uppercase tracking-wide text-green-700">Uploaded</div>
-                    <a class="block truncate text-sm font-medium text-green-800 hover:underline" href="${escapeDocumentHtml(submission.download_url || '#')}" target="_blank" rel="noopener"><i class="ri-file-check-line mr-1"></i>${escapeDocumentHtml(submission.original_filename || 'Submitted document')}</a>
+                    <a class="dynamic-submission-display__file block truncate text-sm font-medium text-green-800 hover:underline" href="${escapeDocumentHtml(submission.download_url || '#')}" target="_blank" rel="noopener" title="${escapeDocumentHtml(submission.original_filename || 'Submitted document')}"><i class="ri-file-check-line mr-1"></i>${escapeDocumentHtml(submission.original_filename || 'Submitted document')}</a>
                   </div>
                   <span class="ui-status ui-status--success">Complete</span>
                 </div>
               </div>` : ''}
-            <input id="${inputId}" type="file" name="${escapeDocumentHtml(inputName)}" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" class="ui-document-file-input">
-            <p class="ui-document-upload__hint"><i class="ri-upload-cloud-2-line"></i> ${submission ? 'Choose a file to replace the current document' : 'Choose file'} &middot; Maximum 5 MB</p>
+            <input id="${inputId}" type="file" name="${escapeDocumentHtml(inputName)}" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" class="ui-document-file-input${isViewMode ? ' hidden' : ''}"${isViewMode ? ' disabled' : ''}>
+            <p class="ui-document-upload__hint${isViewMode ? ' hidden' : ''}"><i class="ri-upload-cloud-2-line"></i> ${submission ? 'Choose a file to replace the current document' : 'Choose file'} &middot; Maximum 5 MB</p>
             <p class="ui-document-inline-error hidden" role="alert"></p>
           </div>`;
         const input = article.querySelector('input[type="file"]');
@@ -4949,7 +4951,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     const saveUpdatesBtn = document.getElementById('saveRequirementUpdatesBtn');
-    if (saveUpdatesBtn) saveUpdatesBtn.classList.toggle('hidden', !payload.application_id);
+    if (saveUpdatesBtn) {
+      const canUpdateDocuments = Boolean(payload.application_id) && !isViewMode;
+      saveUpdatesBtn.classList.toggle('hidden', !canUpdateDocuments);
+      saveUpdatesBtn.style.display = canUpdateDocuments ? '' : 'none';
+    }
     updateRequiredDocumentsStatus();
   }
 
@@ -6459,12 +6465,13 @@ document.addEventListener('DOMContentLoaded', function() {
           if (!container) return;
           container.classList.remove('border-green-400', 'border-green-500', 'bg-green-50', 'border-orange-400', 'bg-orange-50');
           container.classList.add('border-gray-300', 'hover:border-blue-400');
-          input.disabled = false;
+          input.disabled = isViewMode;
           input.required = false;
           input.style.removeProperty('display');
           input.style.removeProperty('opacity');
           input.style.removeProperty('cursor');
-          input.classList.remove('hidden');
+          input.classList.toggle('hidden', isViewMode);
+          container.querySelector('.ui-document-upload__hint')?.classList.toggle('hidden', isViewMode);
           delete input.dataset.reusableFile;
           delete input.dataset.reusableSourceApplication;
           input.closest('.ui-document-card')?.style.removeProperty('display');
@@ -6501,6 +6508,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
       // Check if THIS specific document needs resubmission
       const needsResubmission = requestedResubmissions.includes(documentField);
+      const dynamicSubmission = container.querySelector('.dynamic-submission-display');
       
       if (fileName) {
         const fileDisplay = getDocumentFileDisplay(fileName, documentField === 'seminars_trainings');
@@ -6511,16 +6519,22 @@ document.addEventListener('DOMContentLoaded', function() {
         if (needsResubmission) {
           // Document needs resubmission - NO GREEN, show orange styling
           console.log(`?? ${documentField} needs resubmission - NO GREEN indicator, showing file input`);
+
+          // The resubmission notice below replaces the normal submitted-file
+          // row so the same file is not shown twice in two different states.
+          dynamicSubmission?.remove();
           
           // Orange border styling
           container.classList.remove('border-gray-300', 'border-green-400', 'bg-green-50', 'hover:border-blue-400');
           container.classList.add('border-orange-400', 'bg-orange-50');
           
-          // Keep file input visible and enabled
-          input.disabled = false;
+          // Replacement controls are available only outside read-only progress views.
+          const allowReplacement = !isViewMode;
+          input.disabled = !allowReplacement;
           input.required = false;
-          input.style.display = 'block';
-          input.classList.remove('hidden');
+          input.style.display = allowReplacement ? 'block' : 'none';
+          input.classList.toggle('hidden', !allowReplacement);
+          container.querySelector('.ui-document-upload__hint')?.classList.toggle('hidden', !allowReplacement);
           
           // Add orange notice showing previous file
           const resubmitNotice = document.createElement('div');
@@ -6534,6 +6548,21 @@ document.addEventListener('DOMContentLoaded', function() {
           container.appendChild(resubmitNotice);
           
         } else {
+          // Dynamic requirements already render the canonical submitted-file
+          // row (including its download link and status). Do not append the
+          // legacy approved-file row for the same document.
+          if (dynamicSubmission) {
+            container.classList.remove('border-gray-300', 'border-orange-400', 'bg-orange-50', 'hover:border-blue-400');
+            container.classList.add('border-green-400', 'bg-green-50');
+            const allowReplacement = !isViewMode;
+            input.disabled = !allowReplacement;
+            input.required = false;
+            input.style.removeProperty('display');
+            input.classList.toggle('hidden', !allowReplacement);
+            container.querySelector('.ui-document-upload__hint')?.classList.toggle('hidden', !allowReplacement);
+            return;
+          }
+
           // Document is approved - show a compact success indicator.
           container.classList.remove('border-gray-300', 'border-orange-400', 'bg-orange-50', 'hover:border-blue-400');
           container.classList.add('border-green-400', 'bg-green-50');

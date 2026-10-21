@@ -4760,12 +4760,42 @@ body.gt-app {
 .ui-wizard-documents .border-dashed {
     display: grid;
     gap: 7px;
+    min-width: 0;
     margin-top: auto;
     padding: 10px !important;
     border: 1px solid var(--ui-border-strong) !important;
     border-radius: var(--ui-radius-sm) !important;
     background: #f8fafc !important;
     transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.dynamic-submission-display {
+    box-sizing: border-box;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+}
+
+.dynamic-submission-display > .flex {
+    min-width: 0;
+    width: 100%;
+}
+
+.dynamic-submission-display__details {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.dynamic-submission-display__file {
+    display: block;
+    overflow: hidden;
+    max-width: 100%;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dynamic-submission-display .ui-status {
+    flex: 0 0 auto;
 }
 
 .ui-wizard-documents .border-dashed:focus-within,
