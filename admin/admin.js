@@ -2685,7 +2685,13 @@ function resizeApplicantDocumentPreview(change) {
 
 function openSelectedApplicantDocument() {
     if (!currentSelectedApplicantDocument) return;
-    viewDocument(currentSelectedApplicantDocument.url, currentSelectedApplicantDocument.label, currentSelectedApplicantDocument.isImage);
+    viewDocument(
+        currentSelectedApplicantDocument.url,
+        currentSelectedApplicantDocument.label,
+        currentSelectedApplicantDocument.isImage,
+        currentSelectedApplicantDocument.isPdf,
+        currentSelectedApplicantDocument.fileName
+    );
 }
 
 function requestSelectedDocumentResubmission() {
@@ -3717,7 +3723,7 @@ let currentApplicantId = null;
 
 function openScheduleModal() {
     // Set minimum date to today
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateValue();
     const dateInput = document.getElementById('interviewDate');
     
     if (dateInput) {
@@ -3857,7 +3863,7 @@ function closeApproveInterviewModal() {
 
 function openRescheduleInterviewModal() {
     // Set minimum date to today
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateValue();
     const dateInput = document.getElementById('rescheduleInterviewDate');
     
     if (dateInput) {
@@ -3876,7 +3882,7 @@ function closeRescheduleInterviewModal() {
 
 function openRescheduleDemoModal() {
     // Set minimum date to today
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateValue();
     const dateInput = document.getElementById('rescheduleDemoDate');
     
     if (dateInput) {
@@ -3895,7 +3901,7 @@ function closeRescheduleDemoModal() {
 
 function openDemoScheduleModal() {
     // Set minimum date to today
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateValue();
     const dateInput = document.getElementById('interviewDate');
     
     if (dateInput) {
@@ -3907,6 +3913,71 @@ function openDemoScheduleModal() {
     document.getElementById('scheduleModal').classList.add('flex');
     document.querySelector('#scheduleModal h3').textContent = 'Schedule Demo Teaching';
     document.getElementById('scheduleForm').dataset.action = 'schedule_demo';
+}
+
+function getLocalDateValue(date = new Date()) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function isWeekdayDateValue(dateValue) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue || '')) return false;
+
+    const [year, month, day] = dateValue.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return false;
+
+    const weekday = date.getDay();
+    return weekday >= 1 && weekday <= 5;
+}
+
+function validateWeekdayDateInput(input, showMessage = true) {
+    if (!input || !input.value || isWeekdayDateValue(input.value)) {
+        input?.setCustomValidity('');
+        return true;
+    }
+
+    input.value = '';
+    input.setCustomValidity('Please choose a weekday. Saturdays and Sundays are unavailable.');
+    if (showMessage) {
+        showToast('Please choose a weekday. Saturdays and Sundays are unavailable.', 'warning');
+    }
+    return false;
+}
+
+function initializeWeekdayDateInputs() {
+    document.querySelectorAll('input[data-weekdays-only]').forEach(input => {
+        input.min = getLocalDateValue();
+        input.addEventListener('input', () => validateWeekdayDateInput(input));
+        input.addEventListener('change', () => validateWeekdayDateInput(input, false));
+
+        if (typeof window.flatpickr === 'function') {
+            window.flatpickr(input, {
+                altInput: true,
+                altInputClass: 'weekday-date-input',
+                altFormat: 'F j, Y',
+                dateFormat: 'Y-m-d',
+                minDate: 'today',
+                animate: false,
+                disableMobile: true,
+                disable: [date => date.getDay() === 0 || date.getDay() === 6],
+                onReady: (_selectedDates, _dateStr, instance) => {
+                    instance.altInput?.setAttribute('aria-label', 'Select a weekday date');
+                    instance.altInput?.setAttribute('aria-describedby', input.getAttribute('aria-describedby') || '');
+                    instance.altInput?.setAttribute('aria-haspopup', 'dialog');
+                    instance.altInput?.setAttribute('placeholder', 'Select a weekday');
+                },
+                onOpen: (_selectedDates, _dateStr, instance) => {
+                    instance.altInput?.setAttribute('aria-expanded', 'true');
+                },
+                onClose: (_selectedDates, _dateStr, instance) => {
+                    instance.altInput?.setAttribute('aria-expanded', 'false');
+                }
+            });
+        }
+    });
 }
 
 // Helper function to check if time is a valid 15-minute interval
@@ -3941,6 +4012,8 @@ function validateTimeInput(inputElement) {
 
 // Form submission handlers
 document.addEventListener('DOMContentLoaded', function() {
+    initializeWeekdayDateInputs();
+
     // Apply time validation to all time inputs
     validateTimeInput(document.getElementById('interviewTime'));
     validateTimeInput(document.getElementById('rescheduleInterviewTime'));
@@ -3958,9 +4031,8 @@ document.addEventListener('DOMContentLoaded', function() {
             showToast('Please select both date and time', 'warning');
             return;
         }
-        const selectedWeekday = new Date(dateValue + 'T00:00:00').getDay();
-        if (selectedWeekday === 0 || selectedWeekday === 6) {
-            showToast('Schedules are only available on weekdays.', 'warning');
+        if (!isWeekdayDateValue(dateValue)) {
+            showToast('Please choose a weekday. Saturdays and Sundays are unavailable.', 'warning');
             return;
         }
 
@@ -4398,6 +4470,12 @@ document.addEventListener('DOMContentLoaded', function() {
     if (demoForm) {
         demoForm.addEventListener('submit', async function(e) {
             e.preventDefault();
+
+            const demoDateValue = document.getElementById('demoDate').value;
+            if (!isWeekdayDateValue(demoDateValue)) {
+                showToast('Please choose a weekday. Saturdays and Sundays are unavailable.', 'warning');
+                return;
+            }
             
             // Prevent duplicate submissions
             preventDuplicateSubmission(async () => {
@@ -4408,7 +4486,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const formData = new FormData();
                 formData.append('action', 'schedule_demo');
                 formData.append('applicant_id', currentApplicantId);
-                formData.append('demo_date', document.getElementById('demoDate').value);
+                formData.append('demo_date', demoDateValue);
                 formData.append('demo_time', document.getElementById('demoTime').value);
                 formData.append('demo_notes', document.getElementById('demoNotes').value);
                 
@@ -4500,9 +4578,8 @@ document.addEventListener('DOMContentLoaded', function() {
             showToast('Please select both date and time', 'warning');
             return;
         }
-        const selectedWeekday = new Date(dateValue + 'T00:00:00').getDay();
-        if (selectedWeekday === 0 || selectedWeekday === 6) {
-            showToast('Schedules are only available on weekdays.', 'warning');
+        if (!isWeekdayDateValue(dateValue)) {
+            showToast('Please choose a weekday. Saturdays and Sundays are unavailable.', 'warning');
             return;
         }
 
@@ -4602,6 +4679,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (!dateValue || !timeValue) {
             showToast('Please select both date and time', 'warning');
+            return;
+        }
+
+        if (!isWeekdayDateValue(dateValue)) {
+            showToast('Please choose a weekday. Saturdays and Sundays are unavailable.', 'warning');
             return;
         }
         
@@ -4843,39 +4925,161 @@ function changeApplicantsPage(direction) {
     }
 }
 
-// Document viewer function
-function viewDocument(filePath, documentName, isImage) {
+const documentViewerState = {
+    zoom: 100,
+    baseWidth: 0,
+    baseHeight: 0,
+    image: null,
+    shell: null,
+    lastFocusedElement: null
+};
+
+function setDocumentViewerFallback(message) {
+    const modalContent = document.getElementById('documentModalContent');
+    if (!modalContent) return;
+
+    modalContent.innerHTML = '';
+    const fallback = document.createElement('div');
+    fallback.className = 'document-viewer__fallback';
+    fallback.innerHTML = '<i class="fas fa-file-circle-exclamation" aria-hidden="true"></i><strong>Preview unavailable</strong>';
+    const copy = document.createElement('p');
+    copy.textContent = message;
+    fallback.appendChild(copy);
+    modalContent.appendChild(fallback);
+}
+
+function applyDocumentViewerZoom() {
+    const stage = document.getElementById('documentModalContent');
+    const zoomLabel = document.getElementById('documentModalZoom');
+    const { image, shell, baseWidth, baseHeight, zoom } = documentViewerState;
+    if (!stage || !image || !shell || !baseWidth || !baseHeight) return;
+
+    const scaledWidth = Math.round(baseWidth * (zoom / 100));
+    const scaledHeight = Math.round(baseHeight * (zoom / 100));
+    const gutter = window.innerWidth <= 640 ? 24 : 48;
+
+    image.style.width = `${scaledWidth}px`;
+    image.style.height = `${scaledHeight}px`;
+    shell.style.width = `${Math.max(stage.clientWidth, scaledWidth + gutter)}px`;
+    shell.style.height = `${Math.max(stage.clientHeight, scaledHeight + gutter)}px`;
+    if (zoomLabel) zoomLabel.textContent = `${zoom}%`;
+}
+
+function fitDocumentViewerImage() {
+    const stage = document.getElementById('documentModalContent');
+    const image = documentViewerState.image;
+    if (!stage || !image || !image.naturalWidth || !image.naturalHeight) return;
+
+    const gutter = window.innerWidth <= 640 ? 24 : 48;
+    const availableWidth = Math.max(stage.clientWidth - gutter, 1);
+    const availableHeight = Math.max(stage.clientHeight - gutter, 1);
+    const fitScale = Math.min(availableWidth / image.naturalWidth, availableHeight / image.naturalHeight);
+
+    documentViewerState.baseWidth = Math.round(image.naturalWidth * fitScale);
+    documentViewerState.baseHeight = Math.round(image.naturalHeight * fitScale);
+    documentViewerState.zoom = 100;
+    applyDocumentViewerZoom();
+}
+
+function resizeDocumentViewer(change) {
+    if (!documentViewerState.image) return;
+    documentViewerState.zoom = Math.min(300, Math.max(50, documentViewerState.zoom + change));
+    applyDocumentViewerZoom();
+}
+
+function resetDocumentViewerZoom() {
+    fitDocumentViewerImage();
+}
+
+// Full-viewport document viewer
+function viewDocument(filePath, documentName, isImage, isPdf = false, fileName = '') {
     const modal = document.getElementById('documentViewerModal');
     const modalTitle = document.getElementById('documentModalTitle');
     const modalContent = document.getElementById('documentModalContent');
-    
+    const modalFilename = document.getElementById('documentModalFilename');
+    const modalIcon = document.getElementById('documentModalIcon');
+    const zoomControls = document.getElementById('documentModalZoomControls');
+    const openOriginal = document.getElementById('documentModalOpenOriginal');
+    const download = document.getElementById('documentModalDownload');
+    if (!modal || !modalTitle || !modalContent) return;
+
+    const imageFile = isImage === 'true' || isImage === true;
+    const pdfFile = isPdf === 'true' || isPdf === true || /\.pdf(?:$|[?#])/i.test(String(filePath));
+    documentViewerState.lastFocusedElement = document.activeElement;
+    documentViewerState.image = null;
+    documentViewerState.shell = null;
+    documentViewerState.baseWidth = 0;
+    documentViewerState.baseHeight = 0;
+    documentViewerState.zoom = 100;
+
     modalTitle.textContent = documentName;
-    
-    if (isImage === 'true' || isImage === true) {
-        modalContent.innerHTML = `
-            <img src="${filePath}" alt="${documentName}" class="max-w-full max-h-96 mx-auto rounded">
-        `;
-    } else {
-        modalContent.innerHTML = `
-            <div class="text-center">
-                <i class="fas fa-file-alt text-6xl text-gray-400 mb-4"></i>
-                <p class="text-gray-600 mb-4">Click below to open the document in a new tab</p>
-                <a href="${filePath}" target="_blank" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-                    <i class="fas fa-external-link-alt mr-2"></i>Open Document
-                </a>
-            </div>
-        `;
+    if (modalFilename) modalFilename.textContent = fileName || String(filePath).split('/').pop().split('?')[0] || 'Submitted file';
+    if (modalIcon) modalIcon.className = `fas ${imageFile ? 'fa-file-image' : pdfFile ? 'fa-file-pdf' : 'fa-file-lines'}`;
+    if (zoomControls) zoomControls.classList.toggle('hidden', !imageFile);
+    if (openOriginal) openOriginal.href = filePath;
+    if (download) {
+        download.href = filePath;
+        download.setAttribute('download', fileName || documentName);
     }
-    
+
+    modalContent.innerHTML = '';
     modal.classList.remove('hidden');
-    modal.classList.add('flex');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('document-viewer-open');
+
+    if (imageFile) {
+        const shell = document.createElement('div');
+        const image = document.createElement('img');
+        shell.className = 'document-viewer__media-shell';
+        image.className = 'document-viewer__image';
+        image.src = filePath;
+        image.alt = `Preview of ${documentName}`;
+        image.draggable = false;
+        image.addEventListener('load', fitDocumentViewerImage, { once: true });
+        image.addEventListener('error', () => setDocumentViewerFallback('The image could not be loaded. Open the original file or download it to continue.'), { once: true });
+        shell.appendChild(image);
+        modalContent.appendChild(shell);
+        documentViewerState.image = image;
+        documentViewerState.shell = shell;
+    } else if (pdfFile) {
+        const frame = document.createElement('iframe');
+        frame.className = 'document-viewer__pdf';
+        frame.src = `${filePath}${String(filePath).includes('#') ? '&' : '#'}toolbar=1&navpanes=0&view=FitH`;
+        frame.title = `Preview of ${documentName}`;
+        modalContent.appendChild(frame);
+    } else {
+        setDocumentViewerFallback('This file type cannot be previewed here. Open the original file or download it to review its contents.');
+    }
+
+    window.requestAnimationFrame(() => document.getElementById('documentModalClose')?.focus());
 }
 
 function closeDocumentViewer() {
     const modal = document.getElementById('documentViewerModal');
+    const modalContent = document.getElementById('documentModalContent');
+    if (!modal || modal.classList.contains('hidden')) return;
+
     modal.classList.add('hidden');
-    modal.classList.remove('flex');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('document-viewer-open');
+    if (modalContent) modalContent.innerHTML = '';
+    documentViewerState.image = null;
+    documentViewerState.shell = null;
+
+    const previousFocus = documentViewerState.lastFocusedElement;
+    if (previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus();
+    documentViewerState.lastFocusedElement = null;
 }
+
+document.addEventListener('keydown', function(event) {
+    const modal = document.getElementById('documentViewerModal');
+    if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) closeDocumentViewer();
+});
+
+window.addEventListener('resize', function() {
+    const modal = document.getElementById('documentViewerModal');
+    if (modal && !modal.classList.contains('hidden') && documentViewerState.image) fitDocumentViewerImage();
+});
 
 // Initialize admin panel when page loads
 document.addEventListener('DOMContentLoaded', function() {

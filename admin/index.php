@@ -536,6 +536,7 @@ $recent_activity = $conn->query($recent_activity_query);
     <link rel="shortcut icon" type="image/png" href="../public/assets/images/image-removebg-preview (1).png">
     <script src="https://cdn.tailwindcss.com/3.4.16"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
     <script>
         tailwind.config = {
             theme: {
@@ -3088,6 +3089,7 @@ $recent_activity = $conn->query($recent_activity_query);
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
     <script src="admin.js"></script>
     
     <script>
@@ -3563,9 +3565,11 @@ $recent_activity = $conn->query($recent_activity_query);
             <form id="scheduleForm">
                 <div class="ui-modal-body ui-form-stack">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                        <input type="date" id="interviewDate" required 
+                        <label for="interviewDate" class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                        <input type="date" id="interviewDate" required data-weekdays-only placeholder="Select a weekday"
+                               aria-describedby="interviewDateHelp"
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <p id="interviewDateHelp" class="mt-1 text-xs text-gray-500">Weekdays only — weekends are unavailable.</p>
                     </div>
                     
                     <div>
@@ -3618,9 +3622,11 @@ $recent_activity = $conn->query($recent_activity_query);
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">New Interview Date</label>
-                        <input type="date" id="rescheduleInterviewDate" required 
+                        <label for="rescheduleInterviewDate" class="block text-sm font-medium text-gray-700 mb-1">New Interview Date</label>
+                        <input type="date" id="rescheduleInterviewDate" required data-weekdays-only placeholder="Select a weekday"
+                               aria-describedby="rescheduleInterviewDateHelp"
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        <p id="rescheduleInterviewDateHelp" class="mt-1 text-xs text-gray-500">Weekdays only — weekends are unavailable.</p>
                     </div>
                     
                     <div>
@@ -3673,9 +3679,11 @@ $recent_activity = $conn->query($recent_activity_query);
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">New Demo Date</label>
-                        <input type="date" id="rescheduleDemoDate" required 
+                        <label for="rescheduleDemoDate" class="block text-sm font-medium text-gray-700 mb-1">New Demo Date</label>
+                        <input type="date" id="rescheduleDemoDate" required data-weekdays-only placeholder="Select a weekday"
+                               aria-describedby="rescheduleDemoDateHelp"
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        <p id="rescheduleDemoDateHelp" class="mt-1 text-xs text-gray-500">Weekdays only — weekends are unavailable.</p>
                     </div>
                     
                     <div>
@@ -4103,20 +4111,46 @@ $recent_activity = $conn->query($recent_activity_query);
         </div>
     </div>
 
-    <!-- Document Viewer Modal -->
-    <div id="documentViewerModal" class="fixed inset-0 bg-black bg-opacity-75 items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-lg w-full max-w-7xl mx-4 max-h-[96vh] overflow-hidden">
-            <div class="flex items-center justify-between p-4 border-b border-gray-200">
-                <h3 id="documentModalTitle" class="text-lg font-semibold text-gray-900">Document Viewer</h3>
-                <button onclick="closeDocumentViewer()" class="text-gray-400 hover:text-gray-600">
-                    <i class="fas fa-times text-xl"></i>
+    <!-- Full-viewport document viewer -->
+    <div id="documentViewerModal" class="document-viewer hidden" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="documentModalTitle">
+        <header class="document-viewer__header">
+            <div class="document-viewer__identity">
+                <span class="document-viewer__file-icon" aria-hidden="true"><i id="documentModalIcon" class="fas fa-file-lines"></i></span>
+                <div>
+                    <span class="document-viewer__eyebrow">Document preview</span>
+                    <h3 id="documentModalTitle">Document Viewer</h3>
+                    <p id="documentModalFilename">Review the submitted file</p>
+                </div>
+            </div>
+
+            <div class="document-viewer__actions">
+                <div id="documentModalZoomControls" class="document-viewer__zoom hidden" aria-label="Image zoom controls">
+                    <button type="button" onclick="resizeDocumentViewer(-25)" aria-label="Zoom out" title="Zoom out">
+                        <i class="fas fa-minus" aria-hidden="true"></i>
+                    </button>
+                    <output id="documentModalZoom" aria-live="polite">100%</output>
+                    <button type="button" onclick="resizeDocumentViewer(25)" aria-label="Zoom in" title="Zoom in">
+                        <i class="fas fa-plus" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" onclick="resetDocumentViewerZoom()" aria-label="Fit image to screen" title="Fit to screen">
+                        <i class="fas fa-compress" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <a id="documentModalOpenOriginal" class="document-viewer__action" href="#" target="_blank" rel="noopener" title="Open original in a new tab">
+                    <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i><span>Open original</span>
+                </a>
+                <a id="documentModalDownload" class="document-viewer__action" href="#" download title="Download document">
+                    <i class="fas fa-download" aria-hidden="true"></i><span>Download</span>
+                </a>
+                <button id="documentModalClose" type="button" class="document-viewer__close" onclick="closeDocumentViewer()" aria-label="Close document viewer" title="Close (Esc)">
+                    <i class="fas fa-times" aria-hidden="true"></i>
                 </button>
             </div>
-            
-            <div id="documentModalContent" class="p-6 overflow-auto max-h-[calc(96vh-80px)]">
-                <!-- Document content will be loaded here -->
-            </div>
-        </div>
+        </header>
+
+        <main id="documentModalContent" class="document-viewer__stage" aria-label="Document preview area">
+            <!-- Document content is loaded here. -->
+        </main>
     </div>
 
     <!-- New Edit Job Modal -->

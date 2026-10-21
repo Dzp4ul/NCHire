@@ -61,6 +61,37 @@ test.describe('staff interactive controls', () => {
     await expect(page.locator('#documentReviewerContent')).toBeVisible();
     await expect(page.locator('#selectedDocumentTitle')).toContainText('Application Letter');
 
+    await page.getByRole('button', { name: 'Open document fullscreen' }).click();
+    const documentViewer = page.locator('#documentViewerModal');
+    await expect(documentViewer).toBeVisible();
+    await expect(documentViewer.locator('#documentModalTitle')).toContainText('Application Letter');
+    await expect(documentViewer.locator('#documentModalContent')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(documentViewer).toBeHidden();
+
+    await page.evaluate(() => {
+      (window as any).viewDocument(
+        '../public/assets/images/520382375_1065446909052636_3412465913398569974_n.jpg',
+        'Proof of Enrollment',
+        true,
+        false,
+        'proof-of-enrollment.jpg'
+      );
+    });
+    await expect(documentViewer.locator('.document-viewer__image')).toBeVisible();
+    await expect(documentViewer.locator('#documentModalZoomControls')).toBeVisible();
+    await expect(documentViewer.locator('#documentModalTitle')).toHaveCSS('color', 'rgb(255, 255, 255)');
+    const viewerBounds = await documentViewer.boundingBox();
+    expect(viewerBounds?.width).toBe(page.viewportSize()?.width);
+    expect(viewerBounds?.height).toBe(page.viewportSize()?.height);
+    const stageBounds = await documentViewer.locator('#documentModalContent').boundingBox();
+    const imageBounds = await documentViewer.locator('.document-viewer__image').boundingBox();
+    expect(imageBounds!.height).toBeGreaterThan(stageBounds!.height * 0.8);
+    await documentViewer.getByRole('button', { name: 'Zoom in' }).click();
+    await expect(documentViewer.locator('#documentModalZoom')).toHaveText('125%');
+    await documentViewer.getByRole('button', { name: 'Close document viewer' }).click();
+    await expect(documentViewer).toBeHidden();
+
     await page.locator('[data-applicant-tab="overview"]').click();
     await expect(page.locator('#applicantOverviewPanel')).toBeVisible();
     await expect(page.locator('#personalInfo')).toContainText('Casey');

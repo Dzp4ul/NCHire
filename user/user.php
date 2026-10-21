@@ -2441,23 +2441,33 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                 
                 <!-- Step 2: Interview -->
                 <section id="step2" class="wizard-step hidden">
-                  <header class="ui-wizard-step-header">
-                    <p class="ui-eyebrow">Recruitment stage</p>
-                    <h2 id="interview_step_title" class="text-xl font-semibold text-gray-900 mb-2">Waiting for Interview Schedule</h2>
-                    <p id="interview_step_subtitle" class="text-gray-600 mb-6">Waiting for the dean to schedule your interview.</p>
+                  <header class="ui-wizard-step-header ui-schedule-step-header">
+                    <div class="ui-schedule-step-header__copy">
+                      <p class="ui-eyebrow">Recruitment stage</p>
+                      <h2 id="interview_step_title" class="text-xl font-semibold text-gray-900 mb-2">Waiting for Interview Schedule</h2>
+                      <p id="interview_step_subtitle" class="text-gray-600 mb-6">Waiting for the dean to schedule your interview.</p>
+                    </div>
+                    <div class="ui-schedule-step-header__art" aria-hidden="true">
+                      <span class="ui-schedule-step-header__calendar"><i class="ri-calendar-line"></i></span>
+                      <span class="ui-schedule-step-header__check"><i class="ri-check-line"></i></span>
+                    </div>
                   </header>
                     
-                    <div class="ui-workflow-stage bg-white rounded-lg border border-gray-200 p-6">
-                        <div id="interview_status_container" class="text-center py-8">
-                            <i class="ri-calendar-line text-6xl text-blue-500 mb-4"></i>
-                            <h3 id="interview_status_title" class="text-lg font-semibold text-gray-900 mb-2">Waiting for Interview Schedule</h3>
-                            <p class="text-gray-600" id="interview_status_text">Your application has been submitted. Please wait while the dean reviews your application and schedules your interview.</p>
+                    <div class="ui-workflow-stage">
+                        <div id="interview_status_container" class="ui-schedule-card">
+                            <div class="ui-schedule-card__heading">
+                                <span class="ui-schedule-card__heading-icon" aria-hidden="true"><i class="ri-calendar-line"></i></span>
+                                <div>
+                                    <h3 id="interview_status_title">Waiting for Interview Schedule</h3>
+                                    <p id="interview_status_text">Your application has been submitted. Please wait while the dean reviews your application and schedules your interview.</p>
+                                </div>
+                            </div>
                             <div id="interview_details" class="hidden mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                                 <!-- Interview details will be populated here -->
                             </div>
-                            <div id="interview_approved_status" class="hidden mt-4">
-                                <!-- Approval status will be shown here -->
-                            </div>
+                        </div>
+                        <div id="interview_approved_status" class="hidden mt-4">
+                            <!-- Approval status will be shown here -->
                         </div>
                     </div>
                     
@@ -2473,23 +2483,33 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
                 
                 <!-- Step 3: Demo Teaching -->
                 <section id="step3" class="wizard-step hidden">
-                  <header class="ui-wizard-step-header">
-                    <p class="ui-eyebrow">Recruitment stage</p>
-                    <h2 id="demo_step_title" class="text-xl font-semibold text-gray-900 mb-2">Waiting for Demo Teaching Schedule</h2>
-                    <p id="demo_step_subtitle" class="text-gray-600 mb-6">Waiting for the dean to schedule your demo teaching.</p>
+                  <header class="ui-wizard-step-header ui-schedule-step-header">
+                    <div class="ui-schedule-step-header__copy">
+                      <p class="ui-eyebrow">Recruitment stage</p>
+                      <h2 id="demo_step_title" class="text-xl font-semibold text-gray-900 mb-2">Waiting for Demo Teaching Schedule</h2>
+                      <p id="demo_step_subtitle" class="text-gray-600 mb-6">Waiting for the dean to schedule your demo teaching.</p>
+                    </div>
+                    <div class="ui-schedule-step-header__art" aria-hidden="true">
+                      <span class="ui-schedule-step-header__calendar"><i class="ri-presentation-line"></i></span>
+                      <span class="ui-schedule-step-header__check"><i class="ri-check-line"></i></span>
+                    </div>
                   </header>
                     
-                    <div class="ui-workflow-stage bg-white rounded-lg border border-gray-200 p-6">
-                        <div id="demo_status_container" class="text-center py-8">
-                            <i class="ri-presentation-line text-6xl text-indigo-500 mb-4"></i>
-                            <h3 id="demo_status_title" class="text-lg font-semibold text-gray-900 mb-2">Waiting for Demo Teaching Schedule</h3>
-                            <p class="text-gray-600" id="demo_status_text">Please wait while the Dean schedules your demo teaching session.</p>
+                    <div class="ui-workflow-stage">
+                        <div id="demo_status_container" class="ui-schedule-card">
+                            <div class="ui-schedule-card__heading">
+                                <span class="ui-schedule-card__heading-icon" aria-hidden="true"><i class="ri-presentation-line"></i></span>
+                                <div>
+                                    <h3 id="demo_status_title">Waiting for Demo Teaching Schedule</h3>
+                                    <p id="demo_status_text">Please wait while the Dean schedules your demo teaching session.</p>
+                                </div>
+                            </div>
                             <div id="demo_details" class="hidden mt-6 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                                 <!-- Demo details will be populated here -->
                             </div>
-                            <div id="demo_approved_status" class="hidden mt-4">
-                                <!-- Approval status will be shown here -->
-                            </div>
+                        </div>
+                        <div id="demo_approved_status" class="hidden mt-4">
+                            <!-- Approval status will be shown here -->
                         </div>
                     </div>
                     
@@ -2935,6 +2955,52 @@ document.addEventListener('DOMContentLoaded', function() {
     };
   }
 
+  function renderScheduleDetails({ date, time, location, room, notes, type }) {
+    const safeLocation = location ? escapeHtml(location) : 'To be announced';
+    const safeRoom = room ? escapeHtml(room) : 'To be announced';
+    const scheduleLabel = type === 'demo' ? 'Demo teaching' : 'Interview';
+
+    return `
+      <div class="ui-schedule-facts" role="list" aria-label="${scheduleLabel} schedule">
+        <div class="ui-schedule-fact" role="listitem">
+          <span class="ui-schedule-fact__icon" aria-hidden="true"><i class="ri-calendar-line"></i></span>
+          <span class="ui-schedule-fact__copy"><span class="ui-schedule-fact__label">Date</span><strong>${escapeHtml(date)}</strong></span>
+        </div>
+        <div class="ui-schedule-fact" role="listitem">
+          <span class="ui-schedule-fact__icon" aria-hidden="true"><i class="ri-time-line"></i></span>
+          <span class="ui-schedule-fact__copy"><span class="ui-schedule-fact__label">Time</span><strong>${escapeHtml(time)}</strong></span>
+        </div>
+        <div class="ui-schedule-fact" role="listitem">
+          <span class="ui-schedule-fact__icon" aria-hidden="true"><i class="ri-map-pin-line"></i></span>
+          <span class="ui-schedule-fact__copy"><span class="ui-schedule-fact__label">Location</span><strong>${safeLocation}</strong></span>
+        </div>
+        <div class="ui-schedule-fact" role="listitem">
+          <span class="ui-schedule-fact__icon" aria-hidden="true"><i class="ri-building-line"></i></span>
+          <span class="ui-schedule-fact__copy"><span class="ui-schedule-fact__label">Room / Venue</span><strong>${safeRoom}</strong></span>
+        </div>
+      </div>
+      ${notes ? `<div class="ui-schedule-note"><i class="ri-sticky-note-line" aria-hidden="true"></i><div><span>Additional notes</span><p>${escapeHtml(notes)}</p></div></div>` : ''}
+    `;
+  }
+
+  function renderStageNotice({ tone = 'info', title, message }) {
+    const icon = tone === 'success' ? 'ri-checkbox-circle-line' : tone === 'warning' ? 'ri-time-line' : 'ri-information-line';
+    return `
+      <div class="ui-stage-notice ui-stage-notice--${tone}" role="status">
+        <span class="ui-stage-notice__icon" aria-hidden="true"><i class="${icon}"></i></span>
+        <div class="ui-stage-notice__copy">
+          <strong>${escapeHtml(title)}</strong>
+          ${message ? `<p>${escapeHtml(message)}</p>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  function setScheduleStageState(stepId, state) {
+    const step = document.getElementById(stepId);
+    if (step) step.dataset.scheduleState = state;
+  }
+
   function updateInterviewStage(app) {
     const hasSchedule = Boolean(app && app.interview_date);
     const passed = isPassedStatus(app?.status, app?.workflow_stage, 'interview');
@@ -2960,6 +3026,7 @@ document.addEventListener('DOMContentLoaded', function() {
     nextButton.title = passed ? 'Proceed to Demo Teaching' : 'Wait for the Dean to approve your interview';
 
     if (!hasSchedule) {
+      setScheduleStageState('step2', 'waiting');
       title.textContent = 'Waiting for Interview Schedule';
       subtitle.textContent = 'Waiting for the dean to schedule your interview.';
       statusTitle.textContent = 'Waiting for Interview Schedule';
@@ -2967,26 +3034,37 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
 
+    setScheduleStageState('step2', passed ? 'complete' : (schedule.hasPassed ? 'pending-result' : 'scheduled'));
     title.textContent = passed ? 'Interview Completed' : (schedule.hasPassed ? 'Waiting for Interview Result' : 'Interview Scheduled');
-    subtitle.textContent = passed ? 'Your interview has been completed.' : (schedule.hasPassed ? 'Your interview has been conducted.' : 'Your interview has been scheduled.');
+    subtitle.textContent = passed
+      ? 'Your interview has been completed.'
+      : schedule.hasPassed
+        ? 'Your interview has been conducted.'
+        : 'Your interview has been scheduled. Please review the details below and attend at the specified date, time, and location.';
     statusTitle.textContent = passed ? 'Interview Completed' : (schedule.hasPassed ? 'Interview Result' : 'Interview Details');
     statusText.textContent = passed
       ? 'Your interview was approved. You may proceed to Demo Teaching.'
       : schedule.hasPassed
         ? 'Your interview has been conducted. Please wait for the Dean to record the interview result.'
-        : 'Please review your interview schedule below and attend at the specified date, time, and location.';
-    details.innerHTML = `
-      <p class="text-sm text-green-600 font-medium"><i class="ri-calendar-check-line mr-1"></i>Interview Scheduled</p>
-      <p class="text-sm text-gray-700 mt-2"><i class="ri-calendar-event-line mr-1"></i>${schedule.date}</p>
-      <p class="text-sm text-gray-700 mt-1"><i class="ri-time-line mr-1"></i>${schedule.time}</p>
-      ${app.interview_location ? `<p class="text-sm text-gray-700 mt-1"><i class="ri-map-pin-line mr-1"></i>${escapeHtml(app.interview_location)}</p>` : ''}
-      ${app.interview_room ? `<p class="text-sm text-gray-700 mt-1"><i class="ri-door-open-line mr-1"></i>${escapeHtml(app.interview_room)}</p>` : ''}
-      ${app.interview_notes ? `<p class="text-sm text-gray-600 mt-2">${escapeHtml(app.interview_notes)}</p>` : ''}
-    `;
+        : 'Here are the details of your scheduled interview.';
+    details.innerHTML = renderScheduleDetails({
+      date: schedule.date,
+      time: schedule.time,
+      location: app.interview_location,
+      room: app.interview_room,
+      notes: app.interview_notes,
+      type: 'interview'
+    });
     details.classList.remove('hidden');
     approval.innerHTML = passed
-      ? '<div class="p-3 bg-green-50 border border-green-200 rounded-lg"><p class="text-green-700 font-medium flex items-center justify-center"><i class="ri-checkbox-circle-fill mr-2"></i>Interview Passed</p></div>'
-      : `<div class="p-3 ${schedule.hasPassed ? 'bg-yellow-50 border-yellow-200' : 'bg-blue-50 border-blue-200'} border rounded-lg"><p class="${schedule.hasPassed ? 'text-yellow-700' : 'text-blue-700'} font-medium flex items-center justify-center"><i class="ri-${schedule.hasPassed ? 'time' : 'information'}-line mr-2"></i>Interview Status</p><p class="${schedule.hasPassed ? 'text-yellow-600' : 'text-blue-600'} text-sm text-center mt-2">${schedule.hasPassed ? 'Please wait for the Dean to record the interview result.' : 'Please attend your scheduled interview. After the interview, please wait for the Dean\'s evaluation before proceeding to Demo Teaching.'}</p></div>`;
+      ? renderStageNotice({ tone: 'success', title: 'Interview completed', message: 'Your interview was approved. You may proceed to Demo Teaching.' })
+      : renderStageNotice({
+          tone: schedule.hasPassed ? 'warning' : 'info',
+          title: schedule.hasPassed ? 'Interview result pending' : 'Interview status',
+          message: schedule.hasPassed
+            ? 'Please wait for the Dean to record the interview result.'
+            : 'Please attend your scheduled interview. After the interview, wait for the Dean\'s evaluation before proceeding to Demo Teaching.'
+        });
     approval.classList.remove('hidden');
   }
 
@@ -3015,6 +3093,7 @@ document.addEventListener('DOMContentLoaded', function() {
     nextButton.title = passed ? 'Proceed to Psychological Exam' : 'Wait for the Dean to approve your demo teaching';
 
     if (!hasSchedule) {
+      setScheduleStageState('step3', 'waiting');
       title.textContent = 'Waiting for Demo Teaching Schedule';
       subtitle.textContent = 'Waiting for the dean to schedule your demo teaching.';
       statusTitle.textContent = 'Waiting for Demo Teaching Schedule';
@@ -3022,26 +3101,37 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
 
+    setScheduleStageState('step3', passed ? 'complete' : (schedule.hasPassed ? 'pending-result' : 'scheduled'));
     title.textContent = passed ? 'Demo Teaching Completed' : (schedule.hasPassed ? 'Waiting for Demo Teaching Result' : 'Demo Teaching Scheduled');
-    subtitle.textContent = passed ? 'Your demo teaching has been completed.' : (schedule.hasPassed ? 'Your demo teaching session has been completed.' : 'Your demo teaching session has been scheduled.');
+    subtitle.textContent = passed
+      ? 'Your demo teaching has been completed.'
+      : schedule.hasPassed
+        ? 'Your demo teaching session has been completed.'
+        : 'Your demo teaching has been scheduled. Please review the details below and attend at the specified date, time, and location.';
     statusTitle.textContent = passed ? 'Demo Teaching Completed' : (schedule.hasPassed ? 'Demo Teaching Result' : 'Demo Teaching Details');
     statusText.textContent = passed
       ? 'Your demo teaching was approved. You may proceed to the Psychological Examination.'
       : schedule.hasPassed
         ? 'Your demo teaching session has been completed. Please wait for the Dean to record the result.'
-        : 'Please review your demo teaching schedule below and attend at the specified date, time, and location.';
-    details.innerHTML = `
-      <p class="text-sm text-green-600 font-medium"><i class="ri-calendar-check-line mr-1"></i>Demo Teaching Scheduled</p>
-      <p class="text-sm text-gray-700 mt-2"><i class="ri-calendar-event-line mr-1"></i>${schedule.date}</p>
-      <p class="text-sm text-gray-700 mt-1"><i class="ri-time-line mr-1"></i>${schedule.time}</p>
-      ${app.demo_location ? `<p class="text-sm text-gray-700 mt-1"><i class="ri-map-pin-line mr-1"></i>${escapeHtml(app.demo_location)}</p>` : ''}
-      ${app.demo_room ? `<p class="text-sm text-gray-700 mt-1"><i class="ri-door-open-line mr-1"></i>${escapeHtml(app.demo_room)}</p>` : ''}
-      ${app.demo_notes ? `<p class="text-sm text-gray-600 mt-2">${escapeHtml(app.demo_notes)}</p>` : ''}
-    `;
+        : 'Here are the details of your scheduled demo teaching session.';
+    details.innerHTML = renderScheduleDetails({
+      date: schedule.date,
+      time: schedule.time,
+      location: app.demo_location,
+      room: app.demo_room,
+      notes: app.demo_notes,
+      type: 'demo'
+    });
     details.classList.remove('hidden');
     approval.innerHTML = passed
-      ? '<div class="p-3 bg-green-50 border border-green-200 rounded-lg"><p class="text-green-700 font-medium flex items-center justify-center"><i class="ri-checkbox-circle-fill mr-2"></i>Demo Teaching Passed</p></div>'
-      : `<div class="p-3 ${schedule.hasPassed ? 'bg-yellow-50 border-yellow-200' : 'bg-blue-50 border-blue-200'} border rounded-lg"><p class="${schedule.hasPassed ? 'text-yellow-700' : 'text-blue-700'} font-medium flex items-center justify-center"><i class="ri-${schedule.hasPassed ? 'time' : 'information'}-line mr-2"></i>Demo Teaching Status</p><p class="${schedule.hasPassed ? 'text-yellow-600' : 'text-blue-600'} text-sm text-center mt-2">${schedule.hasPassed ? 'Please wait for the Dean to record the result.' : 'Please attend your scheduled demo teaching session.'}</p></div>`;
+      ? renderStageNotice({ tone: 'success', title: 'Demo teaching completed', message: 'Your demo teaching was approved. You may proceed to the Psychological Examination.' })
+      : renderStageNotice({
+          tone: schedule.hasPassed ? 'warning' : 'info',
+          title: schedule.hasPassed ? 'Demo teaching result pending' : 'Demo teaching status',
+          message: schedule.hasPassed
+            ? 'Please wait for the Dean to record the result.'
+            : 'Please attend your scheduled demo teaching session and wait for the Dean\'s evaluation.'
+        });
     approval.classList.remove('hidden');
   }
 

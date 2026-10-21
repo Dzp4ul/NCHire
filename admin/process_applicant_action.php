@@ -408,6 +408,11 @@ try {
                 echo json_encode(['success' => false, 'error' => 'Demo date and time are required']);
                 exit;
             }
+
+            if (!nc_is_weekday_date($demo_date)) {
+                echo json_encode(['success' => false, 'error' => 'Demo schedules are only available on weekdays']);
+                exit;
+            }
             
             if (empty($demo_location) || empty($demo_room)) {
                 echo json_encode(['success' => false, 'error' => 'Demo location and room are required']);
@@ -906,6 +911,11 @@ try {
             
             if (empty($demo_date) || empty($demo_time)) {
                 echo json_encode(['success' => false, 'error' => 'Demo date and time are required']);
+                exit;
+            }
+
+            if (!nc_is_weekday_date($demo_date)) {
+                echo json_encode(['success' => false, 'error' => 'Demo schedules are only available on weekdays']);
                 exit;
             }
             

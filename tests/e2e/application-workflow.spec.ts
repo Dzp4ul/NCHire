@@ -203,6 +203,44 @@ test.describe('application submission and cross-role recruitment workflow', () =
 
     await login(page, accounts.deanCs);
     token = await csrfToken(page);
+
+    await page.getByRole('button', { name: 'Applicants' }).click();
+    const applicantRow = page.locator('#applicantsTableBody tr').filter({ hasText: 'Casey Pipeline' }).first();
+    await expect(applicantRow).toBeVisible();
+    await applicantRow.getByRole('button', { name: 'View Details' }).click();
+    await page.locator('[data-applicant-tab="decision"]').click();
+    await page.locator('#scheduleBtn').click();
+    await expect(page.locator('#scheduleModal')).toBeVisible();
+
+    const calendarRules = await page.locator('#interviewDate').evaluate(element => {
+      const input = element as HTMLInputElement & { _flatpickr?: any };
+      const picker = input._flatpickr;
+      if (!picker) return { initialized: false, saturdayDisabled: false, sundayDisabled: false, mondayDisabled: true, rejectedValue: input.value };
+
+      picker.jumpToDate(new Date(2030, 0, 5), false);
+      const calendar = picker.calendarContainer as HTMLElement;
+      const isDisabled = (label: string) => calendar.querySelector(`[aria-label="${label}"]`)?.classList.contains('flatpickr-disabled') === true;
+
+      input.value = '2030-01-05';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+
+      return {
+        initialized: true,
+        saturdayDisabled: isDisabled('January 5, 2030'),
+        sundayDisabled: isDisabled('January 6, 2030'),
+        mondayDisabled: isDisabled('January 7, 2030'),
+        rejectedValue: input.value,
+      };
+    });
+    expect(calendarRules).toEqual({
+      initialized: true,
+      saturdayDisabled: true,
+      sundayDisabled: true,
+      mondayDisabled: false,
+      rejectedValue: '',
+    });
+    await page.getByRole('button', { name: 'Close schedule interview dialog' }).click();
+
     const deanAction = async (action: string, extra: Record<string, string> = {}) => {
       const response = await page.request.post('admin/process_applicant_action.php', {
         headers: { 'X-CSRF-Token': token },
@@ -213,10 +251,35 @@ test.describe('application submission and cross-role recruitment workflow', () =
       expect(body.success, `${action}: ${JSON.stringify(body)}`).toBeTruthy();
     };
 
+    const weekendInterview = await page.request.post('admin/process_applicant_action.php', {
+      headers: { 'X-CSRF-Token': token },
+      form: {
+        action: 'schedule_interview', applicant_id: '1', interview_date: '2030-01-05', interview_time: '09:00',
+        interview_location: 'Norzagaray College', interview_room: 'Room 101', interview_room_id: '1',
+      },
+    });
+    await expect(weekendInterview.json()).resolves.toMatchObject({
+      success: false,
+      error: 'Interview schedules are only available on weekdays',
+    });
+
     await deanAction('schedule_interview', {
       interview_date: '2030-01-07', interview_time: '09:00', interview_location: 'Norzagaray College', interview_room: 'Room 101', interview_room_id: '1',
     });
     await deanAction('approve_interview', { interview_notes: 'Interview passed.' });
+
+    const weekendDemo = await page.request.post('admin/process_applicant_action.php', {
+      headers: { 'X-CSRF-Token': token },
+      form: {
+        action: 'schedule_demo', applicant_id: '1', interview_date: '2030-01-06', interview_time: '10:00',
+        interview_location: 'Norzagaray College', interview_room: 'Room 202', interview_notes: 'Prepare a lesson.',
+      },
+    });
+    await expect(weekendDemo.json()).resolves.toMatchObject({
+      success: false,
+      error: 'Demo schedules are only available on weekdays',
+    });
+
     await deanAction('schedule_demo', {
       interview_date: '2030-01-08', interview_time: '10:00', interview_location: 'Norzagaray College', interview_room: 'Room 202', interview_notes: 'Prepare a lesson.'
     });
