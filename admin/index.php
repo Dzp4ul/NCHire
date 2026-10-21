@@ -7,7 +7,7 @@ if (empty($_SESSION['csrf_token'])) {
 
 // Check if admin is logged in
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    header("Location: ../index.php");
+    header("Location: ../public/index.php");
     exit();
 }
 
@@ -21,7 +21,7 @@ if (isset($_SESSION['password_change_required']) && $_SESSION['password_change_r
 $host = "127.0.0.1";
 $user = "root";
 $pass = "";
-$dbname = "nchire";
+$dbname = getenv('NCHIRE_DB_NAME') ?: "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
 if ($conn->connect_error) {

@@ -12,7 +12,7 @@ requireAdminApiAuth();
 $host = "127.0.0.1";
 $user = "root";
 $pass = "";
-$dbname = "nchire";
+$dbname = getenv('NCHIRE_DB_NAME') ?: "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
 if ($conn->connect_error) {
@@ -158,8 +158,12 @@ switch ($method) {
             $newUserId = $conn->insert_id;
             
             // Send temporary password email
-            require_once '../send_temp_password_email.php';
-            $emailResult = sendTemporaryPasswordEmail($input['email'], $input['name'], $temporaryPassword, $input['role']);
+            if (getenv('NCHIRE_TEST_MODE') === '1') {
+                $emailResult = ['success' => true];
+            } else {
+                require_once '../send_temp_password_email.php';
+                $emailResult = sendTemporaryPasswordEmail($input['email'], $input['name'], $temporaryPassword, $input['role']);
+            }
             
             // Fetch the newly created user
             $fetch = $conn->query("SELECT id, full_name as name, email, role, department, profile_picture, status, 

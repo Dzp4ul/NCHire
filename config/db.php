@@ -3,7 +3,7 @@
 $host = "127.0.0.1"; // or localhost
 $user = "root"; // your MySQL username
 $pass = ""; // your MySQL password
-$dbname = "nchire"; // your database name
+$dbname = getenv('NCHIRE_DB_NAME') ?: "nchire"; // defaults to the local application database
 
 // Create connection
 $conn = new mysqli($host, $user, $pass, $dbname);

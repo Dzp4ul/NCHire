@@ -107,7 +107,7 @@ document.addEventListener('click', function() {
 // Logout confirmation
 function confirmLogout() {
     if (confirm('Are you sure you want to sign out?')) {
-        window.location.href = '../index.php?logout=1';
+        window.location.href = '../public/index.php?logout=1';
     }
 }
 </script>

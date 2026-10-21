@@ -6913,3 +6913,305 @@ body.gt-app {
         grid-template-columns: minmax(0, 1fr) 44px;
     }
 }
+
+/* Credential cards ------------------------------------------------------- */
+.ui-credential-count {
+    margin: 0 0 18px;
+    color: var(--ui-text-secondary);
+    font-size: 0.86rem;
+    font-weight: 650;
+}
+
+.ui-credential-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 360px));
+    gap: 22px;
+    align-items: stretch;
+    justify-content: start;
+    min-width: 0;
+}
+
+.ui-credential-grid > .ui-profile-empty--wide {
+    grid-column: 1 / -1;
+    width: 100%;
+}
+
+.ui-credential-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 430px;
+    border: 1px solid #dbe3ee;
+    border-radius: 16px;
+    background: var(--ui-surface);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.ui-credential-card__preview {
+    position: relative;
+    height: 150px;
+    overflow: hidden;
+    border-radius: 15px 15px 0 0;
+    background: linear-gradient(135deg, #e9f0ff 0%, #f8fafc 100%);
+}
+
+.ui-credential-card__preview > img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+}
+
+.ui-credential-card__placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: 100%;
+    height: 100%;
+    color: var(--ui-brand-700);
+}
+
+.ui-credential-card__placeholder i {
+    font-size: 2.1rem;
+}
+
+.ui-credential-card__placeholder span {
+    color: var(--ui-text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.045em;
+    text-transform: uppercase;
+}
+
+.ui-credential-card__badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 5px 10px;
+    border: 1px solid #bfd1ff;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.94);
+    color: var(--ui-brand-700);
+    font-size: 0.7rem;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+.ui-credential-card__badge.is-verified {
+    border-color: #a7ddc3;
+    color: var(--ui-success);
+}
+
+.ui-credential-card__badge.is-missing {
+    border-color: #d7dee8;
+    color: var(--ui-text-muted);
+}
+
+.ui-credential-card__body {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+    padding: 18px 16px 16px;
+}
+
+.ui-credential-card__body h3 {
+    margin: 0;
+    color: var(--ui-text);
+    font-size: 1rem;
+    font-weight: 750;
+    line-height: 1.35;
+}
+
+.ui-credential-card__issuer {
+    display: grid;
+    grid-template-columns: 17px minmax(0, 1fr);
+    gap: 8px;
+    align-items: start;
+    margin: 7px 0 0;
+    color: var(--ui-text-secondary);
+    font-size: 0.81rem;
+    line-height: 1.45;
+}
+
+.ui-credential-card__issuer i,
+.ui-credential-card__dates i {
+    color: var(--ui-text-muted);
+    font-size: 0.95rem;
+}
+
+.ui-credential-card__dates {
+    display: grid;
+    gap: 6px;
+    margin-top: 14px;
+    color: var(--ui-text-secondary);
+    font-size: 0.75rem;
+}
+
+.ui-credential-card__dates span {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ui-credential-card__file {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    margin-top: 16px;
+    padding: 10px 11px;
+    border: 1px solid #dbe3ee;
+    border-radius: 11px;
+    background: #fff;
+}
+
+.ui-credential-card__file-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
+    background: var(--ui-brand-50);
+    color: var(--ui-brand-700);
+    font-size: 1.05rem;
+}
+
+.ui-credential-card__file-copy {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.ui-credential-card__file-copy strong {
+    overflow: hidden;
+    color: var(--ui-text-secondary);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ui-credential-card__file-copy small {
+    color: var(--ui-text-muted);
+    font-size: 0.68rem;
+}
+
+.ui-credential-card__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 60px;
+    margin: 0 16px;
+    padding: 12px 0;
+    border-top: 1px solid #e5eaf1;
+}
+
+.ui-credential-card__document-actions {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+}
+
+.ui-credential-card__document-actions a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ui-brand-700);
+    font-size: 0.74rem;
+    font-weight: 700;
+}
+
+.ui-credential-card__document-actions a:hover {
+    color: var(--ui-brand-900);
+    text-decoration: none;
+}
+
+.ui-credential-card__more {
+    position: relative;
+    margin-left: auto;
+}
+
+.ui-credential-card__more > button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ui-text-secondary);
+    font-size: 1.1rem;
+}
+
+.ui-credential-card__more > button:hover,
+.ui-credential-card__more > button[aria-expanded="true"] {
+    background: var(--ui-surface-muted);
+    color: var(--ui-brand-800);
+}
+
+.ui-credential-card__menu {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 7px);
+    z-index: 20;
+    width: 138px;
+    padding: 5px;
+    border: 1px solid var(--ui-border);
+    border-radius: 10px;
+    background: var(--ui-surface);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+}
+
+.ui-credential-card__menu[hidden] {
+    display: none;
+}
+
+.ui-credential-card__menu button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 9px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--ui-text-secondary);
+    font-size: 0.76rem;
+    font-weight: 650;
+    text-align: left;
+}
+
+.ui-credential-card__menu button:hover {
+    background: var(--ui-surface-muted);
+    color: var(--ui-text);
+}
+
+.ui-credential-card__menu button.is-danger,
+.ui-credential-card__menu button.is-danger:hover {
+    color: var(--ui-danger);
+}
+
+@media (max-width: 640px) {
+    .ui-credential-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ui-credential-card {
+        min-height: 0;
+    }
+
+    .ui-credential-card__preview {
+        height: clamp(135px, 42vw, 180px);
+    }
+}

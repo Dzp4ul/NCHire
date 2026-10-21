@@ -22,7 +22,7 @@ if (!isset($_SESSION['user_id']) && !isset($_SESSION['user_email'])) {
 $servername = "127.0.0.1";
 $username = "root";
 $password = "";
-$dbname = "nchire";
+$dbname = getenv('NCHIRE_DB_NAME') ?: "nchire";
 
 $conn = new mysqli($servername, $username, $password, $dbname);
 if ($conn->connect_error) {

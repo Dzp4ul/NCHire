@@ -16,7 +16,7 @@ if (!isset($_SESSION['user_id']) && !isset($_SESSION['user_email'])) {
         $_SESSION['redirect_after_login'] = 'user.php?job_id=' . intval($_GET['job_id']);
     }
     // Redirect to homepage with login prompt
-    header('Location: ../index.php');
+    header('Location: ../public/index.php');
     exit();
 }
 
@@ -53,7 +53,7 @@ if (isset($_SESSION['application_error'])) {
 $host = "127.0.0.1";
 $user = "root";
 $pass = "";
-$dbname = "nchire";
+$dbname = getenv('NCHIRE_DB_NAME') ?: "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
 if ($conn->connect_error) {
@@ -10302,7 +10302,7 @@ function closeLogoutModal() {
 }
 
 function proceedLogout() {
-    window.location.href = '../index.php?logout=1';
+    window.location.href = '../public/index.php?logout=1';
 }
 
 // Add Work Experience modal

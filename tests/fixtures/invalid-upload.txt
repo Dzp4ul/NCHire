@@ -1,0 +1,1 @@
+This file intentionally has a disallowed extension for negative upload tests.

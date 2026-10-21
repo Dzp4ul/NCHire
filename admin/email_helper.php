@@ -17,6 +17,9 @@ require_once __DIR__ . '/../vendor/autoload.php';
  * @return bool True on success, false on failure
  */
 function sendEmailNotification($to_email, $to_name, $subject, $title, $message, $type = 'info', $bcc = []) {
+    if (getenv('NCHIRE_TEST_MODE') === '1') {
+        return true;
+    }
     $mail = new PHPMailer(true);
     
     try {

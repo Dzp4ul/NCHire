@@ -12,7 +12,7 @@ if (!isset($_SESSION['user_id']) && !isset($_SESSION['user_email'])) {
 $servername = "127.0.0.1";
 $username = "root";
 $password = "";
-$dbname = "nchire";
+$dbname = getenv('NCHIRE_DB_NAME') ?: "nchire";
 
 $conn = new mysqli($servername, $username, $password, $dbname);
 if ($conn->connect_error) {
@@ -372,7 +372,7 @@ if (false && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['saveSkill'])
 // Get user ID from session
 $current_user_id = $_SESSION['user_id'] ?? null;
 if (!$current_user_id) {
-    header("Location: ../index.php");
+    header("Location: ../public/index.php");
     exit();
 }
 
@@ -484,7 +484,14 @@ if ($qualifications_table && $qualifications_table->num_rows > 0) {
     $qualifications_stmt->bind_param("i", $current_user_id);
     $qualifications_stmt->execute();
     $qualifications_result = $qualifications_stmt->get_result();
-    while ($row = $qualifications_result->fetch_assoc()) $qualifications_data[] = $row;
+    while ($row = $qualifications_result->fetch_assoc()) {
+        $row['proof_size_bytes'] = null;
+        if (!empty($row['proof_document']) && strpos((string)$row['proof_document'], '..') === false) {
+            $proofPath = __DIR__ . DIRECTORY_SEPARATOR . ltrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, (string)$row['proof_document']), DIRECTORY_SEPARATOR);
+            if (is_file($proofPath)) $row['proof_size_bytes'] = filesize($proofPath);
+        }
+        $qualifications_data[] = $row;
+    }
     $qualifications_stmt->close();
 }
 
@@ -2262,13 +2269,54 @@ window.showNotification = showNotification;
 <script id="qualificationProfileManagement">
 (function initializeQualificationProfile() {
   const qualificationData = <?php echo json_encode($qualifications_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
-  const escapeValue = value => {
-    const div = document.createElement('div');
-    div.textContent = value == null ? '' : String(value);
-    return div.innerHTML;
-  };
+  const escapeValue = value => String(value == null ? '' : value).replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+  })[character]);
   const modal = document.getElementById('qualificationModal');
   const form = document.getElementById('qualificationForm');
+
+  const formatQualificationDate = value => {
+    if (!value) return 'Not provided';
+    const date = new Date(`${value}T00:00:00`);
+    return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('en-US', {month: 'short', day: 'numeric', year: 'numeric'}).format(date);
+  };
+  const formatFileSize = value => {
+    if (value === null || value === undefined || value === '') return '';
+    const bytes = Number(value);
+    if (!Number.isFinite(bytes) || bytes < 0) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+  const qualificationIsImage = path => /\.(?:jpe?g|png)$/i.test(String(path || ''));
+  const qualificationExtension = path => {
+    const match = String(path || '').match(/\.([a-z0-9]+)$/i);
+    return match ? match[1].toUpperCase() : '';
+  };
+  const setQualificationCount = count => {
+    const label = document.getElementById('qualificationCount');
+    if (label) label.textContent = `${count} ${count === 1 ? 'credential' : 'credentials'}`;
+  };
+
+  function closeQualificationMenus(exceptId) {
+    document.querySelectorAll('.ui-credential-card__menu').forEach(menu => {
+      if (String(menu.id) === `qualificationMenu-${exceptId}`) return;
+      menu.hidden = true;
+      const id = menu.id.replace('qualificationMenu-', '');
+      document.getElementById(`qualificationMenuButton-${id}`)?.setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  window.toggleQualificationMenu = function(id, event) {
+    event?.stopPropagation();
+    const menu = document.getElementById(`qualificationMenu-${id}`);
+    const button = document.getElementById(`qualificationMenuButton-${id}`);
+    if (!menu || !button) return;
+    const willOpen = menu.hidden;
+    closeQualificationMenus(id);
+    menu.hidden = !willOpen;
+    button.setAttribute('aria-expanded', String(willOpen));
+  };
 
   function closeQualificationModal() {
     if (!modal) return;
@@ -2282,21 +2330,61 @@ window.showNotification = showNotification;
     const container = document.getElementById('qualificationsList');
     if (!result.success || !container) return;
     qualificationData.splice(0, qualificationData.length, ...result.data);
+    setQualificationCount(result.data.length);
     if (!result.data.length) {
-      container.innerHTML = '<div class="ui-profile-empty"><i class="ri-award-line"></i><div><strong>No certifications or licenses added yet</strong><p>Add only credentials and training that you currently hold.</p></div><button type="button" onclick="document.getElementById(\'addQualificationBtn\').click()">Add Qualification</button></div>';
+      container.innerHTML = '<div class="ui-profile-empty ui-profile-empty--wide"><i class="ri-award-line"></i><div><strong>No certifications or licenses added yet</strong><p>Add only credentials and training that you currently hold.</p></div><button type="button" onclick="document.getElementById(\'addQualificationBtn\').click()">Add Qualification</button></div>';
       return;
     }
-    container.innerHTML = result.data.map(item => `
-      <div class="ui-profile-record ui-profile-record--credential" data-qualification-id="${Number(item.id)}">
-        <div class="ui-profile-record__body">
-          <div class="ui-profile-record__title-row"><div><h3>${escapeValue(item.title)}</h3><p>${escapeValue(item.qualification_type)} <span aria-hidden="true">•</span> ${escapeValue(item.verification_status || 'unverified')}</p></div><div class="ui-profile-record__actions"><button type="button" onclick="editQualification(${Number(item.id)})" class="ui-link-action"><i class="ri-edit-line"></i>Edit</button><button type="button" onclick="deleteQualification(${Number(item.id)})" class="ui-link-action ui-link-action--danger"><i class="ri-delete-bin-line"></i>Delete</button></div></div>
-          <div class="ui-profile-credential-grid"><div><span>Issued by</span><strong>${escapeValue(item.issuing_organization || 'Not provided')}</strong></div><div><span>Issued</span><strong>${item.issued_date ? escapeValue(item.issued_date) : 'Not provided'}</strong></div>${item.expiry_date ? `<div><span>Expires</span><strong>${escapeValue(item.expiry_date)}</strong></div>` : ''}</div>
-          ${item.proof_document ? `<div class="ui-profile-document-row ui-profile-document-row--standalone"><i class="ri-file-text-line" aria-hidden="true"></i><div><strong>Proof document</strong><span>${escapeValue(String(item.proof_document).split('/').pop())}</span></div><span class="ui-document-status">${escapeValue(item.verification_status || 'unverified')}</span><div class="ui-profile-document-row__actions"><a href="${escapeValue(item.proof_document)}" target="_blank" rel="noopener">View</a></div></div>` : ''}
-        </div>
-      </div>`).join('');
+    container.innerHTML = result.data.map(item => {
+      const id = Number(item.id);
+      const proof = item.proof_document || '';
+      const hasProof = Boolean(proof);
+      const isImage = qualificationIsImage(proof);
+      const isVerified = String(item.verification_status || '').toLowerCase() === 'verified';
+      const badge = hasProof ? (isVerified ? 'Verified' : 'Uploaded') : 'No proof';
+      const badgeClass = hasProof && isVerified ? 'is-verified' : (hasProof ? 'is-uploaded' : 'is-missing');
+      const filename = hasProof ? String(proof).split(/[\\/]/).pop() : '';
+      const fileSize = formatFileSize(item.proof_size_bytes);
+      const extension = qualificationExtension(proof);
+      const preview = isImage
+        ? `<img src="${escapeValue(proof)}" alt="Preview of ${escapeValue(item.title)}">`
+        : `<div class="ui-credential-card__placeholder" aria-hidden="true"><i class="ri-award-line"></i><span>${escapeValue(hasProof && extension ? `${extension} document` : item.qualification_type)}</span></div>`;
+      const file = hasProof ? `
+        <div class="ui-credential-card__file">
+          <span class="ui-credential-card__file-icon"><i class="${isImage ? 'ri-file-image-line' : 'ri-file-text-line'}" aria-hidden="true"></i></span>
+          <span class="ui-credential-card__file-copy"><strong title="${escapeValue(filename)}">${escapeValue(filename)}</strong>${fileSize ? `<small>${escapeValue(fileSize)}</small>` : ''}</span>
+        </div>` : '';
+      const documentActions = hasProof ? `
+        <a href="${escapeValue(proof)}" target="_blank" rel="noopener"><i class="ri-eye-line" aria-hidden="true"></i>View</a>
+        <a href="${escapeValue(proof)}" download><i class="ri-download-line" aria-hidden="true"></i>Download</a>` : '';
+      return `
+        <article class="ui-profile-record ui-credential-card" data-qualification-id="${id}">
+          <div class="ui-credential-card__preview">${preview}<span class="ui-credential-card__badge ${badgeClass}">${badge}</span></div>
+          <div class="ui-credential-card__body">
+            <h3>${escapeValue(item.title)}</h3>
+            <p class="ui-credential-card__issuer"><i class="ri-building-line" aria-hidden="true"></i><span>${escapeValue(item.issuing_organization || 'Issuing organization not provided')}</span></p>
+            <div class="ui-credential-card__dates">
+              <span><i class="ri-calendar-line" aria-hidden="true"></i>Issued: ${escapeValue(formatQualificationDate(item.issued_date))}</span>
+              <span><i class="ri-calendar-line" aria-hidden="true"></i>${item.expiry_date ? `Expires: ${escapeValue(formatQualificationDate(item.expiry_date))}` : 'No Expiration'}</span>
+            </div>
+            ${file}
+          </div>
+          <div class="ui-credential-card__footer">
+            <div class="ui-credential-card__document-actions">${documentActions}</div>
+            <div class="ui-credential-card__more">
+              <button type="button" id="qualificationMenuButton-${id}" aria-label="More actions for ${escapeValue(item.title)}" aria-haspopup="menu" aria-expanded="false" onclick="toggleQualificationMenu(${id}, event)"><i class="ri-more-fill" aria-hidden="true"></i></button>
+              <div class="ui-credential-card__menu" id="qualificationMenu-${id}" role="menu" hidden>
+                <button type="button" role="menuitem" onclick="editQualification(${id})"><i class="ri-edit-line" aria-hidden="true"></i>Edit</button>
+                <button type="button" role="menuitem" class="is-danger" onclick="deleteQualification(${id})"><i class="ri-delete-bin-line" aria-hidden="true"></i>Delete</button>
+              </div>
+            </div>
+          </div>
+        </article>`;
+    }).join('');
   };
 
   window.editQualification = function(id) {
+    closeQualificationMenus();
     const item = qualificationData.find(row => Number(row.id) === Number(id));
     if (!item || !modal) return;
     document.getElementById('edit_qualification_id').value = item.id;
@@ -2312,6 +2400,7 @@ window.showNotification = showNotification;
   };
 
   window.deleteQualification = function(id) {
+    closeQualificationMenus();
     showDeleteConfirm('Delete this structured qualification?', async function() {
       const response = await fetch('save_profile_data.php', {method: 'DELETE', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'delete_qualification=1&id=' + encodeURIComponent(id)});
       const result = await response.json();
@@ -2354,6 +2443,10 @@ window.showNotification = showNotification;
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindQualificationControls);
   else setTimeout(bindQualificationControls, 0);
+  document.addEventListener('click', () => closeQualificationMenus());
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeQualificationMenus();
+  });
 })();
 </script>
 

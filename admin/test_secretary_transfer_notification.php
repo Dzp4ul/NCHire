@@ -16,7 +16,7 @@ $_SESSION['admin_role'] = 'Secretary';
 $servername = "127.0.0.1";
 $username = "root";
 $password = "";
-$dbname = "nchire";
+$dbname = getenv('NCHIRE_DB_NAME') ?: "nchire";
 
 $conn = new mysqli($servername, $username, $password, $dbname);
 

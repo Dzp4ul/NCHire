@@ -11,6 +11,6 @@ unset($_SESSION['admin_department']);
 unset($_SESSION['admin_profile_picture']);
 unset($_SESSION['password_change_required']);
 
-header('Location: ../index.php');
+header('Location: ../public/index.php');
 exit;
 ?>

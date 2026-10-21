@@ -11,7 +11,7 @@ $passed = 0;
 $failed = 0;
 $userId = 0;
 $educationId = 0;
-$baseUrl = 'http://localhost/FinalResearch%20-%20Copy/user';
+$baseUrl = rtrim((string)(getenv('NCHIRE_TEST_BASE_URL') ?: 'http://localhost/FinalResearch%20-%20Copy'), '/') . '/user';
 
 function profile_crud_check(bool $condition, string $message): void
 {

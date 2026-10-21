@@ -3,7 +3,7 @@ session_start();
 
 // Check if admin is logged in
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    header("Location: ../index.php");
+    header("Location: ../public/index.php");
     exit();
 }
 
@@ -17,7 +17,7 @@ if (!isset($_SESSION['password_change_required']) || $_SESSION['password_change_
 $host = "127.0.0.1";
 $user = "root";
 $pass = "";
-$dbname = "nchire";
+$dbname = getenv('NCHIRE_DB_NAME') ?: "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
 if ($conn->connect_error) {
@@ -94,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             unset($_SESSION['password_change_required']);
             
             // Redirect after 2 seconds to homepage with login modal parameter
-            header("Refresh: 2; URL=../index.php?open_login=1");
+            header("Refresh: 2; URL=../public/index.php?open_login=1");
         } else {
             $error = 'Failed to update password. Please try again.';
         }
@@ -244,7 +244,7 @@ $conn->close();
             </form>
 
             <div class="mt-6 text-center">
-                <a href="../index.php?logout=1" class="text-sm text-gray-600 hover:text-gray-800">
+                <a href="logout.php" class="text-sm text-gray-600 hover:text-gray-800">
                     <i class="fas fa-sign-out-alt mr-1"></i>Logout
                 </a>
             </div>

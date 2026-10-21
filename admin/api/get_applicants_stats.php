@@ -7,7 +7,7 @@ requireAdminApiAuth();
 
 // Database connection parameters
 $host = '127.0.0.1';
-$dbname = 'nchire';
+$dbname = getenv('NCHIRE_DB_NAME') ?: 'nchire';
 $username = 'root';
 $password = '';
 

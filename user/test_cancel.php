@@ -7,7 +7,7 @@
 session_start();
 
 // Database connection
-$conn = new mysqli("127.0.0.1", "root", "", "nchire");
+$conn = new mysqli("127.0.0.1", "root", "", getenv('NCHIRE_DB_NAME') ?: "nchire");
 
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);

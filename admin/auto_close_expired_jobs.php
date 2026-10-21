@@ -14,7 +14,7 @@ if (PHP_SAPI !== 'cli') {
 $host = "127.0.0.1";
 $user = "root";
 $pass = "";
-$dbname = "nchire";
+$dbname = getenv('NCHIRE_DB_NAME') ?: "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
 

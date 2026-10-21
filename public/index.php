@@ -5,7 +5,7 @@ session_start(); // Must be first line
 $host = "127.0.0.1"; // XAMPP default host
 $user = "root"; // XAMPP default MySQL username
 $pass = ""; // leave empty unless you set a password
-$dbname = "nchire"; // change to your DB name
+$dbname = getenv('NCHIRE_DB_NAME') ?: "nchire"; // tests override this with an isolated database
 
 $conn = new mysqli($host, $user, $pass, $dbname);
 
@@ -179,7 +179,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['signup_submit'])) {
             $signup_error = "Email already exists. Please try a different email address.";
         } else {
             // Generate a verification code
-            $verification_code = strtoupper(bin2hex(random_bytes(3))); // random 6-character code
+            $verification_code = getenv('NCHIRE_TEST_MODE') === '1'
+                ? (getenv('NCHIRE_TEST_VERIFICATION_CODE') ?: 'ABC123')
+                : strtoupper(bin2hex(random_bytes(3))); // random 6-character code
 
             // Store user data in session temporarily (don't save to database yet)
             $_SESSION['pending_signup'] = [
@@ -190,9 +192,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['signup_submit'])) {
                 'verification_code' => $verification_code
             ];
 
-            // Send verification email without saving to database first
-            $mail = new PHPMailer(true);
-            try {
+            // Tests use a deterministic code and never contact an external mail server.
+            if (getenv('NCHIRE_TEST_MODE') === '1') {
+                $signup_success = "Registration initiated! Please enter the test verification code to complete the process.";
+                $_SESSION['signup_email'] = $signup_email;
+                $show_signup_form = false;
+            } else {
+                // Send verification email without saving to database first
+                $mail = new PHPMailer(true);
+                try {
                 // Server settings
                 $mail->isSMTP();
                 $mail->Host       = 'smtp.gmail.com';
@@ -283,10 +291,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['signup_submit'])) {
                 $signup_success = "Registration initiated! Please check your email for your verification code to complete the process.";
                 $_SESSION['signup_email'] = $signup_email; // Store email for verification
                 $show_signup_form = false;
-            } catch (Throwable $e) {
-                $signup_error = "Failed to send verification email. Mailer Error: " . $e->getMessage();
-                // Clear the pending signup data if email fails
-                unset($_SESSION['pending_signup']);
+                } catch (Throwable $e) {
+                    $signup_error = "Failed to send verification email. Mailer Error: " . $e->getMessage();
+                    // Clear the pending signup data if email fails
+                    unset($_SESSION['pending_signup']);
+                }
             }
         }
     }

@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email'])) {
     $host = "127.0.0.1";
     $user = "root";
     $pass = "";
-    $dbname = "nchire";
+    $dbname = getenv('NCHIRE_DB_NAME') ?: "nchire";
     
     $conn = new mysqli($host, $user, $pass, $dbname);
     if ($conn->connect_error) {
@@ -72,11 +72,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email'])) {
     }
     
     // Generate temporary password (10 characters)
-    $temporaryPassword = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%'), 0, 10);
+    $temporaryPassword = getenv('NCHIRE_TEST_MODE') === '1'
+        ? (getenv('NCHIRE_TEST_TEMP_PASSWORD') ?: 'TempPass1!')
+        : substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%'), 0, 10);
     
     // Send the email before changing the password so a mail failure cannot lock the account.
-    require_once '../shared/helpers/send_temp_password_email.php';
-    $emailResult = sendForgotPasswordEmail($email, $user_name, $temporaryPassword, $user_type);
+    if (getenv('NCHIRE_TEST_MODE') === '1') {
+        $emailResult = ['success' => true];
+    } else {
+        require_once '../shared/helpers/send_temp_password_email.php';
+        $emailResult = sendForgotPasswordEmail($email, $user_name, $temporaryPassword, $user_type);
+    }
     
     if (!$emailResult['success']) {
         $_SESSION['fp_error'] = 'We could not send the reset email. Your password was not changed. Please try again later.';

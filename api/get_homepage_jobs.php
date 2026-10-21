@@ -9,7 +9,7 @@ require_once __DIR__ . '/../shared/helpers/recruitment.php';
 $host = "127.0.0.1";
 $user = "root";
 $pass = "";
-$dbname = "nchire";
+$dbname = getenv('NCHIRE_DB_NAME') ?: "nchire";
 
 try {
     $conn = new mysqli($host, $user, $pass, $dbname);

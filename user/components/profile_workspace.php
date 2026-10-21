@@ -3,6 +3,16 @@ $profile_h = static function ($value): string {
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 };
 $profile_skill_levels = ['', 'Beginner', 'Novice', 'Intermediate', 'Advanced', 'Expert'];
+$profile_format_file_size = static function ($bytes): string {
+    if (!is_numeric($bytes) || (int)$bytes < 0) return '';
+    $size = (int)$bytes;
+    if ($size < 1024) return $size . ' B';
+    if ($size < 1024 * 1024) return round($size / 1024) . ' KB';
+    return number_format($size / (1024 * 1024), 1) . ' MB';
+};
+$profile_is_image_document = static function ($path): bool {
+    return in_array(strtolower(pathinfo((string)$path, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png'], true);
+};
 ?>
 <div id="profileMainContent">
   <main class="ui-profile-page">
@@ -220,19 +230,60 @@ $profile_skill_levels = ['', 'Beginner', 'Novice', 'Intermediate', 'Advanced', '
             <div><p class="ui-eyebrow">Professional credentials</p><h2>Certifications &amp; Licenses</h2><p>Certifications, professional licenses, and relevant training.</p></div>
             <button class="ui-button ui-button--primary" id="addQualificationBtn" type="button"><i class="ri-add-line"></i>Add Qualification</button>
           </div>
-          <div class="ui-profile-record-list" id="qualificationsList">
+          <p class="ui-credential-count" id="qualificationCount"><?php echo count($qualifications_data); ?> <?php echo count($qualifications_data) === 1 ? 'credential' : 'credentials'; ?></p>
+          <div class="ui-credential-grid" id="qualificationsList">
             <?php if (!empty($qualifications_data)): ?>
             <?php foreach ($qualifications_data as $qualification): ?>
-            <div class="ui-profile-record ui-profile-record--credential" data-qualification-id="<?php echo (int)$qualification['id']; ?>">
-              <div class="ui-profile-record__body">
-                <div class="ui-profile-record__title-row"><div><h3><?php echo $profile_h($qualification['title']); ?></h3><p><?php echo $profile_h(ucfirst($qualification['qualification_type'])); ?> <span aria-hidden="true">•</span> <?php echo $profile_h(ucfirst($qualification['verification_status'])); ?></p></div><div class="ui-profile-record__actions"><button type="button" onclick="editQualification(<?php echo (int)$qualification['id']; ?>)" class="ui-link-action"><i class="ri-edit-line"></i>Edit</button><button type="button" onclick="deleteQualification(<?php echo (int)$qualification['id']; ?>)" class="ui-link-action ui-link-action--danger"><i class="ri-delete-bin-line"></i>Delete</button></div></div>
-                <div class="ui-profile-credential-grid"><div><span>Issued by</span><strong><?php echo $profile_h($qualification['issuing_organization'] ?: 'Not provided'); ?></strong></div><div><span>Issued</span><strong><?php echo $qualification['issued_date'] ? $profile_h(date('F Y', strtotime($qualification['issued_date']))) : 'Not provided'; ?></strong></div><?php if (!empty($qualification['expiry_date'])): ?><div><span>Expires</span><strong><?php echo $profile_h(date('F Y', strtotime($qualification['expiry_date']))); ?></strong></div><?php endif; ?></div>
-                <?php if (!empty($qualification['proof_document'])): ?><div class="ui-profile-document-row ui-profile-document-row--standalone"><i class="ri-file-text-line" aria-hidden="true"></i><div><strong>Proof document</strong><span><?php echo $profile_h(basename($qualification['proof_document'])); ?></span></div><span class="ui-document-status"><?php echo $profile_h(ucfirst($qualification['verification_status'])); ?></span><div class="ui-profile-document-row__actions"><a href="<?php echo $profile_h($qualification['proof_document']); ?>" target="_blank" rel="noopener">View</a></div></div><?php endif; ?>
+            <?php
+              $qualification_has_proof = !empty($qualification['proof_document']);
+              $qualification_is_verified = strtolower((string)($qualification['verification_status'] ?? '')) === 'verified';
+              $qualification_badge = $qualification_has_proof ? ($qualification_is_verified ? 'Verified' : 'Uploaded') : 'No proof';
+              $qualification_is_image = $qualification_has_proof && $profile_is_image_document($qualification['proof_document']);
+              $qualification_file_size = $profile_format_file_size($qualification['proof_size_bytes'] ?? null);
+              $qualification_extension = strtoupper(pathinfo((string)($qualification['proof_document'] ?? ''), PATHINFO_EXTENSION));
+            ?>
+            <article class="ui-profile-record ui-credential-card" data-qualification-id="<?php echo (int)$qualification['id']; ?>">
+              <div class="ui-credential-card__preview">
+                <?php if ($qualification_is_image): ?>
+                  <img src="<?php echo $profile_h($qualification['proof_document']); ?>" alt="Preview of <?php echo $profile_h($qualification['title']); ?>">
+                <?php else: ?>
+                  <div class="ui-credential-card__placeholder" aria-hidden="true"><i class="ri-award-line"></i><span><?php echo $profile_h($qualification_has_proof && $qualification_extension ? $qualification_extension . ' document' : ucfirst($qualification['qualification_type'])); ?></span></div>
+                <?php endif; ?>
+                <span class="ui-credential-card__badge <?php echo $qualification_has_proof && $qualification_is_verified ? 'is-verified' : ($qualification_has_proof ? 'is-uploaded' : 'is-missing'); ?>"><?php echo $profile_h($qualification_badge); ?></span>
               </div>
-            </div>
+              <div class="ui-credential-card__body">
+                <h3><?php echo $profile_h($qualification['title']); ?></h3>
+                <p class="ui-credential-card__issuer"><i class="ri-building-line" aria-hidden="true"></i><span><?php echo $profile_h($qualification['issuing_organization'] ?: 'Issuing organization not provided'); ?></span></p>
+                <div class="ui-credential-card__dates">
+                  <span><i class="ri-calendar-line" aria-hidden="true"></i>Issued: <?php echo $qualification['issued_date'] ? $profile_h(date('M j, Y', strtotime($qualification['issued_date']))) : 'Not provided'; ?></span>
+                  <span><i class="ri-calendar-line" aria-hidden="true"></i><?php echo !empty($qualification['expiry_date']) ? 'Expires: ' . $profile_h(date('M j, Y', strtotime($qualification['expiry_date']))) : 'No Expiration'; ?></span>
+                </div>
+                <?php if ($qualification_has_proof): ?>
+                  <div class="ui-credential-card__file">
+                    <span class="ui-credential-card__file-icon"><i class="<?php echo $qualification_is_image ? 'ri-file-image-line' : 'ri-file-text-line'; ?>" aria-hidden="true"></i></span>
+                    <span class="ui-credential-card__file-copy"><strong title="<?php echo $profile_h(basename($qualification['proof_document'])); ?>"><?php echo $profile_h(basename($qualification['proof_document'])); ?></strong><?php if ($qualification_file_size): ?><small><?php echo $profile_h($qualification_file_size); ?></small><?php endif; ?></span>
+                  </div>
+                <?php endif; ?>
+              </div>
+              <div class="ui-credential-card__footer">
+                <div class="ui-credential-card__document-actions">
+                  <?php if ($qualification_has_proof): ?>
+                    <a href="<?php echo $profile_h($qualification['proof_document']); ?>" target="_blank" rel="noopener"><i class="ri-eye-line" aria-hidden="true"></i>View</a>
+                    <a href="<?php echo $profile_h($qualification['proof_document']); ?>" download><i class="ri-download-line" aria-hidden="true"></i>Download</a>
+                  <?php endif; ?>
+                </div>
+                <div class="ui-credential-card__more">
+                  <button type="button" id="qualificationMenuButton-<?php echo (int)$qualification['id']; ?>" aria-label="More actions for <?php echo $profile_h($qualification['title']); ?>" aria-haspopup="menu" aria-expanded="false" onclick="toggleQualificationMenu(<?php echo (int)$qualification['id']; ?>, event)"><i class="ri-more-fill" aria-hidden="true"></i></button>
+                  <div class="ui-credential-card__menu" id="qualificationMenu-<?php echo (int)$qualification['id']; ?>" role="menu" hidden>
+                    <button type="button" role="menuitem" onclick="editQualification(<?php echo (int)$qualification['id']; ?>)"><i class="ri-edit-line" aria-hidden="true"></i>Edit</button>
+                    <button type="button" role="menuitem" class="is-danger" onclick="deleteQualification(<?php echo (int)$qualification['id']; ?>)"><i class="ri-delete-bin-line" aria-hidden="true"></i>Delete</button>
+                  </div>
+                </div>
+              </div>
+            </article>
             <?php endforeach; ?>
             <?php else: ?>
-            <div class="ui-profile-empty"><i class="ri-award-line"></i><div><strong>No certifications or licenses added yet</strong><p>Add only credentials and training that you currently hold.</p></div><button type="button" onclick="document.getElementById('addQualificationBtn').click()">Add Qualification</button></div>
+            <div class="ui-profile-empty ui-profile-empty--wide"><i class="ri-award-line"></i><div><strong>No certifications or licenses added yet</strong><p>Add only credentials and training that you currently hold.</p></div><button type="button" onclick="document.getElementById('addQualificationBtn').click()">Add Qualification</button></div>
             <?php endif; ?>
           </div>
         </section>

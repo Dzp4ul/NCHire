@@ -11,7 +11,7 @@ try {
     session_start();
     
     // Database connection
-    $conn = new mysqli("127.0.0.1", "root", "", "nchire");
+    $conn = new mysqli("127.0.0.1", "root", "", getenv('NCHIRE_DB_NAME') ?: "nchire");
     
     if ($conn->connect_error) {
         echo json_encode(['success' => false, 'error' => 'Database connection failed: ' . $conn->connect_error]);

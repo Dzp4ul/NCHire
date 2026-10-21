@@ -12,7 +12,7 @@ if (!isset($_SESSION['user_id']) && !isset($_SESSION['user_email'])) {
 $servername = "127.0.0.1";
 $username = "root";
 $password = "";
-$dbname = "nchire";
+$dbname = getenv('NCHIRE_DB_NAME') ?: "nchire";
 
 $conn = new mysqli($servername, $username, $password, $dbname);
 if ($conn->connect_error) {
@@ -95,7 +95,14 @@ if ($type === 'education') {
     $stmt->execute();
     $result = $stmt->get_result();
     $data = [];
-    while ($row = $result->fetch_assoc()) $data[] = $row;
+    while ($row = $result->fetch_assoc()) {
+        $row['proof_size_bytes'] = null;
+        if (!empty($row['proof_document']) && strpos((string)$row['proof_document'], '..') === false) {
+            $proofPath = __DIR__ . DIRECTORY_SEPARATOR . ltrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, (string)$row['proof_document']), DIRECTORY_SEPARATOR);
+            if (is_file($proofPath)) $row['proof_size_bytes'] = filesize($proofPath);
+        }
+        $data[] = $row;
+    }
     echo json_encode(['success' => true, 'data' => $data]);
     $stmt->close();
 } else {

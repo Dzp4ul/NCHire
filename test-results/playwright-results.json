@@ -1,0 +1,434 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\xampp\\htdocs\\FinalResearch - Copy\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "tests/e2e/profile-salary.spec.ts",
+      "--project=chromium-desktop",
+      "-g",
+      "work experience|credential cards"
+    ],
+    "configFile": "C:\\xampp\\htdocs\\FinalResearch - Copy\\playwright.config.ts",
+    "rootDir": "C:/xampp/htdocs/FinalResearch - Copy/tests/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "C:\\xampp\\htdocs\\FinalResearch - Copy\\tests\\e2e\\global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/xampp/htdocs/FinalResearch - Copy/test-results/playwright",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-desktop",
+        "name": "chromium-desktop",
+        "testDir": "C:/xampp/htdocs/FinalResearch - Copy/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "C:/xampp/htdocs/FinalResearch - Copy/test-results/playwright",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox-desktop",
+        "name": "firefox-desktop",
+        "testDir": "C:/xampp/htdocs/FinalResearch - Copy/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "/cross-browser\\.spec\\.ts/"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "C:/xampp/htdocs/FinalResearch - Copy/test-results/playwright",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-desktop",
+        "name": "webkit-desktop",
+        "testDir": "C:/xampp/htdocs/FinalResearch - Copy/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "/cross-browser\\.spec\\.ts/"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "C:/xampp/htdocs/FinalResearch - Copy/test-results/playwright",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-tablet",
+        "name": "chromium-tablet",
+        "testDir": "C:/xampp/htdocs/FinalResearch - Copy/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "/cross-browser\\.spec\\.ts/"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "C:/xampp/htdocs/FinalResearch - Copy/test-results/playwright",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-mobile",
+        "name": "chromium-mobile",
+        "testDir": "C:/xampp/htdocs/FinalResearch - Copy/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "/cross-browser\\.spec\\.ts/"
+        ],
+        "timeout": 45000
+      }
+    ],
+    "filteredProjects": [
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "C:\\xampp\\htdocs\\FinalResearch - Copy\\test-results\\playwright",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "chromium-desktop",
+        "testDir": "C:\\xampp\\htdocs\\FinalResearch - Copy\\tests\\e2e",
+        "snapshotDir": "C:\\xampp\\htdocs\\FinalResearch - Copy\\tests\\e2e",
+        "testIgnore": [],
+        "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
+        "timeout": 45000,
+        "use": {
+          "baseURL": "http://127.0.0.1:4173/FinalResearch%20-%20Copy/",
+          "actionTimeout": 10000,
+          "navigationTimeout": 20000,
+          "screenshot": "only-on-failure",
+          "trace": "retain-on-failure",
+          "video": "retain-on-failure",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "screen": {
+            "width": 1920,
+            "height": 1080
+          },
+          "deviceScaleFactor": 1,
+          "isMobile": false,
+          "hasTouch": false,
+          "defaultBrowserType": "chromium"
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": "chromium-desktop"
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "outputFolder": "playwright-report",
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/playwright-results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "default",
+    "updateSourceMethod": "patch",
+    "version": "1.64.1",
+    "workers": 1,
+    "webServer": {
+      "command": "php -S 127.0.0.1:4173 -t ..",
+      "cwd": "C:\\xampp\\htdocs\\FinalResearch - Copy",
+      "url": "http://127.0.0.1:4173/FinalResearch%20-%20Copy/public/index.php",
+      "timeout": 30000,
+      "reuseExistingServer": false,
+      "stdout": "ignore",
+      "stderr": "ignore",
+      "env": {
+        "ALLUSERSPROFILE": "C:\\ProgramData",
+        "APPDATA": "C:\\Users\\celvn\\AppData\\Roaming",
+        "APPLICATION_INSIGHTS_NO_STATSBEAT": "true",
+        "ChocolateyInstall": "C:\\ProgramData\\chocolatey",
+        "ChocolateyLastPathUpdate": "134001236053827297",
+        "CHROME_CRASHPAD_PIPE_NAME": "\\\\.\\pipe\\crashpad_17236_PPKUZSGDMHGUVSSA",
+        "CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS": "1",
+        "CODEX_CI": "1",
+        "CODEX_INTERNAL_ORIGINATOR_OVERRIDE": "codex_vscode",
+        "CODEX_PERMISSION_PROFILE": ":danger-full-access",
+        "CODEX_SESSION_ID": "01a15f26-9203-7f13-bd26-88b8ef0572ce",
+        "CODEX_THREAD_ID": "01a15f26-9203-7f13-bd26-88b8ef0572ce",
+        "CODEX_VERSION": "0.162.0-alpha.17.2",
+        "COLOR": "0",
+        "COLORTERM": "",
+        "CommonProgramFiles": "C:\\Program Files\\Common Files",
+        "CommonProgramFiles(x86)": "C:\\Program Files (x86)\\Common Files",
+        "CommonProgramW6432": "C:\\Program Files\\Common Files",
+        "COMPUTERNAME": "ACER",
+        "ComSpec": "C:\\WINDOWS\\system32\\cmd.exe",
+        "DEBUG": "release",
+        "DriverData": "C:\\Windows\\System32\\Drivers\\DriverData",
+        "EDITOR": "C:\\WINDOWS\\notepad.exe",
+        "EFC_11104_1262719628": "1",
+        "EFC_11104_1592913036": "1",
+        "EFC_11104_2283032206": "1",
+        "EFC_11104_3789132940": "1",
+        "EFC_11104_4126798990": "1",
+        "ELECTRON_RUN_AS_NODE": "1",
+        "FPS_BROWSER_APP_PROFILE_STRING": "Internet Explorer",
+        "FPS_BROWSER_USER_PROFILE_STRING": "Default",
+        "GH_PAGER": "cat",
+        "GIT_PAGER": "cat",
+        "GLOG_logbufsecs": "0",
+        "HOME": "C:\\Users\\celvn",
+        "HOMEDRIVE": "C:",
+        "HOMEPATH": "\\Users\\celvn",
+        "INIT_CWD": "C:\\xampp\\htdocs\\FinalResearch - Copy",
+        "JAVA_HOME": "C:\\Program Files\\Java\\jdk-26.0.2.1\\",
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "LC_CTYPE": "C.UTF-8",
+        "LOCALAPPDATA": "C:\\Users\\celvn\\AppData\\Local",
+        "LOGONSERVER": "\\\\ACER",
+        "NODE": "C:\\Program Files\\nodejs\\node.exe",
+        "NO_COLOR": "1",
+        "npm_command": "exec",
+        "npm_config_cache": "C:\\Users\\celvn\\AppData\\Local\\npm-cache",
+        "npm_config_globalconfig": "C:\\Users\\celvn\\AppData\\Roaming\\npm\\etc\\npmrc",
+        "npm_config_global_prefix": "C:\\Users\\celvn\\AppData\\Roaming\\npm",
+        "npm_config_init_module": "C:\\Users\\celvn\\.npm-init.js",
+        "npm_config_local_prefix": "C:\\xampp\\htdocs\\FinalResearch - Copy",
+        "npm_config_node_gyp": "C:\\Program Files\\nodejs\\node_modules\\npm\\node_modules\\node-gyp\\bin\\node-gyp.js",
+        "npm_config_noproxy": "",
+        "npm_config_npm_version": "10.9.3",
+        "npm_config_prefix": "C:\\Users\\celvn\\AppData\\Roaming\\npm",
+        "npm_config_userconfig": "C:\\Users\\celvn\\.npmrc",
+        "npm_config_user_agent": "npm/10.9.3 node/v22.18.0 win32 x64 workspaces/false",
+        "npm_execpath": "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "npm_lifecycle_event": "npx",
+        "npm_lifecycle_script": "playwright",
+        "npm_node_execpath": "C:\\Program Files\\nodejs\\node.exe",
+        "npm_package_json": "C:\\xampp\\htdocs\\FinalResearch - Copy\\package.json",
+        "npm_package_name": "nchire-system-tests",
+        "NUMBER_OF_PROCESSORS": "12",
+        "OneDrive": "C:\\Users\\celvn\\OneDrive",
+        "OneDriveConsumer": "C:\\Users\\celvn\\OneDrive",
+        "OS": "Windows_NT",
+        "PAGER": "cat",
+        "PATH": "C:\\xampp\\htdocs\\FinalResearch - Copy\\node_modules\\.bin;C:\\xampp\\htdocs\\FinalResearch - Copy\\node_modules\\.bin;C:\\xampp\\htdocs\\node_modules\\.bin;C:\\xampp\\node_modules\\.bin;C:\\node_modules\\.bin;C:\\Program Files\\nodejs\\node_modules\\npm\\node_modules\\@npmcli\\run-script\\lib\\node-gyp-bin;C:\\Users\\celvn\\.codex\\tmp\\arg0\\codex-arg0r4z1iF;C:\\Program Files\\Common Files\\Oracle\\Java\\javapath;C:\\Program Files (x86)\\VMware\\VMware Workstation\\bin\\;C:\\Python313\\Scripts\\;C:\\Python313\\;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\WINDOWS\\System32\\Wbem;C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\;C:\\WINDOWS\\System32\\OpenSSH\\;C:\\Program Files\\dotnet\\;C:\\Program Files (x86)\\Windows Kits\\10\\Windows Performance Toolkit\\;C:\\Program Files (x86)\\NVIDIA Corporation\\PhysX\\Common;C:\\Program Files\\NVIDIA Corporation\\NVIDIA NvDLISR;C:\\Program Files\\Git\\cmd;C:\\xampp\\php;C:\\ProgramData\\ComposerSetup\\bin;C:\\ProgramData\\chocolatey\\bin;C:\\Program Files\\nodejs;C:\\Program Files\\nodejs\\;C:\\flutter\\bin;C:\\apache-jmeter-5.6.3\\bin;C:\\Program Files\\Java\\jdk-26.0.2.1\\bin;C:\\Users\\celvn\\.local\\bin;C:\\Users\\celvn\\AppData\\Local\\Programs\\Python\\Launcher\\;C:\\Users\\celvn\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Users\\celvn\\.dotnet\\tools;C:\\Users\\celvn\\AppData\\Local\\Programs\\Microsoft VS Code\\bin;C:\\Users\\celvn\\AppData\\Roaming\\Composer\\vendor\\bin;C:\\Program Files\\nodejs;C:\\Users\\celvn\\AppData\\Roaming\\npm;C:\\Users\\celvn\\AppData\\Local\\Programs\\Windsurf\\bin;C:\\Users\\celvn\\AppData\\Local\\Programs\\Amazon\\AWSCLIV2\\;c:\\Users\\celvn\\.vscode\\extensions\\openai.chatgpt-26.1007.21434-win32-x64\\bin\\windows-x86_64",
+        "PATHEXT": ".COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC;.PY;.PYW;.CPL",
+        "PROCESSOR_ARCHITECTURE": "AMD64",
+        "PROCESSOR_IDENTIFIER": "AMD64 Family 23 Model 96 Stepping 1, AuthenticAMD",
+        "PROCESSOR_LEVEL": "23",
+        "PROCESSOR_REVISION": "6001",
+        "ProgramData": "C:\\ProgramData",
+        "ProgramFiles": "C:\\Program Files",
+        "ProgramFiles(x86)": "C:\\Program Files (x86)",
+        "ProgramW6432": "C:\\Program Files",
+        "PROMPT": "$P$G",
+        "PSModulePath": "C:\\Users\\celvn\\OneDrive\\Documents\\WindowsPowerShell\\Modules;C:\\Program Files\\WindowsPowerShell\\Modules;C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\Modules",
+        "PUBLIC": "C:\\Users\\Public",
+        "RUST_LOG": "warn",
+        "SESSIONNAME": "Console",
+        "SystemDrive": "C:",
+        "SystemRoot": "C:\\WINDOWS",
+        "TEMP": "C:\\Users\\celvn\\AppData\\Local\\Temp",
+        "TERM": "dumb",
+        "TMP": "C:\\Users\\celvn\\AppData\\Local\\Temp",
+        "USERDOMAIN": "ACER",
+        "USERDOMAIN_ROAMINGPROFILE": "ACER",
+        "USERNAME": "celvn",
+        "USERPROFILE": "C:\\Users\\celvn",
+        "VBOX_HWVIRTEX_IGNORE_SVM_IN_USE": "1",
+        "VSCODE_CODE_CACHE_PATH": "C:\\Users\\celvn\\AppData\\Roaming\\Code\\CachedData\\6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1",
+        "VSCODE_CRASH_REPORTER_PROCESS_TYPE": "extensionHost",
+        "VSCODE_CWD": "C:\\Users\\celvn\\AppData\\Local\\Programs\\Microsoft VS Code",
+        "VSCODE_ESM_ENTRYPOINT": "vs/workbench/api/node/extensionHostProcess",
+        "VSCODE_HANDLES_UNCAUGHT_ERRORS": "true",
+        "VSCODE_IPC_HOOK": "\\\\.\\pipe\\32f264be-1.142.0-main-sock",
+        "VSCODE_NLS_CONFIG": "{\"userLocale\":\"en-us\",\"osLocale\":\"en-us\",\"resolvedLanguage\":\"en\",\"defaultMessagesFile\":\"C:\\\\Users\\\\celvn\\\\AppData\\\\Local\\\\Programs\\\\Microsoft VS Code\\\\6d62b1d5da\\\\resources\\\\app\\\\out\\\\nls.messages.json\",\"locale\":\"en-us\",\"availableLanguages\":{}}",
+        "VSCODE_NODE_COMPILE_CACHE_KIND": "extension-host",
+        "VSCODE_NODE_COMPILE_CACHE_ROOT": "C:\\Users\\celvn\\AppData\\Local\\Programs\\Microsoft VS Code\\6d62b1d5da\\resources\\app\\node-compile-cache",
+        "VSCODE_PID": "17236",
+        "windir": "C:\\WINDOWS",
+        "NCHIRE_DB_NAME": "nchire_e2e",
+        "NCHIRE_TEST_MODE": "1",
+        "NCHIRE_TEST_VERIFICATION_CODE": "ABC123",
+        "NCHIRE_TEST_TEMP_PASSWORD": "TempPass1!"
+      }
+    }
+  },
+  "suites": [
+    {
+      "title": "profile-salary.spec.ts",
+      "file": "profile-salary.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "applicant profile CRUD and salary projection",
+          "file": "profile-salary.spec.ts",
+          "line": 4,
+          "column": 6,
+          "specs": [
+            {
+              "title": "work experience, skill, and qualification records support add and delete",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "C:\\xampp\\htdocs\\FinalResearch - Copy\\tests\\e2e\\profile-salary.spec.ts",
+                        "line": 4,
+                        "column": 6
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6366,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-21T15:57:16.479Z",
+                      "annotations": [
+                        {
+                          "type": "serial",
+                          "location": {
+                            "file": "C:\\xampp\\htdocs\\FinalResearch - Copy\\tests\\e2e\\profile-salary.spec.ts",
+                            "line": 4,
+                            "column": 6
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "841eac97529272886456-2951446cb6f1d466d9a9",
+              "file": "profile-salary.spec.ts",
+              "line": 131,
+              "column": 7
+            },
+            {
+              "title": "credential cards stay inside a mobile viewport",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "C:\\xampp\\htdocs\\FinalResearch - Copy\\tests\\e2e\\profile-salary.spec.ts",
+                        "line": 4,
+                        "column": 6
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2371,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-21T15:57:23.418Z",
+                      "annotations": [
+                        {
+                          "type": "serial",
+                          "location": {
+                            "file": "C:\\xampp\\htdocs\\FinalResearch - Copy\\tests\\e2e\\profile-salary.spec.ts",
+                            "line": 4,
+                            "column": 6
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "841eac97529272886456-108577c795bb89f2e511",
+              "file": "profile-salary.spec.ts",
+              "line": 177,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-21T15:57:13.619Z",
+    "duration": 12642.719000000001,
+    "expected": 2,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

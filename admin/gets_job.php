@@ -6,7 +6,7 @@ require_once __DIR__ . '/../shared/helpers/dynamic_application_requirements.php'
 $host = "127.0.0.1";
 $user = "root";
 $pass = "";
-$dbname = "nchire";
+$dbname = getenv('NCHIRE_DB_NAME') ?: "nchire";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
 
