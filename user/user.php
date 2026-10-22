@@ -111,7 +111,7 @@ if (isset($_SESSION['user_id'])) {
     }
     $profile_stmt->close();
 
-    $authoritative_profile_stmt = $conn->prepare("SELECT first_name, last_name, applicant_email AS email, contact_number AS phone, address FROM applicants WHERE id = ? LIMIT 1");
+    $authoritative_profile_stmt = $conn->prepare("SELECT first_name, last_name, applicant_email AS email, contact_number AS phone, address, profile_picture FROM applicants WHERE id = ? LIMIT 1");
     $authoritative_profile_stmt->bind_param("i", $profile_user_id);
     $authoritative_profile_stmt->execute();
     $authoritative_profile_result = $authoritative_profile_stmt->get_result();
