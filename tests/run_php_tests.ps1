@@ -12,7 +12,9 @@ $directTests = @(
     'tests/SalaryProjectionTest.php',
     'tests/DynamicApplicationRequirementsTest.php',
     'tests/ApplicationDocumentReuseTest.php',
-    'tests/TeachingLoadWorkflowTest.php'
+    'tests/TeachingLoadWorkflowTest.php',
+    'tests/ChatbotDataServiceTest.php',
+    'tests/ChatbotServiceTest.php'
 )
 
 foreach ($testFile in $directTests) {

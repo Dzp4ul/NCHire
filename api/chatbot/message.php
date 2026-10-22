@@ -3,6 +3,8 @@ session_start();
 
 header('Content-Type: application/json');
 header('X-Content-Type-Options: nosniff');
+header('Cache-Control: no-store');
+date_default_timezone_set('Asia/Manila');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
@@ -17,11 +19,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $rootPath = dirname(__DIR__, 2);
 
-require_once $rootPath . '/config/db.php';
 require_once __DIR__ . '/services/EnvLoader.php';
 require_once __DIR__ . '/services/GroqService.php';
-require_once __DIR__ . '/services/ChatbotIntentService.php';
 require_once __DIR__ . '/services/RecruitmentDataService.php';
+require_once __DIR__ . '/services/ChatbotToolService.php';
 require_once __DIR__ . '/services/ChatbotService.php';
 
 ChatbotEnvLoader::load($rootPath);
@@ -49,7 +50,7 @@ $admin = [
     'department' => $_SESSION['admin_department'] ?? '',
 ];
 
-$allowedRoles = ['Secretary', 'Department Head'];
+$allowedRoles = ['Admin', 'Secretary', 'Department Head'];
 if (!in_array($admin['role'], $allowedRoles, true)) {
     chatbot_json_response(403, [
         'success' => false,
@@ -66,28 +67,6 @@ if ($admin['id'] <= 0) {
     ]);
 }
 
-$statusStmt = $conn->prepare("SELECT status FROM admin_users WHERE id = ? LIMIT 1");
-if (!$statusStmt) {
-    chatbot_json_response(500, [
-        'success' => false,
-        'reply' => 'The AI Recruitment Assistant is temporarily unavailable. Please try again.',
-        'type' => 'server_error',
-    ]);
-}
-$statusStmt->bind_param('i', $admin['id']);
-$statusStmt->execute();
-$statusResult = $statusStmt->get_result();
-$statusRow = $statusResult->fetch_assoc();
-$statusStmt->close();
-
-if (!$statusRow || $statusRow['status'] !== 'Active') {
-    chatbot_json_response(403, [
-        'success' => false,
-        'reply' => 'Your account is not authorized to use the AI Recruitment Assistant.',
-        'type' => 'forbidden',
-    ]);
-}
-
 $input = json_decode(file_get_contents('php://input'), true);
 if (!is_array($input)) {
     chatbot_json_response(400, [
@@ -97,12 +76,81 @@ if (!is_array($input)) {
     ]);
 }
 
-if (($input['action'] ?? '') === 'clear') {
-    unset($_SESSION['nchire_chatbot_history'], $_SESSION['nchire_chatbot_context']);
+$csrfToken = (string)($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+$sessionToken = (string)($_SESSION['csrf_token'] ?? '');
+if ($csrfToken === '' || $sessionToken === '' || !hash_equals($sessionToken, $csrfToken)) {
+    chatbot_json_response(403, [
+        'success' => false,
+        'reply' => 'Your session token expired. Refresh the page and try again.',
+        'type' => 'invalid_csrf_token',
+    ]);
+}
+
+mysqli_report(MYSQLI_REPORT_OFF);
+try {
+    $databaseName = getenv('NCHIRE_DB_NAME') ?: 'nchire';
+    $conn = @new mysqli('127.0.0.1', 'root', '', $databaseName);
+} catch (Throwable $connectionError) {
+    $conn = null;
+}
+if (!$conn instanceof mysqli || $conn->connect_errno) {
+    chatbot_json_response(503, [
+        'success' => false,
+        'reply' => 'The NCHire database is unavailable, so I cannot verify an answer. Please try again when the connection is restored.',
+        'type' => 'database_unavailable',
+    ]);
+}
+$conn->set_charset('utf8mb4');
+
+$statusStmt = $conn->prepare("SELECT status, role, department, full_name, email FROM admin_users WHERE id = ? LIMIT 1");
+if (!$statusStmt) {
+    chatbot_json_response(503, [
+        'success' => false,
+        'reply' => 'The NCHire database could not verify your account, so no answer was generated.',
+        'type' => 'database_unavailable',
+    ]);
+}
+$statusStmt->bind_param('i', $admin['id']);
+$statusStmt->execute();
+$statusRow = $statusStmt->get_result()->fetch_assoc();
+$statusStmt->close();
+
+if (!$statusRow || $statusRow['status'] !== 'Active' || !in_array($statusRow['role'], $allowedRoles, true)) {
+    chatbot_json_response(403, [
+        'success' => false,
+        'reply' => 'Your account is not authorized to use the AI Recruitment Assistant.',
+        'type' => 'forbidden',
+    ]);
+}
+
+// Use the current database values rather than potentially stale session role data.
+$admin['name'] = $statusRow['full_name'];
+$admin['email'] = $statusRow['email'];
+$admin['role'] = $statusRow['role'];
+$admin['department'] = $statusRow['department'];
+
+$service = new ChatbotService($conn, $admin);
+$action = (string)($input['action'] ?? 'message');
+if ($action === 'clear') {
+    $service->clear();
     chatbot_json_response(200, [
         'success' => true,
         'reply' => 'Conversation cleared.',
         'type' => 'conversation_cleared',
+    ]);
+}
+if ($action === 'history') {
+    chatbot_json_response(200, [
+        'success' => true,
+        'messages' => $service->getHistory(),
+        'type' => 'conversation_history',
+    ]);
+}
+if ($action !== 'message') {
+    chatbot_json_response(400, [
+        'success' => false,
+        'reply' => 'Unsupported chatbot action.',
+        'type' => 'invalid_request',
     ]);
 }
 
@@ -132,7 +180,6 @@ if (strlen($message) > 1000) {
     ]);
 }
 
-$service = new ChatbotService($conn, $admin);
 $response = $service->handle($message);
 
 http_response_code(($response['success'] ?? false) ? 200 : 503);

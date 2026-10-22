@@ -5630,6 +5630,37 @@ function initializeChatbot() {
 
     chatbotInitialized = true;
     renderChatbotMessages();
+    loadChatbotHistory();
+}
+
+function getChatbotCsrfToken() {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? (meta.getAttribute('content') || '') : '';
+}
+
+async function loadChatbotHistory() {
+    try {
+        const response = await fetch(chatbotEndpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-Token': getChatbotCsrfToken()
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ action: 'history' })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success || !Array.isArray(data.messages) || chatbotMessages.length > 0) {
+            return;
+        }
+        chatbotMessages = data.messages.map(function(message) {
+            return { role: message.role, content: message.content, isError: false };
+        });
+        renderChatbotMessages();
+    } catch (error) {
+        // History loading is optional; message submission remains available.
+    }
 }
 
 function toggleChatbotWidget() {
@@ -5720,7 +5751,8 @@ async function handleChatbotSubmit(e) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                'X-CSRF-Token': getChatbotCsrfToken()
             },
             credentials: 'same-origin',
             body: JSON.stringify({ message: message })
@@ -5751,16 +5783,19 @@ async function clearChatbotConversation() {
     renderChatbotMessages();
 
     try {
-        await fetch(chatbotEndpoint, {
+        const response = await fetch(chatbotEndpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                'X-CSRF-Token': getChatbotCsrfToken()
             },
             credentials: 'same-origin',
             body: JSON.stringify({ action: 'clear' })
         });
-
+        if (!response.ok) {
+            throw new Error('Server history could not be cleared.');
+        }
         showToast('Conversation cleared.', 'success');
     } catch (error) {
         showToast('Conversation cleared locally, but the server history could not be reset.', 'warning');
@@ -5808,8 +5843,8 @@ function renderChatbotMessages() {
         label.textContent = message.role === 'user' ? 'You' : 'NCHire AI Assistant';
 
         const text = document.createElement('div');
-        text.className = 'text-sm leading-relaxed whitespace-pre-wrap';
-        text.textContent = message.content;
+        text.className = 'text-sm leading-relaxed';
+        renderChatbotContent(text, message.content);
 
         bubble.appendChild(label);
         bubble.appendChild(text);
@@ -5822,18 +5857,174 @@ function renderChatbotMessages() {
     });
 }
 
+function appendChatbotInlineText(container, value) {
+    const parts = String(value).split(/(\*\*[^*]+\*\*)/g);
+    parts.forEach(function(part) {
+        if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+            const strong = document.createElement('strong');
+            strong.textContent = part.slice(2, -2);
+            container.appendChild(strong);
+        } else {
+            container.appendChild(document.createTextNode(part));
+        }
+    });
+}
+
+function parseChatbotTableCells(line) {
+    let value = String(line || '').trim();
+    if (value.startsWith('|')) value = value.slice(1);
+    if (value.endsWith('|')) value = value.slice(0, -1);
+    return value.split('|').map(function(cell) { return cell.trim(); });
+}
+
+function isChatbotTableSeparator(cells) {
+    return cells.length >= 2 && cells.every(function(cell) {
+        return /^:?-{3,}:?$/.test(cell.trim());
+    });
+}
+
+function getChatbotTableTitleIndex(headers, cells) {
+    const priorities = ['job title', 'title', 'position', 'applicant name', 'applicant', 'name', 'subject'];
+    for (const priority of priorities) {
+        const index = headers.findIndex(function(header) {
+            return header.trim().toLowerCase() === priority;
+        });
+        if (index >= 0 && String(cells[index] || '').trim() !== '') return index;
+    }
+    const firstValue = cells.findIndex(function(cell) { return String(cell || '').trim() !== ''; });
+    return firstValue >= 0 ? firstValue : 0;
+}
+
+function renderChatbotTable(container, headers, rows) {
+    const collection = document.createElement('div');
+    collection.className = 'space-y-2 my-2';
+    collection.setAttribute('data-chatbot-record-list', 'true');
+
+    rows.forEach(function(cells, rowIndex) {
+        const titleIndex = getChatbotTableTitleIndex(headers, cells);
+        const card = document.createElement('section');
+        card.className = 'rounded-lg border border-gray-200 bg-gray-50 p-3';
+        card.setAttribute('data-chatbot-table-card', 'true');
+
+        const title = document.createElement('h4');
+        title.className = 'font-semibold text-gray-900 leading-snug mb-2';
+        appendChatbotInlineText(title, String(cells[titleIndex] || '').trim() || ('Record ' + (rowIndex + 1)));
+        card.appendChild(title);
+
+        const details = document.createElement('dl');
+        details.className = 'space-y-1.5';
+        headers.forEach(function(header, cellIndex) {
+            if (cellIndex === titleIndex) return;
+            const value = String(cells[cellIndex] || '').trim();
+            if (!value || /^(n\/a|null|none)$/i.test(value)) return;
+
+            const pair = document.createElement('div');
+            pair.className = 'grid grid-cols-[7rem_minmax(0,1fr)] gap-2 items-start';
+            const label = document.createElement('dt');
+            label.className = 'text-xs font-medium text-gray-500';
+            label.textContent = String(header || 'Detail').trim() || 'Detail';
+            const data = document.createElement('dd');
+            data.className = 'text-xs text-gray-800 break-words min-w-0';
+            appendChatbotInlineText(data, value);
+            pair.appendChild(label);
+            pair.appendChild(data);
+            details.appendChild(pair);
+        });
+        card.appendChild(details);
+        collection.appendChild(card);
+    });
+
+    container.appendChild(collection);
+}
+
+function renderChatbotContent(container, content) {
+    const lines = String(content || '').split(/\r?\n/);
+    let activeList = null;
+    let activeListType = '';
+
+    for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+        const line = lines[lineIndex];
+        if (lineIndex + 1 < lines.length && line.includes('|')) {
+            const headers = parseChatbotTableCells(line);
+            const separator = parseChatbotTableCells(lines[lineIndex + 1]);
+            if (headers.length === separator.length && isChatbotTableSeparator(separator)) {
+                const rows = [];
+                let cursor = lineIndex + 2;
+                while (cursor < lines.length && lines[cursor].includes('|')) {
+                    const cells = parseChatbotTableCells(lines[cursor]);
+                    if (cells.length !== headers.length) break;
+                    rows.push(cells);
+                    cursor++;
+                }
+                if (rows.length > 0) renderChatbotTable(container, headers, rows);
+                activeList = null;
+                activeListType = '';
+                lineIndex = cursor - 1;
+                continue;
+            }
+        }
+
+        const heading = line.match(/^\s*#{1,4}\s+(.+)$/);
+        if (heading) {
+            activeList = null;
+            activeListType = '';
+            const title = document.createElement('h4');
+            title.className = 'font-semibold text-gray-900 mt-1 mb-1';
+            appendChatbotInlineText(title, heading[1]);
+            container.appendChild(title);
+            continue;
+        }
+
+        const unordered = line.match(/^\s*[-*]\s+(.+)$/);
+        const ordered = line.match(/^\s*\d+\.\s+(.+)$/);
+        const listType = ordered ? 'ol' : (unordered ? 'ul' : '');
+        if (listType) {
+            if (!activeList || activeListType !== listType) {
+                activeList = document.createElement(listType);
+                activeList.className = listType === 'ol' ? 'list-decimal ml-5 space-y-1' : 'list-disc ml-5 space-y-1';
+                container.appendChild(activeList);
+                activeListType = listType;
+            }
+            const item = document.createElement('li');
+            appendChatbotInlineText(item, (ordered || unordered)[1]);
+            activeList.appendChild(item);
+            continue;
+        }
+
+        activeList = null;
+        activeListType = '';
+        if (line.trim() === '') {
+            const spacer = document.createElement('div');
+            spacer.className = 'h-2';
+            container.appendChild(spacer);
+            continue;
+        }
+        if (/^Data checked:/i.test(line.trim())) {
+            const metadata = document.createElement('div');
+            metadata.className = 'mt-2 pt-2 border-t border-gray-200 text-[11px] text-gray-500';
+            metadata.textContent = line.trim();
+            container.appendChild(metadata);
+            continue;
+        }
+        const paragraph = document.createElement('p');
+        paragraph.className = 'whitespace-pre-wrap break-words';
+        appendChatbotInlineText(paragraph, line);
+        container.appendChild(paragraph);
+    }
+}
+
 function getChatbotBubbleClasses(message) {
-    const base = 'max-w-[85%] rounded-lg px-3 py-2 shadow-sm';
+    const base = 'rounded-lg px-3 py-2 shadow-sm overflow-hidden';
 
     if (message.role === 'user') {
-        return base + ' bg-blue-600 text-white';
+        return base + ' max-w-[85%] bg-blue-600 text-white';
     }
 
     if (message.isError) {
-        return base + ' bg-red-50 text-red-900 border border-red-200';
+        return base + ' w-full max-w-full bg-red-50 text-red-900 border border-red-200';
     }
 
-    return base + ' bg-white text-gray-800 border border-gray-200';
+    return base + ' w-full max-w-full bg-white text-gray-800 border border-gray-200';
 }
 
 function setChatbotLoading(isLoading) {

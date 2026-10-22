@@ -36,6 +36,22 @@ class GroqService
 
     public function chat(array $messages, array $options = [])
     {
+        $completion = $this->complete($messages, $options);
+        $reply = $completion['message']['content'] ?? null;
+        if (!is_string($reply) || trim($reply) === '') {
+            throw new GroqApiException('empty_response', 'Groq returned an empty assistant message.');
+        }
+
+        return trim($reply);
+    }
+
+    /**
+     * Return a normalized Chat Completions response. Unlike chat(), this method
+     * preserves tool calls so the application can execute only its own
+     * validated, read-only recruitment functions.
+     */
+    public function complete(array $messages, array $options = [])
+    {
         if (!$this->isConfigured()) {
             throw new GroqApiException('missing_api_key', 'Groq API key is not configured.');
         }
@@ -47,8 +63,19 @@ class GroqService
             'max_completion_tokens' => $options['max_completion_tokens'] ?? 700,
         ];
 
-        if (isset($options['response_format']) && is_array($options['response_format'])) {
-            $payload['response_format'] = $options['response_format'];
+        foreach (['response_format', 'tools', 'tool_choice'] as $option) {
+            if (array_key_exists($option, $options)) {
+                $payload[$option] = $options[$option];
+            }
+        }
+        if (isset($options['parallel_tool_calls'])) {
+            $payload['parallel_tool_calls'] = (bool) $options['parallel_tool_calls'];
+        }
+        if (isset($options['reasoning_effort']) && is_string($options['reasoning_effort'])) {
+            $payload['reasoning_effort'] = $options['reasoning_effort'];
+        }
+        if (isset($options['user']) && is_string($options['user']) && $options['user'] !== '') {
+            $payload['user'] = substr($options['user'], 0, 128);
         }
 
         $payloadJson = json_encode($payload);
@@ -86,12 +113,23 @@ class GroqService
             throw new GroqApiException($category, $message);
         }
 
-        $reply = $decoded['choices'][0]['message']['content'] ?? null;
-        if (!is_string($reply) || trim($reply) === '') {
-            throw new GroqApiException('empty_response', 'Groq returned an empty assistant message.');
+        $message = $decoded['choices'][0]['message'] ?? null;
+        if (!is_array($message)) {
+            throw new GroqApiException('invalid_response', 'Groq returned no assistant message.');
         }
 
-        return trim($reply);
+        $hasContent = isset($message['content']) && is_string($message['content']) && trim($message['content']) !== '';
+        $hasToolCalls = isset($message['tool_calls']) && is_array($message['tool_calls']) && $message['tool_calls'] !== [];
+        if (!$hasContent && !$hasToolCalls) {
+            throw new GroqApiException('empty_response', 'Groq returned neither content nor a tool call.');
+        }
+
+        return [
+            'message' => $message,
+            'finish_reason' => $decoded['choices'][0]['finish_reason'] ?? null,
+            'model' => $decoded['model'] ?? $payload['model'],
+            'usage' => is_array($decoded['usage'] ?? null) ? $decoded['usage'] : [],
+        ];
     }
 
     private function sendWithCurl($payloadJson, $timeout, $connectTimeout)

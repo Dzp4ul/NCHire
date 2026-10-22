@@ -1798,10 +1798,10 @@ $recent_activity = $conn->query($recent_activity_query);
     </main>
 </div>
 
-<?php if ($admin_role === 'Secretary' || $admin_role === 'Department Head'): ?>
+<?php if (in_array($admin_role, ['Admin', 'Secretary', 'Department Head'], true)): ?>
 <!-- Floating AI Recruitment Assistant -->
 <div id="chatbotWidgetPanel"
-     class="fixed bottom-24 right-4 left-4 sm:left-auto sm:right-6 sm:w-[28rem] h-[34rem] max-h-[calc(100vh-8rem)] bg-white border border-gray-200 rounded-lg shadow-2xl z-40 hidden"
+     class="fixed bottom-24 right-4 left-4 sm:left-auto sm:right-6 sm:w-[32rem] sm:max-w-[calc(100vw-3rem)] h-[38rem] max-h-[calc(100vh-8rem)] bg-white border border-gray-200 rounded-lg shadow-2xl z-40 hidden"
      role="dialog"
      aria-label="NCHire AI Recruitment Assistant">
     <div class="bg-primary text-white px-4 py-3 rounded-t-lg flex items-center justify-between gap-3">
@@ -1810,7 +1810,7 @@ $recent_activity = $conn->query($recent_activity_query);
                 <i class="fas fa-robot"></i>
             </div>
             <div class="min-w-0">
-                <h2 class="font-semibold text-sm truncate">NCHire AI Recruitment Assistant</h2>
+                <h2 class="font-semibold text-sm text-white truncate">NCHire AI Recruitment Assistant</h2>
                 <p class="text-xs text-blue-100 truncate"><?php echo htmlspecialchars($admin_role_display); ?> recruitment workspace</p>
             </div>
         </div>
@@ -1839,19 +1839,34 @@ $recent_activity = $conn->query($recent_activity_query);
                     </div>
                     <h3 class="text-sm font-semibold text-gray-900">Suggested Questions</h3>
                 </div>
+                <?php
+                $chatbot_suggestions = $admin_role === 'Admin'
+                    ? [
+                        'How many unique applicants and applications are currently active?',
+                        'What job vacancies are currently available?',
+                        'Give me a summary of current recruitment activities.',
+                        'What can an Admin do in NCHire?',
+                    ]
+                    : ($admin_role === 'Department Head'
+                        ? [
+                            'Show all active applicants in my department.',
+                            'Are there any interviews scheduled today?',
+                            'Who is waiting for a teaching demonstration?',
+                            'What job vacancies are currently available in my department?',
+                        ]
+                        : [
+                            'How many applicants are currently pending?',
+                            'Which applicants have missing requirements?',
+                            'What job vacancies are currently available?',
+                            'Give me a summary of current recruitment activities.',
+                        ]);
+                ?>
                 <div class="space-y-2">
-                    <button type="button" data-chatbot-suggestion="How many applicants are currently pending?" class="chatbot-suggestion w-full text-left px-3 py-2 rounded-lg border border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm">
-                        How many applicants are currently pending?
+                    <?php foreach ($chatbot_suggestions as $suggestion): ?>
+                    <button type="button" data-chatbot-suggestion="<?php echo htmlspecialchars($suggestion, ENT_QUOTES, 'UTF-8'); ?>" class="chatbot-suggestion w-full text-left px-3 py-2 rounded-lg border border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm">
+                        <?php echo htmlspecialchars($suggestion, ENT_QUOTES, 'UTF-8'); ?>
                     </button>
-                    <button type="button" data-chatbot-suggestion="Show me the applicants for Instructor." class="chatbot-suggestion w-full text-left px-3 py-2 rounded-lg border border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm">
-                        Show me the applicants for Instructor.
-                    </button>
-                    <button type="button" data-chatbot-suggestion="Summarize the application of Gabriel Cruz." class="chatbot-suggestion w-full text-left px-3 py-2 rounded-lg border border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm">
-                        Summarize the application of Gabriel Cruz.
-                    </button>
-                    <button type="button" data-chatbot-suggestion="What job vacancies are currently available?" class="chatbot-suggestion w-full text-left px-3 py-2 rounded-lg border border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm">
-                        What job vacancies are currently available?
-                    </button>
+                    <?php endforeach; ?>
                 </div>
             </div>
         </div>

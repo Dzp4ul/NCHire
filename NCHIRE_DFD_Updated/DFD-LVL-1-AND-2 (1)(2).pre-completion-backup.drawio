@@ -1,0 +1,255 @@
+<mxfile host="app.diagrams.net" agent="Codex" pages="2">
+  <diagram id="dfd-level-1-clean" name="DFD Level 1">
+    <mxGraphModel dx="2060" dy="1122" grid="1" gridSize="20" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="1220" background="light-dark(#ffffff, #121212)" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="l1_applicant" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=none;" value="Applicant&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Job Seeker&lt;/font&gt;" vertex="1">
+          <mxGeometry height="82" width="220" x="70" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_staff" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=none;" value="Recruitment Staff&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Administrator / Secretary /&lt;br&gt;Dean&lt;/font&gt;" vertex="1">
+          <mxGeometry height="102" width="245" x="1580" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_email" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=none;" value="Email / Notification&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Service&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="250" x="1600" y="900" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_groq" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=none;" value="Groq AI Service&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Recruitment Chatbot Only&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="250" x="1600" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_p1" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=none;" value="&lt;font style=&quot;font-size: 11px;&quot;&gt;Account &amp;amp; Profile&lt;br&gt;Management&lt;/font&gt;" vertex="1">
+          <mxGeometry height="155" width="155" x="360" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_p2" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=none;" value="&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Job Posting&lt;br&gt;Management&lt;/font&gt;" vertex="1">
+          <mxGeometry height="155" width="155" x="1180" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_p3" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=none;" value="&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Application&lt;br&gt;Submission &amp;amp; Upload&lt;/font&gt;" vertex="1">
+          <mxGeometry height="170" width="170" x="340" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_p6" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=none;" value="&lt;font style=&quot;font-size: 11px;&quot;&gt;Recruitment&lt;br&gt;Workflow&lt;br&gt;Processing&lt;/font&gt;" vertex="1">
+          <mxGeometry height="180" width="180" x="850" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_p7" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=none;" value="&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;AI Recruitment&lt;br&gt;Assistant Chatbot&lt;/font&gt;" vertex="1">
+          <mxGeometry height="170" width="170" x="1290" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_p9" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=none;" value="&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Notification&lt;br&gt;Management&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="900" y="850" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_d1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="&amp;nbsp;Accounts &amp;amp; Profiles DB" vertex="1">
+          <mxGeometry height="54" width="300" x="650" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_d2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="&amp;nbsp;Job Postings DB" vertex="1">
+          <mxGeometry height="54" width="300" x="1150" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_d3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="&amp;nbsp;Applications &amp;amp; Workflow DB" vertex="1">
+          <mxGeometry height="54" width="290" x="40" y="680" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_d4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="&amp;nbsp;Uploaded Documents" vertex="1">
+          <mxGeometry height="54" width="300" x="330" y="860" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_d6" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="&amp;nbsp;Notifications &amp;amp; Activity Logs" vertex="1">
+          <mxGeometry height="54" width="350" x="1220" y="1100" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_e1" edge="1" parent="1" source="l1_applicant" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=1;exitY=0.35;exitDx=0;exitDy=0;entryX=0;entryY=0.35;entryDx=0;entryDy=0;" target="l1_p1" value="Credentials / profile request">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e2" edge="1" parent="1" source="l1_p1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" target="l1_d1" value="Account / profile update">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e3" edge="1" parent="1" source="l1_d1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" target="l1_p1" value="Account / profile data">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e4" edge="1" parent="1" source="l1_staff" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0;exitY=0.35;exitDx=0;exitDy=0;entryX=1;entryY=0.35;entryDx=0;entryDy=0;" target="l1_p2" value="Create / edit / close jobs">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e5" edge="1" parent="1" source="l1_p2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="l1_d2" value="Save job posting">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="-45" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e6" edge="1" parent="1" source="l1_applicant" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" target="l1_p3" value="Application form,&lt;br&gt;resume and documents">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="180" y="320" /><mxPoint x="300" y="320" /><mxPoint x="300" y="442.5" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e7" edge="1" parent="1" source="l1_p3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0.65;exitY=1;exitDx=0;exitDy=0;entryX=0.4;entryY=0;entryDx=0;entryDy=0;" target="l1_d4" value="Store files">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="820" y="570" /><mxPoint x="820" y="830" /><mxPoint x="450" y="830" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e8" edge="1" parent="1" source="l1_p3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" target="l1_d3" value="Store application">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="300" y="527.5" /><mxPoint x="300" y="620" /><mxPoint x="257.5" y="620" /></Array><mxPoint x="-35" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e9" edge="1" parent="1" source="l1_d4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=1;exitY=0.35;exitDx=0;exitDy=0;entryX=0.25;entryY=1;entryDx=0;entryDy=0;" target="l1_p6" value="Applicant documents">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="700" y="879" /><mxPoint x="700" y="820" /><mxPoint x="895" y="820" /></Array><mxPoint y="18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e10" edge="1" parent="1" source="l1_p1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" target="l1_applicant" value="Access / profile result">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e11" edge="1" parent="1" source="l1_p2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="l1_applicant" value="Published job listings">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1257.5" y="40" /><mxPoint x="180" y="40" /></Array><mxPoint y="-16" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e13" edge="1" parent="1" source="l1_p6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" target="l1_d3" value="Updated stage, schedule and decision">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="790" y="605" /><mxPoint x="790" y="750" /><mxPoint x="330" y="750" /></Array><mxPoint y="18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e14" edge="1" parent="1" source="l1_d3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" target="l1_p6" value="Applications and workflow state">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="740" y="696" /><mxPoint x="740" y="524" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e15" edge="1" parent="1" source="l1_staff" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="l1_p6" value="Review, schedule, decision and dashboard requests">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1641" y="400" /><mxPoint x="940" y="400" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e16" edge="1" parent="1" source="l1_p6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0.75;exitY=0;exitDx=0;exitDy=0;entryX=0.75;entryY=1;entryDx=0;entryDy=0;" target="l1_staff" value="Workflow status and dashboard metrics">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="985" y="430" /><mxPoint x="1764" y="430" /><mxPoint x="1764" y="202" /></Array><mxPoint y="16" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e17" edge="1" parent="1" source="l1_staff" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="l1_p7" value="Secretary / Dean&lt;br&gt;query">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1840" y="151" /><mxPoint x="1840" y="585" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e18" edge="1" parent="1" source="l1_p6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0;exitY=0.25;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="l1_applicant" value="Application status and schedules">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="515" /><mxPoint x="650" y="300" /><mxPoint x="180" y="300" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e19" edge="1" parent="1" source="l1_p6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=1;exitY=0.55;exitDx=0;exitDy=0;entryX=0;entryY=0.55;entryDx=0;entryDy=0;" target="l1_p7" value="Role-scoped recruitment context">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e20" edge="1" parent="1" source="l1_p7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="l1_staff" value="Chatbot response">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1820" y="542.5" /><mxPoint x="1820" y="151" /></Array><mxPoint x="-60" y="16" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e21" edge="1" parent="1" source="l1_p6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="l1_p9" value="Status / schedule / decision event">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="65" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e22" edge="1" parent="1" source="l1_p9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=1;exitY=0.35;exitDx=0;exitDy=0;entryX=0;entryY=0.35;entryDx=0;entryDy=0;" target="l1_email" value="Verification and recruitment email">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e23" edge="1" parent="1" source="l1_email" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" target="l1_p9" value="Email delivery result">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e24" edge="1" parent="1" source="l1_p9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0.7;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" target="l1_d6" value="Notifications and delivery logs">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1012" y="1060" /><mxPoint x="1180" y="1060" /><mxPoint x="1180" y="1116" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e25" edge="1" parent="1" source="l1_p7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.55;entryY=0;entryDx=0;entryDy=0;" target="l1_d6" value="Chatbot usage audit">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="70" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e26" edge="1" parent="1" source="l1_p9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l1_applicant" value="In-app notifications">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="700" y="930" /><mxPoint x="700" y="1040" /><mxPoint x="20" y="1040" /><mxPoint x="20" y="600" /><mxPoint x="50" y="600" /><mxPoint x="50" y="141" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e27" edge="1" parent="1" source="l1_p7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=1;exitY=0.35;exitDx=0;exitDy=0;entryX=0;entryY=0.35;entryDx=0;entryDy=0;" target="l1_groq" value="Prompt and role-scoped context">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1520" y="559.5" /><mxPoint x="1520" y="681.5" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e28" edge="1" parent="1" source="l1_groq" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" target="l1_p7" value="Generated answer">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1550" y="717.5" /><mxPoint x="1550" y="627.5" /></Array><mxPoint y="18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e29" edge="1" parent="1" source="l1_p1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" target="l1_p9" value="Verification / password event">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="600" y="235" /><mxPoint x="600" y="780" /><mxPoint x="940" y="780" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="o4Ti52ABo56arRQZqw-z-1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="D1" vertex="1">
+          <mxGeometry height="54" width="60" x="650" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="o4Ti52ABo56arRQZqw-z-2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="D2" vertex="1">
+          <mxGeometry height="54" width="60" x="1150" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="o4Ti52ABo56arRQZqw-z-3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="D3" vertex="1">
+          <mxGeometry height="54" width="60" x="40" y="680" as="geometry" />
+        </mxCell>
+        <mxCell id="o4Ti52ABo56arRQZqw-z-4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="D4" vertex="1">
+          <mxGeometry height="54" width="60" x="330" y="860" as="geometry" />
+        </mxCell>
+        <mxCell id="o4Ti52ABo56arRQZqw-z-6" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="D5" vertex="1">
+          <mxGeometry height="54" width="60" x="1220" y="1100" as="geometry" />
+        </mxCell>
+        <mxCell id="l9skgSUDvm23wT7ySH61-1" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;1.0&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="60" x="407.5" y="115" as="geometry" />
+        </mxCell>
+        <mxCell id="l9skgSUDvm23wT7ySH61-2" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;2.0&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="60" x="1227.5" y="115" as="geometry" />
+        </mxCell>
+        <mxCell id="l9skgSUDvm23wT7ySH61-3" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;3.0&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="60" x="395" y="445" as="geometry" />
+        </mxCell>
+        <mxCell id="l9skgSUDvm23wT7ySH61-6" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;4.0&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="60" x="910" y="520" as="geometry" />
+        </mxCell>
+        <mxCell id="g4ROWQk7A3OmvxGOE6hf-1" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;5.0&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="60" x="1345" y="545" as="geometry" />
+        </mxCell>
+        <mxCell id="dVyYDA-wQR1t8QGhcmxj-2" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;6.0&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="60" x="950" y="895" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="dfd-level-2-clean" name="DFD Level 2">
+    <mxGraphModel dx="2943" dy="1603" grid="1" gridSize="20" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1480" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="l2_applicant" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=none;" value="Groq AI Service&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Chat Completion API&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="260" x="1270" y="1050" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_staff" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=none;" value="Recruitment Staff&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Secretary / Dean&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="240" x="40" y="640" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_d1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="&amp;nbsp;Accounts &amp;amp; Profiles DB" vertex="1">
+          <mxGeometry height="54" width="320" x="690" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_d2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="&amp;nbsp;Job Postings DB" vertex="1">
+          <mxGeometry height="54" width="320" x="1030" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_d7" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="&amp;nbsp;Applications &amp;amp; Workflow DB" vertex="1">
+          <mxGeometry height="54" width="340" x="1360" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_d9" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="&amp;nbsp;Admin Activity Log" vertex="1">
+          <mxGeometry height="54" width="330" x="1690" y="1050" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p71" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=none;" value="5.1&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Receive Staff&lt;br&gt;Query&lt;/font&gt;" vertex="1">
+          <mxGeometry height="145" width="145" x="400" y="620" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p72" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=none;" value="5.2&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Search Applicant,&lt;br&gt;Job and Workflow&lt;br&gt;Context&lt;/font&gt;" vertex="1">
+          <mxGeometry height="155" width="155" x="900" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p73" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=none;" value="5.3&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Generate AI&lt;br&gt;Answer or Quick&lt;br&gt;Summary&lt;/font&gt;" vertex="1">
+          <mxGeometry height="155" width="155" x="1350" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p74" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=none;" value="5.4&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Return Chatbot&lt;br&gt;Response&lt;/font&gt;" vertex="1">
+          <mxGeometry height="145" width="145" x="1750" y="620" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_e18" edge="1" parent="1" source="l2_staff" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p71" value="Authorized recruitment question">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-20" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_e19" edge="1" parent="1" source="l2_p71" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p72" value="Validated query">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-20" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_e20" edge="1" parent="1" source="l2_d7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;" target="l2_p72" value="Applications and workflow context">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1530" y="540" /><mxPoint x="1024" y="540" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_e21" edge="1" parent="1" source="l2_p72" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p73" value="Role-scoped database context">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-20" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_e22" edge="1" parent="1" source="l2_p73" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p74" value="Generated or local answer">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-20" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_e23" edge="1" parent="1" source="l2_p74" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.67;entryY=1;entryDx=0;entryDy=0;" target="l2_staff" value="Chatbot response">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2120" y="692.5" /><mxPoint x="2120" y="1250" /><mxPoint x="200" y="1250" /></Array><mxPoint y="-20" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_e24" edge="1" parent="1" source="l2_p74" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="l2_d9" value="Log intent and result">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="70" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_e1" edge="1" parent="1" source="l2_p73" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0.35;exitY=1;exitDx=0;exitDy=0;entryX=0.35;entryY=0;entryDx=0;entryDy=0;" target="l2_applicant" value="Prompt and scoped context">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="-80" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_e2" edge="1" parent="1" source="l2_applicant" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0.7;exitY=0;exitDx=0;exitDy=0;entryX=0.7;entryY=1;entryDx=0;entryDy=0;" target="l2_p73" value="Generated answer">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="80" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_e3" edge="1" parent="1" source="l2_d1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.2;entryY=0;entryDx=0;entryDy=0;" target="l2_p72" value="Staff role and applicant profiles">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="850" y="400" /><mxPoint x="931" y="400" /></Array><mxPoint x="-60" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_e4" edge="1" parent="1" source="l2_d2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;endArrow=block;endFill=1;fontColor=default;fontSize=12;labelBackgroundColor=none;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="l2_p72" value="Job posting context">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1190" y="470" /><mxPoint x="977.5" y="470" /></Array><mxPoint x="45" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="2GzsxgjK2UUjbPGNlhND-1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="D1" vertex="1">
+          <mxGeometry height="54" width="72.5" x="690" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="2GzsxgjK2UUjbPGNlhND-2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="D2" vertex="1">
+          <mxGeometry height="54" width="72.5" x="1030" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="2GzsxgjK2UUjbPGNlhND-7" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="D3" vertex="1">
+          <mxGeometry height="54" width="72.5" x="1360" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="2GzsxgjK2UUjbPGNlhND-9" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="D5" vertex="1">
+          <mxGeometry height="54" width="72.5" x="1690" y="1050" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

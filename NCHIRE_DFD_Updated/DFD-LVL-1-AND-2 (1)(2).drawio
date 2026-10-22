@@ -1,0 +1,615 @@
+<mxfile host="app.diagrams.net" agent="Codex" pages="2">
+  <diagram id="dfd-level-1-clean" name="DFD Level 1">
+    <mxGraphModel dx="2400" dy="1500" grid="1" gridSize="20" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2400" pageHeight="1500" background="#ffffff" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="l1_applicant" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="Applicant&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Job Seeker&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="240" x="60" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_staff" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="Recruitment Staff&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Administrator / Secretary /&lt;br&gt;Dean&lt;/font&gt;" vertex="1">
+          <mxGeometry height="110" width="270" x="2070" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_email" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="Email / Notification&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Service&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="270" x="2070" y="1120" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_groq" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="Groq AI Service&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Recruitment Chatbot Only&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="290" x="2050" y="660" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_p1" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="&lt;font style=&quot;font-size: 11px;&quot;&gt;Account &amp;amp; Profile&lt;br&gt;Management&lt;/font&gt;" vertex="1">
+          <mxGeometry height="180" width="180" x="380" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_p2" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="&lt;font style=&quot;font-size: 11px;&quot;&gt;Job Posting&lt;br&gt;Management&lt;/font&gt;" vertex="1">
+          <mxGeometry height="180" width="180" x="1570" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_p3" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="&lt;font style=&quot;font-size: 11px;&quot;&gt;Application&lt;br&gt;Submission &amp;amp; Upload&lt;/font&gt;" vertex="1">
+          <mxGeometry height="190" width="190" x="360" y="550" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_p6" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="&lt;font style=&quot;font-size: 11px;&quot;&gt;Recruitment&lt;br&gt;Workflow&lt;br&gt;Processing&lt;/font&gt;" vertex="1">
+          <mxGeometry height="200" width="200" x="1050" y="560" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_p7" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="&lt;font style=&quot;font-size: 11px;&quot;&gt;AI Recruitment&lt;br&gt;Assistant Chatbot&lt;/font&gt;" vertex="1">
+          <mxGeometry height="190" width="190" x="1600" y="570" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_p9" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="&lt;font style=&quot;font-size: 11px;&quot;&gt;Notification&lt;br&gt;Management&lt;/font&gt;" vertex="1">
+          <mxGeometry height="180" width="180" x="1080" y="1080" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_d1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Accounts &amp;amp; Profiles DB" vertex="1">
+          <mxGeometry height="58" width="330" x="700" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="o4Ti52ABo56arRQZqw-z-1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D1" vertex="1">
+          <mxGeometry height="58" width="60" x="700" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_d2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Job Postings &amp;amp; Requirements DB" vertex="1">
+          <mxGeometry height="58" width="350" x="1490" y="350" as="geometry" />
+        </mxCell>
+        <mxCell id="o4Ti52ABo56arRQZqw-z-2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D2" vertex="1">
+          <mxGeometry height="58" width="60" x="1490" y="350" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_d3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Applications &amp;amp; Workflow DB" vertex="1">
+          <mxGeometry height="58" width="330" x="650" y="780" as="geometry" />
+        </mxCell>
+        <mxCell id="o4Ti52ABo56arRQZqw-z-3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D3" vertex="1">
+          <mxGeometry height="58" width="60" x="650" y="780" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_d4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Uploaded Documents &amp;amp; Versions" vertex="1">
+          <mxGeometry height="58" width="340" x="220" y="930" as="geometry" />
+        </mxCell>
+        <mxCell id="o4Ti52ABo56arRQZqw-z-4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D4" vertex="1">
+          <mxGeometry height="58" width="60" x="220" y="930" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_d6" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Notifications &amp;amp; Activity Logs" vertex="1">
+          <mxGeometry height="58" width="390" x="1510" y="850" as="geometry" />
+        </mxCell>
+        <mxCell id="o4Ti52ABo56arRQZqw-z-6" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D5" vertex="1">
+          <mxGeometry height="58" width="60" x="1510" y="850" as="geometry" />
+        </mxCell>
+        <mxCell id="l9skgSUDvm23wT7ySH61-1" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Arial;fontSize=16;fontColor=#000000;" value="1.0" vertex="1">
+          <mxGeometry height="30" width="60" x="440" y="122" as="geometry" />
+        </mxCell>
+        <mxCell id="l9skgSUDvm23wT7ySH61-2" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Arial;fontSize=16;fontColor=#000000;" value="2.0" vertex="1">
+          <mxGeometry height="30" width="60" x="1630" y="122" as="geometry" />
+        </mxCell>
+        <mxCell id="l9skgSUDvm23wT7ySH61-3" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Arial;fontSize=16;fontColor=#000000;" value="3.0" vertex="1">
+          <mxGeometry height="30" width="60" x="425" y="592" as="geometry" />
+        </mxCell>
+        <mxCell id="l9skgSUDvm23wT7ySH61-6" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Arial;fontSize=16;fontColor=#000000;" value="4.0" vertex="1">
+          <mxGeometry height="30" width="60" x="1120" y="600" as="geometry" />
+        </mxCell>
+        <mxCell id="g4ROWQk7A3OmvxGOE6hf-1" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Arial;fontSize=16;fontColor=#000000;" value="5.0" vertex="1">
+          <mxGeometry height="30" width="60" x="1665" y="612" as="geometry" />
+        </mxCell>
+        <mxCell id="dVyYDA-wQR1t8QGhcmxj-2" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Arial;fontSize=16;fontColor=#000000;" value="6.0" vertex="1">
+          <mxGeometry height="30" width="60" x="1140" y="1115" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_e1" edge="1" parent="1" source="l1_applicant" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.35;exitDx=0;exitDy=0;entryX=0;entryY=0.35;entryDx=0;entryDy=0;" target="l1_p1" value="Credentials / profile request">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e2" edge="1" parent="1" source="l1_p1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" target="l1_d1" value="Account / profile update">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e3" edge="1" parent="1" source="l1_d1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" target="l1_p1" value="Account / profile data">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e4" edge="1" parent="1" source="l1_staff" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0;exitY=0.35;exitDx=0;exitDy=0;entryX=1;entryY=0.35;entryDx=0;entryDy=0;" target="l1_p2" value="Create / edit / close jobs">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e5" edge="1" parent="1" source="l1_p2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="l1_d2" value="Save posting and requirements">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="100" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e6" edge="1" parent="1" source="l1_applicant" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.55;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="l1_p3" value="Application form, resume and documents">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="192" y="500" /><mxPoint x="455" y="500" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e7" edge="1" parent="1" source="l1_p3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="l1_d4" value="Store files and versions">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="85" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e8" edge="1" parent="1" source="l1_p3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.65;exitDx=0;exitDy=0;entryX=0;entryY=0.35;entryDx=0;entryDy=0;" target="l1_d3" value="Store application">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="620" y="673.5" /><mxPoint x="620" y="800.3" /></Array><mxPoint x="45" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e9" edge="1" parent="1" source="l1_d4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="l1_p6" value="Applicant documents">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="900" y="959" /><mxPoint x="900" y="900" /><mxPoint x="1150" y="900" /></Array><mxPoint y="18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e10" edge="1" parent="1" source="l1_p1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" target="l1_applicant" value="Access / profile result">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e11" edge="1" parent="1" source="l1_p2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="l1_applicant" value="Published job listings">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1660" y="40" /><mxPoint x="180" y="40" /></Array><mxPoint y="-16" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e12" edge="1" parent="1" source="l1_p2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.75;entryDx=0;entryDy=0;" target="l1_staff" value="Job posting status">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e13" edge="1" parent="1" source="l1_p6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" target="l1_d3" value="Updated stage, schedule and decision">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e14" edge="1" parent="1" source="l1_d3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" target="l1_p6" value="Applications and workflow state">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e15" edge="1" parent="1" source="l1_staff" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.15;exitY=1;exitDx=0;exitDy=0;entryX=0.35;entryY=0;entryDx=0;entryDy=0;" target="l1_p6" value="Review, schedule and decision requests">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2110.5" y="430" /><mxPoint x="1120" y="430" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e16" edge="1" parent="1" source="l1_p6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.65;exitY=0;exitDx=0;exitDy=0;entryX=0.35;entryY=1;entryDx=0;entryDy=0;" target="l1_staff" value="Workflow status and dashboard metrics">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1180" y="470" /><mxPoint x="2164.5" y="470" /></Array><mxPoint y="18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e17" edge="1" parent="1" source="l1_staff" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.65;exitY=1;exitDx=0;exitDy=0;entryX=0.55;entryY=0;entryDx=0;entryDy=0;" target="l1_p7" value="Secretary / Dean chatbot query">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2245.5" y="530" /><mxPoint x="1704.5" y="530" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e18" edge="1" parent="1" source="l1_p6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0;exitY=0.25;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="l1_applicant" value="Application status and schedules">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="610" /><mxPoint x="650" y="360" /><mxPoint x="180" y="360" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e19" edge="1" parent="1" source="l1_p6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.55;exitDx=0;exitDy=0;entryX=0;entryY=0.55;entryDx=0;entryDy=0;" target="l1_p7" value="Role-scoped recruitment context">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e20" edge="1" parent="1" source="l1_p7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.85;exitY=0;exitDx=0;exitDy=0;entryX=0.85;entryY=1;entryDx=0;entryDy=0;" target="l1_staff" value="Chatbot response">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1761.5" y="500" /><mxPoint x="2299.5" y="500" /></Array><mxPoint y="18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e21" edge="1" parent="1" source="l1_p6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="l1_p9" value="Status / schedule / decision event">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="90" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e22" edge="1" parent="1" source="l1_p9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.35;exitDx=0;exitDy=0;entryX=0;entryY=0.35;entryDx=0;entryDy=0;" target="l1_email" value="Verification and recruitment email">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e23" edge="1" parent="1" source="l1_email" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" target="l1_p9" value="Email delivery result">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e24" edge="1" parent="1" source="l1_p9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.75;exitY=0;exitDx=0;exitDy=0;entryX=0.25;entryY=1;entryDx=0;entryDy=0;" target="l1_d6" value="Notification / delivery log">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1215" y="1030" /><mxPoint x="1430" y="1030" /><mxPoint x="1430" y="940" /><mxPoint x="1607.5" y="940" /></Array><mxPoint x="40" y="-14" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e25" edge="1" parent="1" source="l1_p7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.6;entryY=0;entryDx=0;entryDy=0;" target="l1_d6" value="Chatbot usage audit">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="70" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e26" edge="1" parent="1" source="l1_p9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l1_applicant" value="">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="630" y="1170" /><mxPoint x="630" y="1300" /><mxPoint x="30" y="1300" /><mxPoint x="30" y="170" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e26_label" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=#ffffff;align=center;verticalAlign=middle;rounded=0;fontFamily=Arial;fontSize=12;fontColor=#000000;" value="In-app notifications" vertex="1">
+          <mxGeometry height="30" width="190" x="220" y="1270" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_e27" edge="1" parent="1" source="l1_p7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.35;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" target="l1_groq" value="Prompt and role-scoped context">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e28" edge="1" parent="1" source="l1_groq" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0;exitY=0.72;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" target="l1_p7" value="Generated answer">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l1_e29" edge="1" parent="1" source="l1_p1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;jumpStyle=arc;jumpSize=8;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" target="l1_p9" value="Verification / password event">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="630" y="270" /><mxPoint x="630" y="880" /><mxPoint x="100" y="880" /><mxPoint x="100" y="1040" /><mxPoint x="1125" y="1040" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="dfd-level-2-clean" name="DFD Level 2">
+    <mxGraphModel dx="4400" dy="3950" grid="1" gridSize="20" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="4400" pageHeight="3950" background="#ffffff" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="l2_sec1_title" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Arial;fontSize=22;fontStyle=1;fontColor=#000000;" value="Process 1.0 — Account &amp;amp; Profile Management" vertex="1">
+          <mxGeometry height="45" width="1900" x="80" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_sec2_title" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Arial;fontSize=22;fontStyle=1;fontColor=#000000;" value="Process 2.0 — Job Posting Management" vertex="1">
+          <mxGeometry height="45" width="1900" x="2280" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_sec3_title" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Arial;fontSize=22;fontStyle=1;fontColor=#000000;" value="Process 3.0 — Application Submission &amp;amp; Upload" vertex="1">
+          <mxGeometry height="45" width="1900" x="80" y="1340" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_sec4_title" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Arial;fontSize=22;fontStyle=1;fontColor=#000000;" value="Process 4.0 — Recruitment Workflow Processing" vertex="1">
+          <mxGeometry height="45" width="1900" x="2280" y="1340" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_sec5_title" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Arial;fontSize=22;fontStyle=1;fontColor=#000000;" value="Process 5.0 — AI Recruitment Assistant Chatbot" vertex="1">
+          <mxGeometry height="45" width="1900" x="80" y="2640" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_sec6_title" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Arial;fontSize=22;fontStyle=1;fontColor=#000000;" value="Process 6.0 — Notification Management" vertex="1">
+          <mxGeometry height="45" width="1900" x="2280" y="2640" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s1_applicant" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="Applicant&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Job Seeker&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="240" x="60" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p11" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="1.1&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Receive Registration /&lt;br&gt;Login Information&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="380" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p12" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="1.2&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Validate Credentials&lt;br&gt;&amp;amp; Verification&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="680" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p13" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="1.3&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Manage User&lt;br&gt;Profile Information&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="980" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p14" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="1.4&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Update Account &amp;amp;&lt;br&gt;Profile Records&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="1280" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p15" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="1.5&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Return Account or&lt;br&gt;Profile Status&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="1580" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s1_d1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Accounts &amp;amp; Profiles DB" vertex="1">
+          <mxGeometry height="58" width="400" x="1020" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s1_d1_num" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D1" vertex="1">
+          <mxGeometry height="58" width="60" x="1020" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s1_p6ref" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=13;align=center;verticalAlign=middle;spacing=6;labelBackgroundColor=#ffffff;" value="6.0&lt;br&gt;&lt;font style=&quot;font-size: 10px;&quot;&gt;Notification&lt;br&gt;Management&lt;/font&gt;" vertex="1">
+          <mxGeometry height="140" width="140" x="1720" y="780" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s1_e1" edge="1" parent="1" source="l2_s1_applicant" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p11" value="Registration / login details">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s1_e2" edge="1" parent="1" source="l2_p11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p12" value="Submitted credentials">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s1_e3" edge="1" parent="1" source="l2_s1_d1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="l2_p12" value="Stored account record">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1120" y="340" /><mxPoint x="760" y="340" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s1_e4" edge="1" parent="1" source="l2_p12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p13" value="Validated user / profile request">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s1_e5" edge="1" parent="1" source="l2_p13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p14" value="Profile information">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s1_e6" edge="1" parent="1" source="l2_p14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.75;entryY=1;entryDx=0;entryDy=0;" target="l2_s1_d1" value="Account / profile update">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="90" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s1_e7" edge="1" parent="1" source="l2_p14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p15" value="Stored account / profile status">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s1_e8" edge="1" parent="1" source="l2_p15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="l2_s1_applicant" value="Access or profile status">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1660" y="700" /><mxPoint x="180" y="700" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s1_e9" edge="1" parent="1" source="l2_p12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.25;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_s1_p6ref" value="Verification / password event">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="720" y="300" /><mxPoint x="900" y="300" /><mxPoint x="900" y="120" /><mxPoint x="1900" y="120" /><mxPoint x="1900" y="850" /><mxPoint x="1720" y="850" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s2_staff" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="Recruitment Staff&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Authorized Job Managers&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="240" x="2260" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s2_applicant" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="Applicant&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Job Seeker&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="220" x="4140" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p21" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="2.1&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Receive Job Details&lt;br&gt;&amp;amp; Requirements&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="2580" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p22" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="2.2&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Validate Job and&lt;br&gt;Teaching-Load Details&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="2880" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p23" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="2.3&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Create or Update&lt;br&gt;Job Posting&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="3180" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p24" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="2.4&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Manage Posting&lt;br&gt;Status &amp;amp; Deadline&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="3480" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p25" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="2.5&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Display Published&lt;br&gt;Job Postings&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="3780" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s2_d2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Job Postings &amp;amp; Requirements DB" vertex="1">
+          <mxGeometry height="58" width="420" x="3160" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s2_d2_num" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D2" vertex="1">
+          <mxGeometry height="58" width="60" x="3160" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s2_e1" edge="1" parent="1" source="l2_s2_staff" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p21" value="Job data and dynamic requirements">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s2_e2" edge="1" parent="1" source="l2_p21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p22" value="Submitted posting data">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s2_e3" edge="1" parent="1" source="l2_p22" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p23" value="Validated job / load details">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s2_e4" edge="1" parent="1" source="l2_p23" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.35;entryY=1;entryDx=0;entryDy=0;" target="l2_s2_d2" value="Save posting and requirements">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="-70" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s2_e5" edge="1" parent="1" source="l2_s2_d2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.8;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="l2_p24" value="Posting and deadline data">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="80" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s2_e6" edge="1" parent="1" source="l2_p24" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.7;exitY=0;exitDx=0;exitDy=0;entryX=0.95;entryY=1;entryDx=0;entryDy=0;" target="l2_s2_d2" value="Availability / status update">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="3592" y="360" /><mxPoint x="3559" y="360" /></Array><mxPoint x="65" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s2_e7" edge="1" parent="1" source="l2_s2_d2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="l2_p25" value="Active postings">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="3700" y="199" /><mxPoint x="3860" y="199" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s2_e8" edge="1" parent="1" source="l2_p25" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_s2_applicant" value="Published job listings">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s2_e9" edge="1" parent="1" source="l2_p24" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="l2_s2_staff" value="Posting status">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="3560" y="700" /><mxPoint x="2380" y="700" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s3_applicant" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="Applicant&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Job Seeker&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="240" x="60" y="1760" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p31" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="3.1&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Receive Applicant&lt;br&gt;Job Application&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="380" y="1730" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p32" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="3.2&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Validate Application&lt;br&gt;&amp;amp; Requirements&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="680" y="1730" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p33" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="3.3&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Receive or Reuse&lt;br&gt;Required Documents&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="980" y="1730" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p34" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="3.4&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Store Application&lt;br&gt;&amp;amp; File Versions&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="1280" y="1730" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p35" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="3.5&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Return Submission&lt;br&gt;Status&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="1580" y="1730" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s3_d1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Accounts &amp;amp; Profiles DB" vertex="1">
+          <mxGeometry height="58" width="380" x="500" y="1470" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s3_d1_num" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D1" vertex="1">
+          <mxGeometry height="58" width="60" x="500" y="1470" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s3_d2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Job Postings &amp;amp; Requirements DB" vertex="1">
+          <mxGeometry height="58" width="420" x="940" y="1470" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s3_d2_num" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D2" vertex="1">
+          <mxGeometry height="58" width="60" x="940" y="1470" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s3_d3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Applications &amp;amp; Workflow DB" vertex="1">
+          <mxGeometry height="58" width="400" x="1060" y="2120" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s3_d3_num" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D3" vertex="1">
+          <mxGeometry height="58" width="60" x="1060" y="2120" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s3_d4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Uploaded Documents &amp;amp; Versions" vertex="1">
+          <mxGeometry height="58" width="400" x="1500" y="2120" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s3_d4_num" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D4" vertex="1">
+          <mxGeometry height="58" width="60" x="1500" y="2120" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s3_e1" edge="1" parent="1" source="l2_s3_applicant" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p31" value="Selected job and application form">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s3_e2" edge="1" parent="1" source="l2_p31" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p32" value="Application data">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s3_e3" edge="1" parent="1" source="l2_s3_d1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.65;exitY=1;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;" target="l2_p32" value="Applicant profile data">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="-45" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s3_e4" edge="1" parent="1" source="l2_s3_d2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.15;exitY=1;exitDx=0;exitDy=0;entryX=0.7;entryY=0;entryDx=0;entryDy=0;" target="l2_p32" value="Job and document requirements">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1003" y="1640" /><mxPoint x="792" y="1640" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s3_e5" edge="1" parent="1" source="l2_p32" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p33" value="Validated application">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s3_e6" edge="1" parent="1" source="l2_s3_applicant" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="l2_p33" value="Resume and required documents">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="180" y="2050" /><mxPoint x="1060" y="2050" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s3_e7" edge="1" parent="1" source="l2_p33" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p34" value="Validated files">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s3_e8" edge="1" parent="1" source="l2_p34" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.35;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="l2_s3_d3" value="Application record">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="-75" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s3_e9" edge="1" parent="1" source="l2_p34" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.2;entryY=0;entryDx=0;entryDy=0;" target="l2_s3_d4" value="Uploaded files and versions">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1400" y="2040" /><mxPoint x="1580" y="2040" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s3_e10" edge="1" parent="1" source="l2_p34" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p35" value="Submission result">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s3_e11" edge="1" parent="1" source="l2_p35" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="l2_s3_applicant" value="Application submission status">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2020" y="1810" /><mxPoint x="2020" y="2310" /><mxPoint x="180" y="2310" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s4_staff" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="Recruitment Staff&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Secretary / Dean&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="240" x="2260" y="1760" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p41" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="4.1&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Retrieve Submitted&lt;br&gt;Applications&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="2580" y="1730" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p42" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="4.2&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Review Applicant&lt;br&gt;Profile &amp;amp; Documents&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="2880" y="1730" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p43" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="4.3&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Update Application&lt;br&gt;Status / Stage&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="3180" y="1730" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p44" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="4.4&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Manage Schedules&lt;br&gt;&amp;amp; Decisions&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="3480" y="1730" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p45" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="4.5&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Save Workflow&lt;br&gt;Updates &amp;amp; History&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="3780" y="1730" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s4_d3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Applications &amp;amp; Workflow DB" vertex="1">
+          <mxGeometry height="58" width="400" x="2460" y="1470" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s4_d3_num" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D3" vertex="1">
+          <mxGeometry height="58" width="60" x="2460" y="1470" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s4_d1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Accounts &amp;amp; Profiles DB" vertex="1">
+          <mxGeometry height="58" width="380" x="2920" y="1470" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s4_d1_num" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D1" vertex="1">
+          <mxGeometry height="58" width="60" x="2920" y="1470" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s4_d4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Uploaded Documents &amp;amp; Versions" vertex="1">
+          <mxGeometry height="58" width="400" x="3360" y="1470" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s4_d4_num" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D4" vertex="1">
+          <mxGeometry height="58" width="60" x="3360" y="1470" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s4_d3_write" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Applications &amp;amp; Workflow DB" vertex="1">
+          <mxGeometry height="58" width="400" x="3800" y="1470" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s4_d3_write_num" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D3" vertex="1">
+          <mxGeometry height="58" width="60" x="3800" y="1470" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s4_p6ref" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=13;align=center;verticalAlign=middle;spacing=6;labelBackgroundColor=#ffffff;" value="6.0&lt;br&gt;&lt;font style=&quot;font-size: 10px;&quot;&gt;Notification&lt;br&gt;Management&lt;/font&gt;" vertex="1">
+          <mxGeometry height="140" width="140" x="4100" y="2020" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s4_e1" edge="1" parent="1" source="l2_s4_staff" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p41" value="Review / workflow request">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s4_e2" edge="1" parent="1" source="l2_s4_d3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="l2_p41" value="Scoped submitted applications">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="85" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s4_e3" edge="1" parent="1" source="l2_p41" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p42" value="Application selected for review">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s4_e4" edge="1" parent="1" source="l2_s4_d1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.35;exitY=1;exitDx=0;exitDy=0;entryX=0.35;entryY=0;entryDx=0;entryDy=0;" target="l2_p42" value="Applicant profile">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="-60" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s4_e5" edge="1" parent="1" source="l2_s4_d4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.1;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" target="l2_p42" value="Submitted documents">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="3398" y="1650" /><mxPoint x="3000" y="1650" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s4_e6" edge="1" parent="1" source="l2_p42" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p43" value="Review outcome and notes">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s4_e7" edge="1" parent="1" source="l2_p43" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p44" value="Updated stage / action">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s4_e8" edge="1" parent="1" source="l2_p44" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p45" value="Schedule or decision details">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s4_e9" edge="1" parent="1" source="l2_p45" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.2;entryY=1;entryDx=0;entryDy=0;" target="l2_s4_d3_write" value="Stage, schedule, decision and history">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="65" y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s4_e10" edge="1" parent="1" source="l2_p45" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_s4_p6ref" value="Status / schedule / decision event">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="4020" y="1850" /><mxPoint x="4020" y="2090" /></Array><mxPoint x="35" y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s4_e11" edge="1" parent="1" source="l2_p45" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="l2_s4_staff" value="Workflow result">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="3860" y="2300" /><mxPoint x="2380" y="2300" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_staff" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="Recruitment Staff&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Secretary / Dean&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="240" x="60" y="3070" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_applicant" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="Groq AI Service&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Chat Completion API&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="300" x="1100" y="3500" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_d1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Accounts &amp;amp; Profiles DB" vertex="1">
+          <mxGeometry height="58" width="380" x="450" y="2770" as="geometry" />
+        </mxCell>
+        <mxCell id="2GzsxgjK2UUjbPGNlhND-1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D1" vertex="1">
+          <mxGeometry height="58" width="60" x="450" y="2770" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_d2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Job Postings &amp;amp; Requirements DB" vertex="1">
+          <mxGeometry height="58" width="400" x="870" y="2770" as="geometry" />
+        </mxCell>
+        <mxCell id="2GzsxgjK2UUjbPGNlhND-2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D2" vertex="1">
+          <mxGeometry height="58" width="60" x="870" y="2770" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_d7" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Applications &amp;amp; Workflow DB" vertex="1">
+          <mxGeometry height="58" width="400" x="1310" y="2770" as="geometry" />
+        </mxCell>
+        <mxCell id="2GzsxgjK2UUjbPGNlhND-7" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D3" vertex="1">
+          <mxGeometry height="58" width="60" x="1310" y="2770" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_d9" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Admin Activity Log" vertex="1">
+          <mxGeometry height="58" width="360" x="1570" y="3510" as="geometry" />
+        </mxCell>
+        <mxCell id="2GzsxgjK2UUjbPGNlhND-9" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D5" vertex="1">
+          <mxGeometry height="58" width="60" x="1570" y="3510" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p71" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="5.1&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Receive Staff&lt;br&gt;Query&lt;/font&gt;" vertex="1">
+          <mxGeometry height="155" width="155" x="380" y="3040" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p72" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="5.2&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Search Applicant,&lt;br&gt;Job and Workflow&lt;br&gt;Context&lt;/font&gt;" vertex="1">
+          <mxGeometry height="155" width="155" x="780" y="3040" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p73" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="5.3&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Generate AI&lt;br&gt;Answer or Quick&lt;br&gt;Summary&lt;/font&gt;" vertex="1">
+          <mxGeometry height="155" width="155" x="1180" y="3040" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p74" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="5.4&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Return Chatbot&lt;br&gt;Response&lt;/font&gt;" vertex="1">
+          <mxGeometry height="155" width="155" x="1580" y="3040" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_e18" edge="1" parent="1" source="l2_staff" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p71" value="Authorized recruitment question">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-20" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_e19" edge="1" parent="1" source="l2_p71" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p72" value="Validated query">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-20" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_e20" edge="1" parent="1" source="l2_d7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;" target="l2_p72" value="Applications and workflow context">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1410" y="2920" /><mxPoint x="904" y="2920" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_e21" edge="1" parent="1" source="l2_p72" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p73" value="Role-scoped database context">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-20" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_e22" edge="1" parent="1" source="l2_p73" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p74" value="Generated or local answer">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-20" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_e23" edge="1" parent="1" source="l2_p74" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="l2_staff" value="Chatbot response">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2040" y="3117.5" /><mxPoint x="2040" y="3760" /><mxPoint x="180" y="3760" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_e24" edge="1" parent="1" source="l2_p74" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="l2_d9" value="Log intent and result">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="75" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_e1" edge="1" parent="1" source="l2_p73" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.35;exitY=1;exitDx=0;exitDy=0;entryX=0.35;entryY=0;entryDx=0;entryDy=0;" target="l2_applicant" value="Prompt and scoped context">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="-85" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_e2" edge="1" parent="1" source="l2_applicant" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.7;exitY=0;exitDx=0;exitDy=0;entryX=0.7;entryY=1;entryDx=0;entryDy=0;" target="l2_p73" value="Generated answer">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="85" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_e3" edge="1" parent="1" source="l2_d1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.7;exitY=1;exitDx=0;exitDy=0;entryX=0.2;entryY=0;entryDx=0;entryDy=0;" target="l2_p72" value="Staff role and applicant profiles">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="716" y="2940" /><mxPoint x="811" y="2940" /></Array><mxPoint x="-70" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_e4" edge="1" parent="1" source="l2_d2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="l2_p72" value="Job posting context">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1070" y="2960" /><mxPoint x="857.5" y="2960" /></Array><mxPoint x="45" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s6_events" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=13;align=center;verticalAlign=middle;spacing=6;labelBackgroundColor=#ffffff;" value="1.0 / 4.0&lt;br&gt;&lt;font style=&quot;font-size: 10px;&quot;&gt;Account and&lt;br&gt;Workflow Events&lt;/font&gt;" vertex="1">
+          <mxGeometry height="150" width="150" x="2260" y="3045" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p61" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="6.1&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Receive Notification&lt;br&gt;Trigger&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="2540" y="3040" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p62" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="6.2&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Retrieve Recipient&lt;br&gt;Information&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="2880" y="3040" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p63" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="6.3&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Prepare Notification&lt;br&gt;Content&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="3220" y="3040" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p64" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="6.4&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Send Email or&lt;br&gt;In-App Notification&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="3220" y="3370" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_p65" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="6.5&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Record Notification&lt;br&gt;or Delivery Status&lt;/font&gt;" vertex="1">
+          <mxGeometry height="160" width="160" x="3580" y="3370" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s6_d1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Accounts &amp;amp; Profiles DB" vertex="1">
+          <mxGeometry height="58" width="380" x="2760" y="2770" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s6_d1_num" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D1" vertex="1">
+          <mxGeometry height="58" width="60" x="2760" y="2770" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s6_d3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Applications &amp;amp; Workflow DB" vertex="1">
+          <mxGeometry height="58" width="400" x="3200" y="2770" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s6_d3_num" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D3" vertex="1">
+          <mxGeometry height="58" width="60" x="3200" y="2770" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s6_email" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="Email / Notification&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Service&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="300" x="2720" y="3590" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s6_d5" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacingLeft=58;labelBackgroundColor=#ffffff;" value="Notifications &amp;amp; Activity Logs" vertex="1">
+          <mxGeometry height="58" width="400" x="3560" y="3600" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s6_d5_num" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;labelBackgroundColor=#ffffff;" value="D5" vertex="1">
+          <mxGeometry height="58" width="60" x="3560" y="3600" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s6_recipients" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#000000;fillColor=#ffffff;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=8;labelBackgroundColor=#ffffff;" value="Notification Recipients&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Applicant / Recruitment Staff&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="240" x="4100" y="3400" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_s6_e1" edge="1" parent="1" source="l2_s6_events" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p61" value="Notification event">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s6_e2" edge="1" parent="1" source="l2_p61" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p62" value="Validated trigger">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s6_e3" edge="1" parent="1" source="l2_s6_d1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.35;entryY=0;entryDx=0;entryDy=0;" target="l2_p62" value="Account and contact data">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="-55" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s6_e4" edge="1" parent="1" source="l2_s6_d3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.2;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" target="l2_p62" value="Application recipient data">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="3280" y="2950" /><mxPoint x="3000" y="2950" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s6_e5" edge="1" parent="1" source="l2_p62" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p63" value="Recipient context">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s6_e6" edge="1" parent="1" source="l2_p63" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="l2_p64" value="Prepared content">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="90" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s6_e7" edge="1" parent="1" source="l2_p64" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.35;entryY=0;entryDx=0;entryDy=0;" target="l2_s6_email" value="Email request">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="3260" y="3560" /><mxPoint x="2825" y="3560" /></Array><mxPoint x="-70" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s6_e8" edge="1" parent="1" source="l2_s6_email" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.7;exitY=0;exitDx=0;exitDy=0;entryX=0.7;entryY=1;entryDx=0;entryDy=0;" target="l2_p64" value="Delivery result">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2930" y="3575" /><mxPoint x="3332" y="3575" /></Array><mxPoint x="70" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s6_e9" edge="1" parent="1" source="l2_p64" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="l2_s6_recipients" value="Email / in-app notification">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="3440" y="3410" /><mxPoint x="3440" y="3310" /><mxPoint x="4220" y="3310" /></Array><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s6_e10" edge="1" parent="1" source="l2_p64" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="l2_p65" value="Delivery outcome">
+          <mxGeometry relative="1" as="geometry"><mxPoint y="-18" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="l2_s6_e11" edge="1" parent="1" source="l2_p65" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#000000;endArrow=block;endFill=1;fontColor=#000000;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" target="l2_s6_d5" value="Notification / delivery record">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="85" as="offset" /></mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

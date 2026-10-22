@@ -10,6 +10,9 @@ unset($_SESSION['admin_role']);
 unset($_SESSION['admin_department']);
 unset($_SESSION['admin_profile_picture']);
 unset($_SESSION['password_change_required']);
+unset($_SESSION['nchire_chatbot_state_v2']);
+unset($_SESSION['nchire_chatbot_history']);
+unset($_SESSION['nchire_chatbot_context']);
 
 header('Location: ../public/index.php');
 exit;
