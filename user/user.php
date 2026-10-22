@@ -2701,7 +2701,7 @@ document.addEventListener('click', function(e) {
   }
 });
 
-if (searchInput) {
+if (searchInput && searchResults) {
   searchInput.addEventListener('input', function() {
 const searchTerm = this.value.toLowerCase();
 if (searchTerm.length > 0) {

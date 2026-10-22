@@ -53,6 +53,21 @@ while ($row = $autoIncrementTables->fetch_assoc()) {
 }
 $server->query('SET FOREIGN_KEY_CHECKS = 1');
 
+// Keep fixture files inside the web-accessible upload roots so download links work.
+$fixtureSource = __DIR__ . '/fixtures/valid-document.pdf';
+$fixtureTargets = [
+    dirname(__DIR__) . '/user/uploads/requirements/e2e',
+    dirname(__DIR__) . '/user/uploads/education_documents/e2e',
+];
+foreach ($fixtureTargets as $targetDir) {
+    if (!is_dir($targetDir) && !mkdir($targetDir, 0777, true) && !is_dir($targetDir)) {
+        throw new RuntimeException("Could not create fixture directory {$targetDir}.");
+    }
+    if (!copy($fixtureSource, $targetDir . '/valid-document.pdf')) {
+        throw new RuntimeException("Could not copy fixture into {$targetDir}.");
+    }
+}
+
 $server->begin_transaction();
 try {
     $adminInsert = $server->prepare(
@@ -91,7 +106,7 @@ try {
     $applicantInsert->close();
 
     $educationInsert = $server->prepare(
-        "INSERT INTO user_education (user_id, education_level, degree, field_of_study, institution, education_status, completed_units, year_completed, certificate_of_grades, proof_of_enrollment, start_year, end_year, gpa) VALUES (?, ?, ?, ?, 'Norzagaray College Test University', ?, ?, ?, '../tests/fixtures/valid-document.pdf', '../tests/fixtures/valid-document.pdf', 2024, ?, '1.25')"
+        "INSERT INTO user_education (user_id, education_level, degree, field_of_study, institution, education_status, completed_units, year_completed, certificate_of_grades, proof_of_enrollment, start_year, end_year, gpa) VALUES (?, ?, ?, ?, 'Norzagaray College Test University', ?, ?, ?, 'uploads/education_documents/e2e/valid-document.pdf', 'uploads/education_documents/e2e/valid-document.pdf', 2024, ?, '1.25')"
     );
     $educationRows = [
         [$applicantIds['applicant.e2e@example.test'], 'master', 'Master of Information Technology', 'Information Technology', 'ongoing', 17, null, 0],
@@ -206,7 +221,7 @@ try {
     $applicationLetterRequirement->close();
     if ($requirementId > 0) {
         $submission = $server->prepare(
-            "INSERT INTO applicant_requirement_submissions (application_id, requirement_id, file_path, original_filename, storage_area, version_number, is_active) VALUES (?, ?, 'tests/fixtures/valid-document.pdf', 'valid-document.pdf', 'requirements', 1, 1)"
+            "INSERT INTO applicant_requirement_submissions (application_id, requirement_id, file_path, original_filename, storage_area, version_number, is_active) VALUES (?, ?, 'e2e/valid-document.pdf', 'valid-document.pdf', 'requirements', 1, 1)"
         );
         $submission->bind_param('ii', $applicationIds[0], $requirementId);
         $submission->execute();
