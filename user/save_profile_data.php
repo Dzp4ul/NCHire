@@ -260,6 +260,11 @@ if (isset($_POST['saveEducation'])) {
         exit();
     }
 
+    if (!empty($ed_ey) && (int)$ed_ey < (int)$ed_sy) {
+        echo json_encode(['success' => false, 'message' => 'End year cannot be earlier than start year.']);
+        exit();
+    }
+
     $response_data = [
         'degree' => $ed_degree,
         'field_of_study' => $ed_fs,
@@ -416,6 +421,11 @@ if (isset($_POST['saveExperience'])) {
     
     if (empty($job_title) || empty($work_comp) || empty($start_date)) {
         echo json_encode(['success' => false, 'message' => 'Please fill in all required fields']);
+        exit();
+    }
+
+    if ($end_date && $end_date < $start_date) {
+        echo json_encode(['success' => false, 'message' => 'End date cannot be earlier than start date.']);
         exit();
     }
     

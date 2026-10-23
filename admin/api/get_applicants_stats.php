@@ -82,9 +82,9 @@ try {
         // Total Applicants
         $sql = "SELECT COUNT(*) as count 
                 FROM job_applicants 
-                WHERE workflow_stage IN ('department_head_review', 'interview_scheduled', 'interview_completed',
+                WHERE workflow_stage IN ('department_head_review', 'waiting_interview_schedule', 'interview_scheduled', 'interview_completed',
                                         'demo_scheduled', 'demo_completed', 'psych_scheduled', 'psych_completed',
-                                        'initially_hired', 'permanently_hired', 'hired')
+                                        'initially_hired', 'permanently_hired', 'hired', 'passed')
                 AND assigned_to_department IN (:department, :department_alias)";
         $stmt = $pdo->prepare($sql);
         $stmt->bindValue(':department', $admin_department);

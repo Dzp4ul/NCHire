@@ -475,7 +475,7 @@ window.alert = function(message) { showToast(message, 'info'); };
 </div>
 
 <!-- Mobile Menu Button -->
-<button id="mobileMenuBtn" class="lg:hidden text-white focus:outline-none">
+<button id="mobileMenuBtn" class="lg:hidden text-white focus:outline-none" aria-label="Open menu">
 <i class="ri-menu-line text-2xl"></i>
 </button>
 </div>
@@ -490,7 +490,7 @@ window.alert = function(message) { showToast(message, 'info'); };
 <!-- Close Button -->
 <div class="flex items-center justify-between p-4 border-b border-blue-700">
 <span class="text-xl font-bold">Menu</span>
-<button id="closeMobileMenu" class="text-white focus:outline-none">
+<button id="closeMobileMenu" class="text-white focus:outline-none" aria-label="Close menu">
 <i class="ri-close-line text-2xl"></i>
 </button>
 </div>
@@ -1669,7 +1669,7 @@ At NCHire, we connect talented individuals with top employers to help you take t
 <!-- Jobs Carousel -->
 <div id="jobsCarousel" class="hidden relative px-12 md:px-16 lg:px-20">
 <!-- Left Arrow -->
-<button id="carouselPrev" class="carousel-arrow-left absolute left-0 md:left-2 top-1/2 -translate-y-1/2 z-20 bg-primary shadow-2xl rounded-full p-2 md:p-3 hover:bg-secondary hover:scale-110 transition-all duration-300 group disabled:opacity-30 disabled:cursor-not-allowed">
+<button id="carouselPrev" class="carousel-arrow-left absolute left-0 md:left-2 top-1/2 -translate-y-1/2 z-20 bg-primary shadow-2xl rounded-full p-2 md:p-3 hover:bg-secondary hover:scale-110 transition-all duration-300 group disabled:opacity-30 disabled:cursor-not-allowed" aria-label="Previous featured opportunity">
 <i class="ri-arrow-left-s-line text-xl md:text-2xl text-white"></i>
 </button>
 
@@ -1681,7 +1681,7 @@ At NCHire, we connect talented individuals with top employers to help you take t
 </div>
 
 <!-- Right Arrow -->
-<button id="carouselNext" class="carousel-arrow-right absolute right-0 md:right-2 top-1/2 -translate-y-1/2 z-20 bg-primary shadow-2xl rounded-full p-2 md:p-3 hover:bg-secondary hover:scale-110 transition-all duration-300 group disabled:opacity-30 disabled:cursor-not-allowed">
+<button id="carouselNext" class="carousel-arrow-right absolute right-0 md:right-2 top-1/2 -translate-y-1/2 z-20 bg-primary shadow-2xl rounded-full p-2 md:p-3 hover:bg-secondary hover:scale-110 transition-all duration-300 group disabled:opacity-30 disabled:cursor-not-allowed" aria-label="Next featured opportunity">
 <i class="ri-arrow-right-s-line text-xl md:text-2xl text-white"></i>
 </button>
 
@@ -1811,6 +1811,8 @@ function renderIndicators() {
     
     for (let i = 0; i < totalSlides; i++) {
         const dot = document.createElement('button');
+        dot.type = 'button';
+        dot.setAttribute('aria-label', `Go to slide ${i + 1}`);
         dot.className = `w-3 h-3 rounded-full transition-all duration-300 ${i === 0 ? 'bg-primary w-8' : 'bg-gray-300'}`;
         dot.onclick = () => goToSlide(i);
         indicators.appendChild(dot);

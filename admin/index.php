@@ -607,8 +607,8 @@ $recent_activity = $conn->query($recent_activity_query);
                      alt="NCHire Logo" class="w-8 h-8 object-contain">
                 <div><span class="text-xl font-bold text-primary">NCHire</span><small><?php echo htmlspecialchars($admin_role_display); ?> workspace</small></div>
             </div>
-            <button id="closeSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
-                <i class="fas fa-times text-xl"></i>
+            <button id="closeSidebar" class="lg:hidden text-gray-500 hover:text-gray-700" aria-label="Close navigation">
+                <i class="fas fa-times text-xl" aria-hidden="true"></i>
             </button>
         </div>
 
@@ -650,16 +650,16 @@ $recent_activity = $conn->query($recent_activity_query);
         <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
             <div class="flex items-center justify-between h-16 px-6">
                 <div class="flex items-center gap-4">
-                    <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
-                        <i class="fas fa-bars text-xl"></i>
+                    <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700" aria-label="Open navigation">
+                        <i class="fas fa-bars text-xl" aria-hidden="true"></i>
                     </button>
                     <span class="lg:hidden text-sm font-semibold text-primary">NCHire Admin</span>
                 </div>
                 
                 <div class="flex items-center gap-4">
                     <div class="relative">
-                        <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100 transition-colors">
-                            <i class="fas fa-bell text-xl"></i>
+                        <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100 transition-colors" aria-label="Open notifications">
+                            <i class="fas fa-bell text-xl" aria-hidden="true"></i>
                             <span id="notificationBadge" class="hidden absolute top-0 right-0 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center font-semibold">0</span>
                         </button>
                         
@@ -1246,7 +1246,7 @@ $recent_activity = $conn->query($recent_activity_query);
                             <label for="jobStatusFilter">Status</label>
                             <select id="jobStatusFilter" onchange="filterJobs()" 
                                     class="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                <option value="all">All Status</option>
+                                <option value="all">All Statuses</option>
                                 <option value="active">Active</option>
                                 <option value="closed">Closed</option>
                             </select>
@@ -1324,7 +1324,7 @@ $recent_activity = $conn->query($recent_activity_query);
                     <div class="ui-filter-bar__controls ui-filter-bar__controls--four">
                         <!-- Search by Name -->
                         <div>
-                            <label for="nameSearch">Search Applicant</label>
+                            <label for="nameSearch">Search applicants</label>
                             <input type="text" id="nameSearch" placeholder="Search by name..." 
                                    oninput="applyAllFilters()"
                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
@@ -1667,7 +1667,7 @@ $recent_activity = $conn->query($recent_activity_query);
                             <label for="archiveStatusFilter">Archive status</label>
                             <select id="archiveStatusFilter" onchange="filterArchiveByStatus(this.value)" 
                                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                <option value="all">All Status</option>
+                                <option value="all">All Statuses</option>
                                 <option value="rejected">Rejected Only</option>
                                 <option value="cancelled">Cancelled Only</option>
                             </select>
@@ -1754,7 +1754,7 @@ $recent_activity = $conn->query($recent_activity_query);
                             <select id="userStatusFilter" 
                                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                                     onchange="filterUsers()">
-                                <option value="">All Status</option>
+                                <option value="">All Statuses</option>
                                 <option value="Active">Active</option>
                                 <option value="Inactive">Inactive</option>
                             </select>
@@ -1943,7 +1943,7 @@ $recent_activity = $conn->query($recent_activity_query);
                         <div class="mb-4 border-b border-gray-200 pb-3"><h3 class="font-semibold text-gray-900">Basic Information</h3></div>
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <div><label class="block text-sm font-medium text-gray-700 mb-1">Employment Type</label><select name="type" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary"><option value="Full-time">Full-time</option><option value="Part-time">Part-time</option></select></div>
-                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Application Deadline</label><input type="date" name="deadline" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary"></div>
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Application Deadline</label><input type="date" name="deadline" min="<?php echo date('Y-m-d'); ?>" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary"></div>
                             <div><label class="block text-sm font-medium text-gray-700 mb-1">Academic Year</label><input type="text" name="academic_year" value="<?php echo htmlspecialchars(nc_current_academic_year()); ?>" pattern="\d{4}-\d{4}" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary" placeholder="2026-2027"></div>
                             <div><label class="block text-sm font-medium text-gray-700 mb-1">Semester</label><select name="semester" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary"><option value="First Semester" <?php echo nc_current_semester() === 'First Semester' ? 'selected' : ''; ?>>First Semester</option><option value="Second Semester" <?php echo nc_current_semester() === 'Second Semester' ? 'selected' : ''; ?>>Second Semester</option><option value="Summer">Summer</option></select></div>
                             <div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Department</label><select name="department" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary"><option value="">Select department</option><option value="Computing Studies">Computing Studies</option><option value="Hospitality Management">Hospitality Management</option><option value="Education">Education</option></select></div>
@@ -2734,8 +2734,8 @@ $recent_activity = $conn->query($recent_activity_query);
             <div class="p-6 border-b border-gray-200">
                 <div class="flex justify-between items-center">
                     <h2 class="text-xl font-semibold text-gray-900">Create New Admin User</h2>
-                    <button onclick="closeCreateUserModal()" class="text-gray-400 hover:text-gray-600">
-                        <i class="fas fa-times text-xl"></i>
+                    <button onclick="closeCreateUserModal()" class="text-gray-400 hover:text-gray-600" aria-label="Close create user dialog">
+                        <i class="fas fa-times text-xl" aria-hidden="true"></i>
                     </button>
                 </div>
             </div>
@@ -2856,8 +2856,8 @@ $recent_activity = $conn->query($recent_activity_query);
             <div class="p-6 border-b border-gray-200">
                 <div class="flex justify-between items-center">
                     <h2 class="text-xl font-semibold text-gray-900">Edit Admin User</h2>
-                    <button onclick="closeEditUserModal()" class="text-gray-400 hover:text-gray-600">
-                        <i class="fas fa-times text-xl"></i>
+                    <button onclick="closeEditUserModal()" class="text-gray-400 hover:text-gray-600" aria-label="Close edit user dialog">
+                        <i class="fas fa-times text-xl" aria-hidden="true"></i>
                     </button>
                 </div>
             </div>
@@ -2908,8 +2908,8 @@ $recent_activity = $conn->query($recent_activity_query);
                                        class="w-full border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                                        placeholder="Leave blank to keep current">
                                 <button type="button" onclick="togglePasswordVisibility('editUserPassword', 'editPasswordIcon')" 
-                                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700">
-                                    <i id="editPasswordIcon" class="fas fa-eye"></i>
+                                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700" aria-label="Show or hide password">
+                                    <i id="editPasswordIcon" class="fas fa-eye" aria-hidden="true"></i>
                                 </button>
                             </div>
                         </div>
@@ -2986,8 +2986,8 @@ $recent_activity = $conn->query($recent_activity_query);
             <div class="p-6 border-b border-gray-200">
                 <div class="flex justify-between items-center">
                     <h2 class="text-xl font-semibold text-gray-900">My Profile</h2>
-                    <button onclick="closeMyProfileModal()" class="text-gray-400 hover:text-gray-600">
-                        <i class="fas fa-times text-xl"></i>
+                    <button onclick="closeMyProfileModal()" class="text-gray-400 hover:text-gray-600" aria-label="Close profile dialog">
+                        <i class="fas fa-times text-xl" aria-hidden="true"></i>
                     </button>
                 </div>
             </div>
@@ -3043,8 +3043,8 @@ $recent_activity = $conn->query($recent_activity_query);
                                        class="w-full border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                                        placeholder="Leave blank to keep current">
                                 <button type="button" onclick="togglePasswordVisibility('myProfilePassword', 'myProfilePasswordIcon')" 
-                                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700">
-                                    <i id="myProfilePasswordIcon" class="fas fa-eye"></i>
+                                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700" aria-label="Show or hide password">
+                                    <i id="myProfilePasswordIcon" class="fas fa-eye" aria-hidden="true"></i>
                                 </button>
                             </div>
                         </div>
@@ -3680,8 +3680,8 @@ $recent_activity = $conn->query($recent_activity_query);
         <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-semibold text-gray-900">Reschedule Demo Teaching</h3>
-                <button onclick="closeRescheduleDemoModal()" class="text-gray-400 hover:text-gray-600">
-                    <i class="fas fa-times"></i>
+                <button onclick="closeRescheduleDemoModal()" class="text-gray-400 hover:text-gray-600" aria-label="Close reschedule demo dialog">
+                    <i class="fas fa-times" aria-hidden="true"></i>
                 </button>
             </div>
             
@@ -3749,8 +3749,8 @@ $recent_activity = $conn->query($recent_activity_query);
         <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-semibold text-gray-900">Request Resubmission</h3>
-                <button onclick="closeResubmitModal()" class="text-gray-400 hover:text-gray-600">
-                    <i class="fas fa-times"></i>
+                <button onclick="closeResubmitModal()" class="text-gray-400 hover:text-gray-600" aria-label="Close resubmission dialog">
+                    <i class="fas fa-times" aria-hidden="true"></i>
                 </button>
             </div>
             
@@ -3868,8 +3868,8 @@ $recent_activity = $conn->query($recent_activity_query);
         <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-semibold text-gray-900">Transfer to Dean</h3>
-                <button onclick="closeTransferModal()" class="text-gray-400 hover:text-gray-600">
-                    <i class="fas fa-times"></i>
+                <button onclick="closeTransferModal()" class="text-gray-400 hover:text-gray-600" aria-label="Close transfer dialog">
+                    <i class="fas fa-times" aria-hidden="true"></i>
                 </button>
             </div>
             
@@ -3918,8 +3918,8 @@ $recent_activity = $conn->query($recent_activity_query);
         <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-semibold text-gray-900">Mark Application Passed</h3>
-                <button onclick="closeHireModal()" class="text-gray-400 hover:text-gray-600">
-                    <i class="fas fa-times"></i>
+                <button onclick="closeHireModal()" class="text-gray-400 hover:text-gray-600" aria-label="Close mark passed dialog">
+                    <i class="fas fa-times" aria-hidden="true"></i>
                 </button>
             </div>
             
@@ -4179,8 +4179,8 @@ $recent_activity = $conn->query($recent_activity_query);
                         <h2 class="text-2xl font-bold">Edit Teaching Load</h2>
                         <p class="text-blue-100 text-sm mt-1">Update teaching load information and requirements</p>
                     </div>
-                    <button onclick="closeNewEditJobModal()" class="text-white hover:text-gray-200 transition-colors">
-                        <i class="fas fa-times text-2xl"></i>
+                    <button onclick="closeNewEditJobModal()" class="text-white hover:text-gray-200 transition-colors" aria-label="Close teaching load dialog">
+                        <i class="fas fa-times text-2xl" aria-hidden="true"></i>
                     </button>
                 </div>
             </div>
@@ -4433,8 +4433,8 @@ $recent_activity = $conn->query($recent_activity_query);
                         <h2 class="text-2xl font-bold">Edit Secretary Position</h2>
                         <p class="text-blue-100 text-sm mt-1">Update secretary job information and requirements</p>
                     </div>
-                    <button onclick="closeSecretaryEditModal()" class="text-white hover:text-gray-200 transition-colors">
-                        <i class="fas fa-times text-2xl"></i>
+                    <button onclick="closeSecretaryEditModal()" class="text-white hover:text-gray-200 transition-colors" aria-label="Close secretary position dialog">
+                        <i class="fas fa-times text-2xl" aria-hidden="true"></i>
                     </button>
                 </div>
             </div>
@@ -4594,8 +4594,8 @@ $recent_activity = $conn->query($recent_activity_query);
         <div class="p-6 border-b border-gray-200">
             <div class="flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-gray-900">More Filters</h3>
-                <button onclick="closeMoreFiltersModal()" class="text-gray-400 hover:text-gray-600">
-                    <i class="fas fa-times"></i>
+                <button onclick="closeMoreFiltersModal()" class="text-gray-400 hover:text-gray-600" aria-label="Close filters dialog">
+                    <i class="fas fa-times" aria-hidden="true"></i>
                 </button>
             </div>
         </div>
