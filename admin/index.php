@@ -2734,7 +2734,7 @@ $recent_activity = $conn->query($recent_activity_query);
             <div class="p-6 border-b border-gray-200">
                 <div class="flex justify-between items-center">
                     <h2 class="text-xl font-semibold text-gray-900">Create New Admin User</h2>
-                    <button onclick="closeCreateUserModal()" class="text-gray-400 hover:text-gray-600" aria-label="Close create user dialog">
+                    <button onclick="closeCreateUserModal()" class="text-gray-400 hover:text-gray-600" aria-label="Close new user form">
                         <i class="fas fa-times text-xl" aria-hidden="true"></i>
                     </button>
                 </div>
