@@ -3253,8 +3253,8 @@ function getStatusBadge(status) {
     
     switch(status) {
         case 'Submitted':
-            colorClass = 'bg-green-100 text-green-800';
-            icon = '<i class="fas fa-check-circle mr-1"></i>';
+            colorClass = 'bg-blue-100 text-blue-800';
+            icon = '<i class="fas fa-paper-plane mr-1"></i>';
             break;
         case 'Pending':
             colorClass = 'bg-yellow-100 text-yellow-800';
@@ -5290,7 +5290,7 @@ function displayFilteredApplicants() {
             </td>
             <td class="px-6 py-4">
                 <button onclick="event.stopPropagation(); viewApplicantDetails(${applicant.id})" 
-                        class="text-blue-600 hover:text-blue-800 font-medium text-sm">
+                        class="ui-link-action whitespace-nowrap">
                     View Details
                 </button>
             </td>

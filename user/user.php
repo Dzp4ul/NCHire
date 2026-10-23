@@ -1941,8 +1941,8 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
         <div class="p-6">
             <div class="flex items-center justify-between mb-8">
                 <h2 class="text-xl font-bold text-gray-900">Menu</h2>
-                <button id="closeMobileMenu" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                    <i class="ri-close-line text-2xl text-gray-600"></i>
+                <button id="closeMobileMenu" class="p-2 hover:bg-gray-100 rounded-lg transition-colors" aria-label="Close menu">
+                    <i class="ri-close-line text-2xl text-gray-600" aria-hidden="true"></i>
                 </button>
             </div>
             <nav class="space-y-4">
@@ -2098,7 +2098,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
     <!-- Pagination controls -->
     <div class="flex items-center space-x-2">
         <!-- Previous button -->
-        <button id="prevPageBtn" class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+        <button id="prevPageBtn" class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Previous page" disabled>
             <i class="ri-arrow-left-line"></i>
         </button>
         
@@ -2108,7 +2108,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
         </div>
         
         <!-- Next button -->
-        <button id="nextPageBtn" class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+        <button id="nextPageBtn" class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Next page" disabled>
             <i class="ri-arrow-right-line"></i>
         </button>
     </div>
@@ -2628,7 +2628,7 @@ $profile_picture = $user_profile_data['profile_picture'] ?? '';
 <h2 id="modalTitle" class="text-2xl font-bold text-gray-900 mb-2"></h2>
 <div id="modalMeta" class="flex items-center text-sm text-gray-600 space-x-4"></div>
 </div>
-<button id="closeModal" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600">
+<button id="closeModal" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600" aria-label="Close dialog">
 <i class="ri-close-line text-xl"></i>
 </button>
 </div>
