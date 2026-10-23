@@ -145,7 +145,7 @@ switch ($method) {
         $temporaryPassword = str_shuffle($temporaryPassword);
         
         // Hash the temporary password
-        $hashed_password = password_hash($temporaryPassword, PASSWORD_DEFAULT);
+        $hashed_password = password_hash($temporaryPassword, PASSWORD_BCRYPT);
         
         // Insert new user with password_change_required = 1
         $stmt = $conn->prepare("INSERT INTO admin_users (full_name, email, password, password_change_required, role, department, phone, profile_picture, status) 
@@ -407,7 +407,7 @@ switch ($method) {
         }
         if (isset($input['password']) && !empty($input['password'])) {
             $updates[] = "password = ?";
-            $params[] = password_hash($input['password'], PASSWORD_DEFAULT);
+            $params[] = password_hash($input['password'], PASSWORD_BCRYPT);
             $types .= "s";
         }
         

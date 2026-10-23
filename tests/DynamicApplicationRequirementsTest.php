@@ -53,7 +53,7 @@ try {
     requirementCheck($requirementsB[0]['input_name'] === 'license' && $requirementsB[0]['legacy_document_type'] === 'professional_license', '2a predefined create-form requirements retain legacy upload compatibility');
 
     $email = 'dynamic-requirement-' . bin2hex(random_bytes(5)) . '@example.invalid';
-    $password = password_hash('test-only', PASSWORD_DEFAULT);
+    $password = password_hash('test-only', PASSWORD_BCRYPT);
     $applicant = $conn->prepare("INSERT INTO applicants (first_name, last_name, applicant_email, applicant_password, is_verified) VALUES ('Dynamic', 'Test', ?, ?, 1)");
     $applicant->bind_param('ss', $email, $password);
     $applicant->execute();

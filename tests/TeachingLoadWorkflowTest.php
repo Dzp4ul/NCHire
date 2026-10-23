@@ -51,7 +51,7 @@ try {
 
     $unique = bin2hex(random_bytes(6));
     $email = "teaching-load-test-{$unique}@example.invalid";
-    $password = password_hash('test-only-password', PASSWORD_DEFAULT);
+    $password = password_hash('test-only-password', PASSWORD_BCRYPT);
     $userStmt = $conn->prepare("INSERT INTO applicants (first_name, last_name, applicant_email, applicant_password, is_verified) VALUES ('Teaching', 'Load Test', ?, ?, 1)");
     $userStmt->bind_param('ss', $email, $password);
     if (!$userStmt->execute()) {

@@ -73,7 +73,7 @@ try {
     $adminInsert = $server->prepare(
         'INSERT INTO admin_users (full_name, email, password, password_change_required, role, department, status) VALUES (?, ?, ?, 0, ?, ?, ?)'
     );
-    $adminPassword = password_hash('AdminPass1!', PASSWORD_DEFAULT);
+    $adminPassword = password_hash('AdminPass1!', PASSWORD_BCRYPT);
     $accounts = [
         ['E2E Administrator', 'admin.e2e@example.test', $adminPassword, 'Admin', 'Administration', 'Active'],
         ['E2E Secretary', 'secretary.e2e@example.test', $adminPassword, 'Secretary', 'Registrar', 'Active'],
@@ -91,7 +91,7 @@ try {
     $applicantInsert = $server->prepare(
         'INSERT INTO applicants (first_name, last_name, applicant_email, applicant_password, is_verified, contact_number, address, password_change_required) VALUES (?, ?, ?, ?, 1, ?, ?, 0)'
     );
-    $applicantPassword = password_hash('ApplicantPass1!', PASSWORD_DEFAULT);
+    $applicantPassword = password_hash('ApplicantPass1!', PASSWORD_BCRYPT);
     $applicants = [
         ['Avery', 'Applicant', 'applicant.e2e@example.test', $applicantPassword, '09170000001', 'Norzagaray, Bulacan'],
         ['Casey', 'Pipeline', 'pipeline.e2e@example.test', $applicantPassword, '09170000002', 'Norzagaray, Bulacan'],

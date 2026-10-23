@@ -57,7 +57,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['verification_code']))
             $is_verified = 1;
             $storedPassword = (string)$pending_signup['password'];
             if (($passwordInfo = password_get_info($storedPassword)) && ($passwordInfo['algoName'] ?? 'unknown') === 'unknown') {
-                $storedPassword = password_hash($storedPassword, PASSWORD_DEFAULT);
+                $storedPassword = password_hash($storedPassword, PASSWORD_BCRYPT);
             }
             $stmt = $conn->prepare("INSERT INTO applicants (first_name, last_name, applicant_email, applicant_password, is_verified) VALUES (?, ?, ?, ?, ?)");
             $stmt->bind_param("ssssi", 

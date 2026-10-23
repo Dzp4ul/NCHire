@@ -821,7 +821,7 @@ if (isset($_POST['updatePassword'])) {
     
     // Update password in database
     error_log("Updating password in database...");
-    $new_password_hash = password_hash($new_password, PASSWORD_DEFAULT);
+    $new_password_hash = password_hash($new_password, PASSWORD_BCRYPT);
     $update_sql = "UPDATE applicants SET applicant_password = ?, password_change_required = 0 WHERE id = ?";
     $update_stmt = $conn->prepare($update_sql);
     $update_stmt->bind_param("si", $new_password_hash, $user_id);

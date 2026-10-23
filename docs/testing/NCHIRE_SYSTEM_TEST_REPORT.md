@@ -161,7 +161,7 @@ The following findings were addressed after this report was captured:
 | SEC-01 | Fixed | Diagnostic session-creation endpoints now return 404; the unauthenticated debug panel was removed. |
 | SEC-02 | Fixed | Non-admin staff cannot change `role`, `department`, `status`, or `password` through the users API. |
 | SEC-03 | Code fixed | SMTP credentials were removed from tracked source and are read from `NCHIRE_SMTP_*` environment variables. The leaked credential must still be rotated in the mail provider. |
-| SEC-04 | Fixed | Applicant passwords are stored with `password_hash`; legacy plaintext credentials upgrade automatically on the next successful login. Password/code logging was removed. |
+| SEC-04 | Fixed | Applicant passwords are stored with bcrypt (`PASSWORD_BCRYPT`); legacy plaintext credentials upgrade automatically on the next successful login. Password/code logging was removed. |
 | SEC-05 | Fixed | Admin and applicant logins call `session_regenerate_id(true)`. |
 | SEC-06 | Fixed for applicant mutations | CSRF validation now covers profile, cancellation, attachment, psych-receipt, draft, notification, and password-change requests. |
 | DATA-01 | Fixed at application layer | Duplicate active applications to the same teaching load are rejected. Existing seed duplicates prevent adding a blanket unique index without a data migration. |

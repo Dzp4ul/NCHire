@@ -94,12 +94,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email'])) {
     // Update database based on user type
     if ($table === 'admin_users') {
         // Admin users use hashed passwords
-        $hashed_password = password_hash($temporaryPassword, PASSWORD_DEFAULT);
+        $hashed_password = password_hash($temporaryPassword, PASSWORD_BCRYPT);
         $stmt = $conn->prepare("UPDATE admin_users SET password = ?, password_change_required = 1 WHERE id = ?");
         $stmt->bind_param("si", $hashed_password, $user_id);
     } else {
         // Applicant passwords are stored using password_hash.
-        $hashed_password = password_hash($temporaryPassword, PASSWORD_DEFAULT);
+        $hashed_password = password_hash($temporaryPassword, PASSWORD_BCRYPT);
         $stmt = $conn->prepare("UPDATE applicants SET applicant_password = ?, password_change_required = 1 WHERE id = ?");
         $stmt->bind_param("si", $hashed_password, $user_id);
     }

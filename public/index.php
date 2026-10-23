@@ -90,8 +90,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login_submit'])) {
             && $storedPassword !== ''
             && hash_equals($storedPassword, $password);
         if (password_verify($password, $storedPassword) || $legacyPlaintextMatch) {
-            if ($legacyPlaintextMatch || password_needs_rehash($storedPassword, PASSWORD_DEFAULT)) {
-                $rehash = password_hash($password, PASSWORD_DEFAULT);
+            if ($legacyPlaintextMatch || password_needs_rehash($storedPassword, PASSWORD_BCRYPT)) {
+                $rehash = password_hash($password, PASSWORD_BCRYPT);
                 $rehashStmt = $conn->prepare("UPDATE applicants SET applicant_password = ? WHERE id = ?");
                 if ($rehashStmt) {
                     $rehashStmt->bind_param("si", $rehash, $row['id']);
@@ -205,7 +205,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['signup_submit'])) {
                 'first_name' => $signup_firstname,
                 'last_name' => $signup_lastname,
                 'email' => $signup_email,
-                'password' => password_hash($signup_password, PASSWORD_DEFAULT),
+                'password' => password_hash($signup_password, PASSWORD_BCRYPT),
                 'verification_code' => $verification_code
             ];
 

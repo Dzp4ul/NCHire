@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Passwords do not match.';
     } else {
         // Hash the new password
-        $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+        $hashed_password = password_hash($new_password, PASSWORD_BCRYPT);
         
         // Update password and set password_change_required to 0
         $stmt = $conn->prepare("UPDATE admin_users SET password = ?, password_change_required = 0 WHERE id = ?");

@@ -139,7 +139,7 @@ Complete "forgot password" system that sends temporary passwords via email and f
 ## Security Features
 
 ### Password Handling
-- **Admin Users:** Passwords hashed with `password_hash()` (PHP bcrypt)
+- **Admin Users:** Passwords hashed with bcrypt (`PASSWORD_BCRYPT`)
 - **Applicants:** Plain text (as per current system architecture)
 - **Temporary Password:** 10 characters (letters, numbers, special chars)
 
@@ -275,7 +275,7 @@ $temporaryPassword = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM
 
 ### Update Admin User
 ```php
-$hashed_password = password_hash($temporaryPassword, PASSWORD_DEFAULT);
+$hashed_password = password_hash($temporaryPassword, PASSWORD_BCRYPT);
 $stmt = $conn->prepare("UPDATE admin_users SET password = ?, password_change_required = 1 WHERE id = ?");
 $stmt->bind_param("si", $hashed_password, $user_id);
 ```

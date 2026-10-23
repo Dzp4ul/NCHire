@@ -26,7 +26,7 @@ if (!nc_table_exists($conn, 'application_document_versions')) {
 $conn->begin_transaction();
 try {
     $email = 'document-test-' . bin2hex(random_bytes(5)) . '@example.invalid';
-    $password = password_hash('test-only', PASSWORD_DEFAULT);
+    $password = password_hash('test-only', PASSWORD_BCRYPT);
     $stmt = $conn->prepare("INSERT INTO applicants (first_name, last_name, applicant_email, applicant_password, is_verified) VALUES ('Document', 'Test', ?, ?, 1)");
     $stmt->bind_param('ss', $email, $password);
     $stmt->execute();

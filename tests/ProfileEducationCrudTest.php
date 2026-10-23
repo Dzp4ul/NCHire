@@ -74,7 +74,7 @@ function profile_education_payload(array $overrides = []): array
 
 try {
     $email = 'salary-crud-' . bin2hex(random_bytes(8)) . '@example.invalid';
-    $password = password_hash('test-only-password', PASSWORD_DEFAULT);
+    $password = password_hash('test-only-password', PASSWORD_BCRYPT);
     $user = $conn->prepare("INSERT INTO applicants (first_name, last_name, applicant_email, applicant_password, is_verified) VALUES ('Salary', 'CRUD Test', ?, ?, 1)");
     $user->bind_param('ss', $email, $password);
     if (!$user->execute()) {

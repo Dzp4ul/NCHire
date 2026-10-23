@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Passwords do not match.';
     } else {
         // Update password and set password_change_required to 0
-        $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+        $hashed_password = password_hash($new_password, PASSWORD_BCRYPT);
         $stmt = $conn->prepare("UPDATE applicants SET applicant_password = ?, password_change_required = 0 WHERE id = ?");
         $stmt->bind_param("si", $hashed_password, $_SESSION['user_id']);
         
