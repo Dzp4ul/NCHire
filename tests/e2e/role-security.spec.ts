@@ -104,6 +104,45 @@ test.describe('authorization, session, and route security', () => {
     await expect(response.json()).resolves.toMatchObject({ success: false });
   });
 
+  test('authorized staff can view archived applicant details without crossing department scope', async ({ page }) => {
+    await login(page, accounts.secretary);
+    const archiveResponse = await page.request.get('admin/get_archive.php');
+    expect(archiveResponse.status()).toBe(200);
+    const archive = await archiveResponse.json();
+    const cancelled = archive.find((application: Record<string, unknown>) =>
+      application.workflow_stage === 'cancelled' && application.assigned_to_department === 'Computing Studies'
+    );
+    expect(cancelled).toBeTruthy();
+    const cancelledId = Number(cancelled.id);
+
+    let detailsResponse = await page.request.get(`admin/view_applicant.php?id=${cancelledId}`);
+    expect(detailsResponse.status()).toBe(200);
+    await expect(detailsResponse.json()).resolves.toMatchObject({
+      success: true,
+      applicant: { id: cancelledId, workflow_stage: 'cancelled' },
+    });
+
+    await login(page, accounts.deanCs);
+    detailsResponse = await page.request.get(`admin/view_applicant.php?id=${cancelledId}`);
+    expect(detailsResponse.status()).toBe(200);
+    await expect(detailsResponse.json()).resolves.toMatchObject({
+      success: true,
+      applicant: { id: cancelledId, workflow_stage: 'cancelled' },
+    });
+
+    await page.getByRole('button', { name: 'Archive' }).click();
+    const archivedRow = page.locator('#archiveTableBody tr').filter({ hasText: 'Riley Restricted' }).first();
+    await expect(archivedRow).toBeVisible();
+    await archivedRow.getByRole('button', { name: 'View Details' }).click();
+    await expect(page.locator('#applicantDetailsSection')).toBeVisible();
+    await expect(page.locator('#applicantReviewName')).toContainText('Riley Restricted');
+
+    await login(page, accounts.deanEducation);
+    detailsResponse = await page.request.get(`admin/view_applicant.php?id=${cancelledId}`);
+    expect(detailsResponse.status()).toBe(403);
+    await expect(detailsResponse.json()).resolves.toMatchObject({ success: false });
+  });
+
   test('non-admin staff cannot create or delete staff accounts', async ({ page }) => {
     await login(page, accounts.secretary);
     const token = await csrfToken(page);

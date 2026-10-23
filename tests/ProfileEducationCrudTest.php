@@ -108,7 +108,7 @@ try {
             'applicant_fname' => 'Updated',
             'applicant_lname' => 'Applicant',
             'applicant_email' => $email,
-            'applicant_num' => '09171234567',
+            'applicant_num' => '+639171234567',
             'applicant_address' => 'Test Address',
         ]
     );
@@ -122,7 +122,7 @@ try {
         && ($syncedApplication['applicant_name'] ?? '') === 'Updated'
         && ($syncedApplication['full_name'] ?? '') === 'Updated Applicant'
         && ($syncedApplication['applicant_email'] ?? '') === $email
-        && ($syncedApplication['contact_num'] ?? '') === '09171234567',
+        && ($syncedApplication['contact_num'] ?? '') === '+639171234567',
         'editing account identity synchronizes previously submitted applications'
     );
 

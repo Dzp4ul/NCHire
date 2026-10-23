@@ -346,9 +346,9 @@ if (isset($_POST['savePersonal'])) {
     
     // Validate phone number format if provided
     if (!empty($phone)) {
-        if (!preg_match('/^09[0-9]{9}$/', $phone)) {
+        if (!preg_match('/^\+639[0-9]{9}$/', $phone)) {
             error_log("ERROR: Invalid phone number format");
-            echo json_encode(['success' => false, 'message' => 'Invalid phone number format. Please use Philippine mobile format (e.g., 09123456789)']);
+            echo json_encode(['success' => false, 'message' => 'Enter a valid Philippine mobile number in the format +639XXXXXXXXX (e.g., +639356389098).']);
             exit();
         }
     }

@@ -2712,11 +2712,12 @@ $recent_activity = $conn->query($recent_activity_query);
 
 <div id="deleteJobModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
   <div class="bg-white p-6 rounded-lg shadow-lg w-1/3">
-    <h2 class="text-xl font-bold mb-4">Delete Job</h2>
+    <h2 class="text-xl font-bold mb-4">Delete Teaching Load</h2>
     <p>Are you sure you want to delete <span class="job-title font-semibold"></span>?</p>
+    <p class="delete-job-impact mt-3 text-sm text-gray-600">This action cannot be undone.</p>
     <div class="mt-4 flex justify-end gap-2">
       <button onclick="cancelDeleteJob()" class="bg-gray-300 px-4 py-2 rounded">Cancel</button>
-      <button onclick="confirmDeleteJob()" class="bg-red-500 text-white px-4 py-2 rounded">Delete</button>
+      <button id="confirmDeleteJobBtn" onclick="confirmDeleteJob()" class="bg-red-500 text-white px-4 py-2 rounded disabled:cursor-not-allowed disabled:opacity-50">Delete</button>
     </div>
   </div>
 </div>

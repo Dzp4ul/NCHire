@@ -85,15 +85,22 @@ unset(
 $role = $_SESSION['admin_role'] ?? '';
 $department = $_SESSION['admin_department'] ?? '';
 $departmentAlias = $department === 'Computing Studies' ? 'Computer Science' : ($department === 'Computer Science' ? 'Computing Studies' : $department);
+$workflowStage = strtolower((string)($applicant['workflow_stage'] ?? ''));
+$applicationStatus = strtolower((string)($applicant['status'] ?? ''));
+$isArchived = in_array($workflowStage, ['rejected', 'cancelled'], true);
+$isInAssignedDepartment = in_array($applicant['assigned_to_department'], [$department, $departmentAlias], true);
 $authorized = false;
 if ($role === 'Secretary') {
     $secretaryId = (int)($_SESSION['admin_id'] ?? 0);
-    $authorized = $applicant['workflow_stage'] !== 'rejected' && (empty($applicant['secretary_id']) || $applicant['workflow_stage'] === 'secretary_review' || (int)$applicant['secretary_id'] === $secretaryId);
+    // The Secretary archive intentionally spans all departments, matching
+    // get_archive.php. Active records retain their existing ownership check.
+    $authorized = $isArchived || (empty($applicant['secretary_id']) || $workflowStage === 'secretary_review' || (int)$applicant['secretary_id'] === $secretaryId);
 } elseif ($role === 'Department Head') {
     $allowedStages = ['waiting_interview_schedule','department_head_review','interview_scheduled','interview_completed','demo_scheduled','demo_completed','psych_scheduled','psych_completed','initially_hired','permanently_hired','passed','hired'];
-    $authorized = in_array($applicant['workflow_stage'], $allowedStages, true) && in_array($applicant['assigned_to_department'], [$department, $departmentAlias], true);
+    $authorized = $isInAssignedDepartment && ($isArchived || in_array($workflowStage, $allowedStages, true));
 } elseif (in_array($role, ['HR Manager', 'Recruiter'], true)) {
-    $authorized = $applicant['status'] !== 'Rejected' && in_array($applicant['assigned_to_department'], [$department, $departmentAlias], true);
+    // These roles use the same department-scoped archive listing.
+    $authorized = $isInAssignedDepartment && ($isArchived || $applicationStatus !== 'rejected');
 }
 if (!$authorized) {
     http_response_code(403);

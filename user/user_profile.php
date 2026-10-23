@@ -260,9 +260,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['savePersonal'])) {
         $phone = isset($_POST['applicant_num']) ? $conn->real_escape_string($_POST['applicant_num']) : '';
         $address = isset($_POST['applicant_address']) ? $conn->real_escape_string($_POST['applicant_address']) : '';
         
-        // Validate Philippine phone number format (must be 11 digits starting with 09)
-        if (!empty($phone) && !preg_match('/^09[0-9]{9}$/', $phone)) {
-            $error_message = "Invalid phone number format. Must be 11 digits starting with 09 (e.g., 09123456789).";
+        // Store Philippine mobile numbers in international format.
+        if (!empty($phone) && !preg_match('/^\+639[0-9]{9}$/', $phone)) {
+            $error_message = "Enter a valid Philippine mobile number in the format +639XXXXXXXXX (e.g., +639356389098).";
         } else {
             // Get user ID from session
             $user_id = $_SESSION['user_id'] ?? null;
@@ -735,12 +735,13 @@ function showToast(message, type = 'success') {
   toast.innerHTML = `
     <div class="flex items-center">
       <i class="${style.icon} ${style.iconColor} text-xl mr-3"></i>
-      <p class="${style.textColor} font-medium">${message}</p>
+      <p class="${style.textColor} font-medium" data-toast-message></p>
       <button onclick="this.parentElement.parentElement.remove()" class="ml-auto ${style.textColor} hover:opacity-70">
         <i class="ri-close-line text-xl"></i>
       </button>
     </div>
   `;
+  toast.querySelector('[data-toast-message]').textContent = String(message || '');
   
   container.appendChild(toast);
   
@@ -758,11 +759,11 @@ function showToast(message, type = 'success') {
 
 // Show notifications if present
 <?php if ($success_message): ?>
-  showToast('<?php echo addslashes($success_message); ?>', 'success');
+  showToast(<?php echo json_encode($success_message, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>, 'success');
 <?php endif; ?>
 
 <?php if ($error_message): ?>
-  showToast('<?php echo addslashes($error_message); ?>', 'error');
+  showToast(<?php echo json_encode($error_message, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>, 'error');
 <?php endif; ?>
 
 <?php if (isset($_GET['education_added'])): ?>
@@ -784,8 +785,11 @@ function confirmSave() {
   closeSaveModal();
   // Validate phone number before submitting
   const phoneInput = document.querySelector('#profileMainContent input[name="applicant_num"]');
-  if (phoneInput && phoneInput.value && !/^09[0-9]{9}$/.test(phoneInput.value.trim())) {
-    showToast('Invalid phone number! Must be 11 digits starting with 09 (e.g., 09123456789)', 'error');
+  const phoneSuffix = phoneInput ? phoneInput.value.trim() : '';
+  if (phoneSuffix && !/^[0-9]{9}$/.test(phoneSuffix)) {
+    phoneInput.setAttribute('aria-invalid', 'true');
+    phoneInput.focus();
+    showToast('Enter the 9 digits after +639. Example: +639356389098.', 'error');
     return;
   }
   
@@ -793,7 +797,7 @@ function confirmSave() {
   document.getElementById('form_fname').value = document.querySelector('#personalInfo input[name="applicant_fname"]').value;
   document.getElementById('form_lname').value = document.querySelector('#personalInfo input[name="applicant_lname"]').value;
   document.getElementById('form_email').value = document.querySelector('#personalInfo input[name="applicant_email"]').value;
-  document.getElementById('form_phone').value = document.querySelector('input[name="applicant_num"]').value;
+  document.getElementById('form_phone').value = phoneSuffix ? `+639${phoneSuffix}` : '';
   document.getElementById('form_address').value = document.querySelector('#personalInfo textarea[name="applicant_address"]').value;
   
   // Submit the form

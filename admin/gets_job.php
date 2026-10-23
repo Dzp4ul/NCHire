@@ -25,8 +25,14 @@ $jobId = isset($_GET['id']) ? (int)$_GET['id'] : null;
 
 if ($jobId) {
     // Fetch single job with all fields
-    $sql = "SELECT * 
-            FROM job WHERE id = ?";
+    $sql = "SELECT j.*,
+                   (SELECT COUNT(*) FROM job_applicants ja WHERE ja.job_id = j.id) AS applicant_count,
+                   (SELECT COUNT(*) FROM teaching_assignments ta WHERE ta.job_id = j.id) AS assignment_count,
+                   (SELECT COUNT(*) FROM job_applicants finalized
+                    WHERE finalized.job_id = j.id
+                      AND (finalized.workflow_stage IN ('initially_hired', 'permanently_hired', 'passed', 'hired')
+                           OR finalized.status IN ('Initially Hired', 'Permanently Hired', 'Passed', 'Application Passed', 'Hired'))) AS finalized_application_count
+            FROM job j WHERE j.id = ?";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $jobId);
     $stmt->execute();
@@ -41,11 +47,9 @@ if ($jobId) {
         $job['salary_projection'] = nc_calculate_salary_projection_from_education([], $job, null, $conn);
         $job['salary_display'] = $job['salary_projection']['salary_display'];
         $job['application_requirements'] = nc_get_teaching_load_requirements($conn, (int)$job['id'], true);
-        $applicantCountStmt = $conn->prepare('SELECT COUNT(*) AS total FROM job_applicants WHERE job_id = ?');
-        $applicantCountStmt->bind_param('i', $jobId);
-        $applicantCountStmt->execute();
-        $job['applicant_count'] = (int)($applicantCountStmt->get_result()->fetch_assoc()['total'] ?? 0);
-        $applicantCountStmt->close();
+        $job['applicant_count'] = (int)($job['applicant_count'] ?? 0);
+        $job['assignment_count'] = (int)($job['assignment_count'] ?? 0);
+        $job['finalized_application_count'] = (int)($job['finalized_application_count'] ?? 0);
         echo json_encode($job);
     } else {
         echo json_encode(["error" => "Job not found"]);
@@ -53,7 +57,14 @@ if ($jobId) {
     $stmt->close();
 } else {
     // Fetch all jobs with all fields
-    $sql = "SELECT * FROM job ORDER BY id DESC";
+    $sql = "SELECT j.*,
+                   (SELECT COUNT(*) FROM job_applicants ja WHERE ja.job_id = j.id) AS applicant_count,
+                   (SELECT COUNT(*) FROM teaching_assignments ta WHERE ta.job_id = j.id) AS assignment_count,
+                   (SELECT COUNT(*) FROM job_applicants finalized
+                    WHERE finalized.job_id = j.id
+                      AND (finalized.workflow_stage IN ('initially_hired', 'permanently_hired', 'passed', 'hired')
+                           OR finalized.status IN ('Initially Hired', 'Permanently Hired', 'Passed', 'Application Passed', 'Hired'))) AS finalized_application_count
+            FROM job j ORDER BY j.id DESC";
     $result = $conn->query($sql);
 
     $jobs = [];
@@ -66,6 +77,9 @@ if ($jobId) {
             $row['salary_projection'] = nc_calculate_salary_projection_from_education([], $row, null, $conn);
             $row['salary_display'] = $row['salary_projection']['salary_display'];
             $row['application_requirements'] = nc_get_teaching_load_requirements($conn, (int)$row['id'], true);
+            $row['applicant_count'] = (int)($row['applicant_count'] ?? 0);
+            $row['assignment_count'] = (int)($row['assignment_count'] ?? 0);
+            $row['finalized_application_count'] = (int)($row['finalized_application_count'] ?? 0);
             $jobs[] = $row;
         }
     }

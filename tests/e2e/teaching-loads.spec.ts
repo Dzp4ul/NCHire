@@ -172,4 +172,37 @@ test.describe('teaching-load and dynamic-requirement management', () => {
       expect.objectContaining({ requirement_name: 'Teaching Portfolio', is_required: true }),
     ]));
   });
+
+  test('deleting an available load cancels and archives its related applications', async ({ page }) => {
+    const row = page.locator('#jobsTableBody tr').filter({ hasText: 'CS 101 - Web Systems' });
+    await row.locator('details summary').click();
+    await row.getByRole('button', { name: 'Delete' }).click();
+
+    const deleteModal = page.locator('#deleteJobModal');
+    await expect(deleteModal).toBeVisible();
+    await expect(deleteModal).toContainText('cancel 2 related applications');
+    await deleteModal.getByRole('button', { name: 'Delete' }).click();
+
+    await expect(page.locator('body')).toContainText('2 related applications were cancelled and moved to Archive');
+    await expect(page.locator('#jobsTableBody')).not.toContainText('CS 101 - Web Systems');
+
+    const archiveResponse = await page.request.get('admin/get_archive.php');
+    expect(archiveResponse.status()).toBe(200);
+    const archived = await archiveResponse.json();
+    const cancelled = archived.filter((application: Record<string, unknown>) =>
+      application.applicant_email === accounts.pipeline.email
+      && application.position === 'E2E CS 101 - Web Systems'
+    );
+    expect(cancelled).toHaveLength(2);
+    expect(cancelled).toEqual(expect.arrayContaining([
+      expect.objectContaining({ status: 'Cancelled', workflow_stage: 'cancelled' }),
+    ]));
+
+    const activeResponse = await page.request.get('admin/gets_applicants.php');
+    expect(activeResponse.status()).toBe(200);
+    const activeApplications = await activeResponse.json();
+    expect(activeApplications).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ position: 'E2E CS 101 - Web Systems' }),
+    ]));
+  });
 });

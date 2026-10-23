@@ -60,7 +60,7 @@ try {
                 a.profile_picture
             FROM job_applicants ja
             LEFT JOIN applicants a ON ja.user_id = a.id
-            WHERE ja.workflow_stage != 'rejected' 
+            WHERE ja.workflow_stage NOT IN ('rejected', 'cancelled')
             AND (ja.secretary_id IS NULL OR ja.secretary_id = 0 OR ja.workflow_stage = 'secretary_review' 
                  OR ja.secretary_id = :secretary_id)
             ORDER BY 
@@ -129,7 +129,7 @@ try {
                 a.profile_picture
             FROM job_applicants ja
             LEFT JOIN applicants a ON ja.user_id = a.id
-            WHERE ja.status != 'Rejected'
+            WHERE ja.status NOT IN ('Rejected', 'Cancelled')
             AND ja.assigned_to_department IN (:department, :department_alias)
             ORDER BY ja.applied_date DESC";
         $params['department'] = $admin_department;

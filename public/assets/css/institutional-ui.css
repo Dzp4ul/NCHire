@@ -3951,6 +3951,61 @@ body.gt-app {
     font-size: 0.86rem;
 }
 
+.ui-profile-phone-field {
+    display: flex;
+    min-height: 42px;
+    overflow: hidden;
+    border: 1px solid var(--ui-border-strong);
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-surface);
+}
+
+.ui-profile-phone-field:focus-within {
+    border-color: var(--ui-brand-700);
+    box-shadow: var(--ui-focus);
+}
+
+.ui-profile-phone-field__prefix {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 7px;
+    padding: 0 12px;
+    border-right: 1px solid var(--ui-border);
+    background: #f8fafc;
+    color: var(--ui-text);
+    font-size: 0.86rem;
+    font-weight: 650;
+}
+
+.ui-profile-phone-field__flag {
+    font-size: 1.15rem;
+    line-height: 1;
+}
+
+.ui-profile-edit-grid .ui-profile-phone-field input {
+    min-width: 0;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+.ui-profile-phone-field:has(input:disabled) {
+    background: #f1f5f9;
+}
+
+.ui-profile-phone-field:has(input:disabled) .ui-profile-phone-field__prefix {
+    background: #e2e8f0;
+    color: var(--ui-text-secondary);
+}
+
+.ui-profile-field-help {
+    margin: 6px 0 0;
+    color: var(--ui-text-muted);
+    font-size: 0.74rem;
+    line-height: 1.4;
+}
+
 .ui-profile-edit-grid textarea {
     min-height: 84px;
     resize: vertical;
@@ -7790,7 +7845,7 @@ button.requirements-document-item {
 
 .ui-profile-identity-header__facts {
     display: grid;
-    grid-template-columns: repeat(3, minmax(105px, 1fr));
+    grid-template-columns: minmax(220px, 1fr);
     gap: 0;
     margin: 0;
 }

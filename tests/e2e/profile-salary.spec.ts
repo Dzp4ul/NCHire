@@ -19,9 +19,9 @@ test.describe('applicant profile CRUD and salary projection', () => {
     await page.locator('#savePersonalBtn').click();
     await expect(page.locator('#saveConfirmModal')).toBeVisible();
     await page.locator('#saveConfirmModal').getByRole('button', { name: 'Save Changes' }).click();
-    await expect(page.locator('body')).toContainText('Invalid phone number');
+    await expect(page.locator('body')).toContainText('Enter the 9 digits after +639');
 
-    await page.locator('#profilePhone').fill('09171112222');
+    await page.locator('#profilePhone').fill('171112222');
     await page.locator('#profileAddress').fill('E2E Updated Address, Bulacan');
     await page.locator('#savePersonalBtn').click();
     await page.locator('#saveConfirmModal').getByRole('button', { name: 'Save Changes' }).click();
@@ -33,15 +33,25 @@ test.describe('applicant profile CRUD and salary projection', () => {
   });
 
   test('personal phone number persists after saving', async ({ page }) => {
-    test.fail(true, 'Known UI defect: confirmSave() reads the earlier hidden applicant_num field, so the visible phone value is submitted as empty.');
     await page.locator('#editPersonalBtn').click();
-    await page.locator('#profilePhone').fill('09171112222');
+    await page.locator('#profilePhone').fill('171112222');
     await page.locator('#savePersonalBtn').click();
     await page.locator('#saveConfirmModal').getByRole('button', { name: 'Save Changes' }).click();
     await page.waitForLoadState('domcontentloaded');
-    await expect(page.locator('#personalInfoView')).toContainText('09171112222');
+    await expect(page.locator('#personalInfoView')).toContainText('+639171112222');
     await page.reload();
-    await expect(page.locator('#personalInfoView')).toContainText('09171112222');
+    await expect(page.locator('#personalInfoView')).toContainText('+639171112222');
+  });
+
+  test('in-app profile shows the intended phone validation message', async ({ page }) => {
+    await page.goto('user/user.php');
+    await page.locator('#profileLink').click();
+    await expect(page.locator('#profileMainContent')).toBeVisible();
+    await page.locator('#editPersonalBtn').click();
+    await page.locator('#profilePhone').fill('123');
+    await page.locator('#savePersonalBtn').click();
+    await expect(page.locator('body')).toContainText('Enter the 9 digits after +639');
+    await expect(page.locator('body')).not.toContainText('profilePictureContainer.innerHTML');
   });
 
   test('Master’s unit boundaries and completion precedence persist through the backend', async ({ page }) => {

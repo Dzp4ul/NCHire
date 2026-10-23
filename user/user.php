@@ -8390,6 +8390,15 @@ document.addEventListener('DOMContentLoaded', function () {
     if (savePersonalBtn && personalActions && editPersonalBtn) {
       savePersonalBtn.addEventListener('click', function() {
         console.log('Save button clicked');
+
+        const phoneInput = document.querySelector('#profilePhone');
+        const phoneSuffix = phoneInput ? phoneInput.value.trim() : '';
+        if (phoneSuffix && !/^[0-9]{9}$/.test(phoneSuffix)) {
+          phoneInput.setAttribute('aria-invalid', 'true');
+          phoneInput.focus();
+          showToast('Enter the 9 digits after +639. Example: +639356389098.', 'error');
+          return;
+        }
         
         // Collect form data
         const formData = new FormData();
@@ -8397,8 +8406,11 @@ document.addEventListener('DOMContentLoaded', function () {
         
         personalInputs.forEach(input => {
           if (input.name) {
-            formData.append(input.name, input.value);
-            console.log('Adding to form:', input.name, input.value);
+            const inputValue = input.name === 'applicant_num' && phoneSuffix
+              ? `+639${phoneSuffix}`
+              : input.value;
+            formData.append(input.name, inputValue);
+            console.log('Adding to form:', input.name, inputValue);
           }
         });
         
@@ -8413,21 +8425,19 @@ document.addEventListener('DOMContentLoaded', function () {
           console.log('FormData:', key, value);
         }
         
-        // Send form data to user_profile.php
-        fetch('user_profile.php', {
+        // Use the JSON endpoint so validation errors are returned as messages,
+        // rather than scraping text from the full profile page.
+        fetch('save_profile_data.php', {
           method: 'POST',
           body: formData
         })
-        .then(response => {
-          console.log('Response status:', response.status);
-          return response.text();
+        .then(async response => {
+          const data = await response.json().catch(() => null);
+          if (!data) throw new Error('The server returned an invalid response.');
+          return data;
         })
         .then(data => {
-          console.log('Response data length:', data.length);
-          console.log('Contains success:', data.includes('Personal information updated successfully'));
-          
-          // Check if the response contains success or error messages
-          if (data.includes('Personal information updated successfully')) {
+          if (data.success) {
             personalInputs.forEach(input => {
               input.disabled = true;
             });
@@ -8443,24 +8453,18 @@ document.addEventListener('DOMContentLoaded', function () {
             personalView?.classList.remove('hidden');
             personalEdit?.classList.add('hidden');
             editPersonalBtn.style.display = 'block';
-            showToast('Personal information updated successfully!', 'success');
+            showToast(data.message || 'Personal information updated successfully!', 'success');
             // Reload the profile content to show updated data
             setTimeout(() => {
               loadContent('user_profile.php', initializeProfileListeners);
             }, 1000);
-          } else if (data.includes('Error')) {
-            // Extract error message if possible
-            const errorMatch = data.match(/Error[^<]*/);
-            const errorMsg = errorMatch ? errorMatch[0] : 'Error saving personal information. Please try again.';
-            showToast(errorMsg, 'error');
           } else {
-            showToast('Unexpected response. Please try again.', 'error');
-            console.log('Full response:', data.substring(0, 500));
+            showToast(data.message || 'Unable to save personal information.', 'error');
           }
         })
         .catch(error => {
           console.error('Fetch error:', error);
-          showToast('Network error saving personal information', 'error');
+          showToast(error.message || 'Network error saving personal information.', 'error');
         });
       });
     }

@@ -13,6 +13,16 @@ $profile_format_file_size = static function ($bytes): string {
 $profile_is_image_document = static function ($path): bool {
     return in_array(strtolower(pathinfo((string)$path, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png'], true);
 };
+$profile_phone_number = trim((string)($applicant['applicant_num'] ?? ''));
+$profile_phone_digits = preg_replace('/\D+/', '', $profile_phone_number);
+$profile_phone_suffix = $profile_phone_digits;
+if (preg_match('/^639([0-9]{9})$/', $profile_phone_digits, $profile_phone_match)) {
+    $profile_phone_suffix = $profile_phone_match[1];
+} elseif (preg_match('/^09([0-9]{9})$/', $profile_phone_digits, $profile_phone_match)) {
+    $profile_phone_suffix = $profile_phone_match[1];
+} elseif (preg_match('/^9([0-9]{9})$/', $profile_phone_digits, $profile_phone_match)) {
+    $profile_phone_suffix = $profile_phone_match[1];
+}
 ?>
 <div id="profileMainContent">
   <main class="ui-profile-page">
@@ -50,7 +60,6 @@ $profile_is_image_document = static function ($path): bool {
           </div>
       </div>
       <dl class="ui-profile-identity-header__facts">
-        <div><dt>Profile status</dt><dd><span class="ui-status-dot"></span><?php echo $profile_h($account_status_label); ?></dd></div>
         <div><dt>Graduate qualification</dt><dd id="profileGraduateQualification"><?php echo $profile_h($qualification_summary['title']); ?></dd></div>
       </dl>
       <button class="ui-button ui-button--secondary ui-profile-edit-basic" type="button"><i class="ri-edit-line"></i>Edit Basic Information</button>
@@ -107,7 +116,14 @@ $profile_is_image_document = static function ($path): bool {
             <div><label for="profileFirstName">First Name</label><input id="profileFirstName" type="text" name="applicant_fname" value="<?php echo $profile_h($applicant['applicant_fname']); ?>" pattern="[A-Za-z\s\-']+" title="Please enter only letters, spaces, hyphens, and apostrophes" disabled></div>
             <div><label for="profileLastName">Last Name</label><input id="profileLastName" type="text" name="applicant_lname" value="<?php echo $profile_h($applicant['applicant_lname']); ?>" pattern="[A-Za-z\s\-']+" title="Please enter only letters, spaces, hyphens, and apostrophes" disabled></div>
             <div><label for="profileEmail">Email Address</label><input id="profileEmail" type="email" name="applicant_email" value="<?php echo $profile_h($applicant['applicant_email']); ?>" disabled></div>
-            <div><label for="profilePhone">Phone Number</label><input id="profilePhone" type="tel" name="applicant_num" value="<?php echo $profile_h($applicant['applicant_num']); ?>" pattern="09[0-9]{9}" maxlength="11" placeholder="09XXXXXXXXX" title="Please enter a valid Philippine mobile number (e.g., 09123456789)" oninput="this.value = this.value.replace(/[^0-9]/g, '')" disabled></div>
+            <div>
+              <label for="profilePhone">Phone Number</label>
+              <div class="ui-profile-phone-field">
+                <span class="ui-profile-phone-field__prefix" aria-label="Philippine mobile prefix plus six three nine"><span class="ui-profile-phone-field__flag" aria-hidden="true">🇵🇭</span><span>+639</span></span>
+                <input id="profilePhone" type="tel" inputmode="numeric" autocomplete="tel-national" name="applicant_num" value="<?php echo $profile_h($profile_phone_suffix); ?>" pattern="[0-9]{9}" minlength="9" maxlength="9" placeholder="356389098" aria-describedby="profilePhoneHelp" title="Enter the 9 digits after +639 (e.g., 356389098)" disabled>
+              </div>
+              <p class="ui-profile-field-help" id="profilePhoneHelp">Enter the remaining 9 digits. Full format: +639356389098.</p>
+            </div>
             <div class="ui-profile-edit-grid__wide"><label for="profileAddress">Address</label><textarea id="profileAddress" name="applicant_address" rows="3" disabled placeholder="Enter your complete address"><?php echo $profile_h($applicant['applicant_address']); ?></textarea></div>
           </div>
           <div class="hidden ui-form-actions" id="personalActions">
@@ -322,7 +338,20 @@ $profile_is_image_document = static function ($path): bool {
     const navigationItems = Array.from(root.querySelectorAll('[data-profile-target]'));
     const panels = Array.from(root.querySelectorAll('[data-profile-section]'));
     const mobileSelect = document.getElementById('profileSectionSelect');
+    const phoneInput = root.querySelector('#profilePhone');
     const sectionAliases = { personalInfo: 'overview', education: 'education', experience: 'experience', skills: 'skills', qualifications: 'qualifications', settings: 'settings' };
+
+    if (phoneInput && phoneInput.dataset.phoneBound !== '1') {
+      phoneInput.dataset.phoneBound = '1';
+      phoneInput.addEventListener('input', function() {
+        let digits = this.value.replace(/\D/g, '');
+        if (digits.startsWith('639') && digits.length >= 12) digits = digits.slice(3);
+        else if (digits.startsWith('09') && digits.length >= 11) digits = digits.slice(2);
+        else if (digits.startsWith('9') && digits.length >= 10) digits = digits.slice(1);
+        this.value = digits.slice(0, 9);
+        this.removeAttribute('aria-invalid');
+      });
+    }
 
     function showProfileSection(section, updateHash) {
       const target = sectionAliases[section] || section;

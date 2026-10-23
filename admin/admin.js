@@ -1715,41 +1715,71 @@ function deleteJob(id) {
     if (!job) return;
 
     const modal = document.getElementById('deleteJobModal');
+    const confirmButton = document.getElementById('confirmDeleteJobBtn');
+    const applicationCount = Number(job.applicant_count || 0);
+    const protectedCount = Number(job.assignment_count || 0) + Number(job.finalized_application_count || 0);
     modal.dataset.jobId = id;
-    modal.querySelector('.job-title').innerText = job.job_title;
+    modal.querySelector('.job-title').innerText = job.teaching_load_title || job.job_title;
+    const impact = modal.querySelector('.delete-job-impact');
+    if (protectedCount > 0) {
+        impact.textContent = 'This load has a finalized hire or teaching assignment. Close it instead to preserve its history.';
+        impact.className = 'delete-job-impact mt-3 text-sm font-medium text-red-700';
+        confirmButton.disabled = true;
+    } else if (applicationCount > 0) {
+        impact.textContent = `Deleting this load will cancel ${applicationCount} related application${applicationCount === 1 ? '' : 's'} and move ${applicationCount === 1 ? 'it' : 'them'} to Archive.`;
+        impact.className = 'delete-job-impact mt-3 text-sm font-medium text-amber-700';
+        confirmButton.disabled = false;
+    } else {
+        impact.textContent = 'This action cannot be undone.';
+        impact.className = 'delete-job-impact mt-3 text-sm text-gray-600';
+        confirmButton.disabled = false;
+    }
     modal.classList.remove('hidden');
 }
 
-function confirmDeleteJob() {
+async function confirmDeleteJob() {
     const modal = document.getElementById('deleteJobModal');
     const jobId = modal.dataset.jobId;
     const jobTitle = modal.querySelector('.job-title').innerText;
+    const confirmButton = document.getElementById('confirmDeleteJobBtn');
 
-    fetch('delete_job.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: jobId })
-    })
-    .then(res => res.json())
-    .then(result => {
+    if (!jobId || confirmButton.disabled) return;
+    confirmButton.disabled = true;
+    confirmButton.textContent = 'Deleting...';
+
+    try {
+        const response = await fetch('delete_job.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ id: jobId })
+        });
+        const responseText = await response.text();
+        let result;
+        try {
+            result = JSON.parse(responseText);
+        } catch (parseError) {
+            throw new Error('The server returned an invalid response while deleting the teaching load.');
+        }
+
         if (result.success) {
-            showToast(`Job posting "${jobTitle}" has been deleted successfully`, 'success');
-            loadJobs();
+            showToast(result.message || `Teaching load "${jobTitle}" was deleted successfully.`, 'success');
+            await loadJobs();
             // Refresh dashboard if we're on the dashboard page
             if (typeof loadDashboardData === 'function') {
                 loadDashboardData();
             }
         } else {
-            showToast(result.message || 'Failed to delete teaching load', 'error');
-            console.error(result.message);
+            showToast(result.message || result.error || 'Failed to delete teaching load.', 'error');
+            console.error(result.message || result.error);
         }
-        modal.classList.add('hidden');
-    })
-    .catch(error => {
-        showToast('Network error: Failed to delete teaching load', 'error');
+    } catch (error) {
+        showToast(error.message || 'Failed to delete teaching load.', 'error');
         console.error('Error deleting job:', error);
+    } finally {
+        confirmButton.disabled = false;
+        confirmButton.textContent = 'Delete';
         modal.classList.add('hidden');
-    });
+    }
 }
 
 function cancelDeleteJob() {

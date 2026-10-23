@@ -18,8 +18,8 @@ function handlePersonalInfoSave($conn, $user_id, $post_data) {
     $address = isset($post_data['applicant_address']) ? $conn->real_escape_string($post_data['applicant_address']) : '';
 
     // Validate phone
-    if (!empty($phone) && !preg_match('/^09[0-9]{9}$/', $phone)) {
-        return ['success' => false, 'message' => 'Invalid phone number format. Must be 11 digits starting with 09.'];
+    if (!empty($phone) && !preg_match('/^\+639[0-9]{9}$/', $phone)) {
+        return ['success' => false, 'message' => 'Enter a valid Philippine mobile number in the format +639XXXXXXXXX (e.g., +639356389098).'];
     }
 
     $conn->begin_transaction();
