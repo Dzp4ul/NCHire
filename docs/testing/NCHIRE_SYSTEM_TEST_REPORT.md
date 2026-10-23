@@ -152,6 +152,27 @@ Verified required versus optional behavior, two independent posting checklists, 
 | UI-01 | Low | Staff notifications and profile dropdowns can remain open simultaneously. | Opening the profile menu stops event propagation and does not close the notification menu. | Explicitly close the peer dropdown in each toggle handler. |
 | UX-01 | Low | Applicant email appears editable despite UI copy implying it is immutable. | The page removes read-only behavior and the profile endpoint accepts an email update. | Either enforce immutability in UI and backend or document/reverify email-change behavior. |
 
+## Remediation update — 2026-10-23
+
+The following findings were addressed after this report was captured:
+
+| ID | Status | Change |
+|---|---|---|
+| SEC-01 | Fixed | Diagnostic session-creation endpoints now return 404; the unauthenticated debug panel was removed. |
+| SEC-02 | Fixed | Non-admin staff cannot change `role`, `department`, `status`, or `password` through the users API. |
+| SEC-03 | Code fixed | SMTP credentials were removed from tracked source and are read from `NCHIRE_SMTP_*` environment variables. The leaked credential must still be rotated in the mail provider. |
+| SEC-04 | Fixed | Applicant passwords are stored with `password_hash`; legacy plaintext credentials upgrade automatically on the next successful login. Password/code logging was removed. |
+| SEC-05 | Fixed | Admin and applicant logins call `session_regenerate_id(true)`. |
+| SEC-06 | Fixed for applicant mutations | CSRF validation now covers profile, cancellation, attachment, psych-receipt, draft, notification, and password-change requests. |
+| DATA-01 | Fixed at application layer | Duplicate active applications to the same teaching load are rejected. Existing seed duplicates prevent adding a blanket unique index without a data migration. |
+| ROUTE-01 | Fixed | Protected-page redirects and the default test URL no longer depend on the encoded project-root path. |
+| FUNC-01 | Fixed | Phone edits now use the visible phone field and persist in `+639XXXXXXXXX` form. |
+| API-01 | Fixed | Unauthorized dashboard-statistics requests return HTTP 401. |
+| UI-01 | Fixed | Opening one staff header dropdown closes the other. |
+| UX-01 | Fixed | Admin user-email editing stays read-only, matching the UI copy. |
+
+The portable PHP runner is now `tests/run_php_tests.mjs`; the PowerShell script remains available for Windows.
+
 ## Negative and edge coverage
 
 Covered empty required forms, invalid credentials, inactive users, invalid email, name sanitization, weak/mismatched passwords, duplicate registration, invalid verification code, unknown forgot-password account, multiple tabs, refresh/persistence, logout, unauthorized pages/APIs, missing/invalid CSRF, cross-role actions, cross-department actions, invalid uploads, optional omissions, incomplete profile, banned applicant, full-time qualification rules, closed/expired postings, duplicate application, invalid/negative/large Master's units, modal cancel paths, repeated final hiring, and capacity exhaustion.
@@ -171,7 +192,7 @@ The suite records screenshots, videos, and traces for failing/expected-failing t
 - Playwright configuration: `playwright.config.ts`
 - Browser suites: `tests/e2e/`
 - Isolated schema/fixture setup: `tests/setup_e2e_database.php`
-- PHP test runner: `tests/run_php_tests.ps1`
+- PHP test runner: `tests/run_php_tests.mjs` (PowerShell alternative: `tests/run_php_tests.ps1`)
 - Upload fixtures: `tests/fixtures/`
 - HTML report: `playwright-report/index.html`
 - Machine-readable report: `test-results/playwright-results.json`

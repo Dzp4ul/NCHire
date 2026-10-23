@@ -5,7 +5,8 @@ test.describe('cross-browser and responsive smoke coverage', () => {
   test('public landing page, navigation, modals, and live teaching loads render', async ({ page }) => {
     const sameOriginFailures: string[] = [];
     page.on('response', response => {
-      if (response.url().includes('/FinalResearch%20-%20Copy/') && response.status() >= 500) {
+      const pageOrigin = new URL(page.url()).origin;
+      if (new URL(response.url()).origin === pageOrigin && response.status() >= 500) {
         sameOriginFailures.push(`${response.status()} ${response.url()}`);
       }
     });

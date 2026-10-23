@@ -34,6 +34,9 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+require_once __DIR__ . '/../config/csrf.php';
+nc_require_csrf();
+
 $host = "127.0.0.1";
 $user = "root";
 $pass = "";

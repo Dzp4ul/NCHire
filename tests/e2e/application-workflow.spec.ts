@@ -113,7 +113,6 @@ test.describe('application submission and cross-role recruitment workflow', () =
   });
 
   test('backend rejects a duplicate application to the same teaching load', async ({ page }) => {
-    test.fail(true, 'Known integrity defect: the submission endpoint has no duplicate-application check or unique constraint.');
     await login(page, accounts.applicant);
     const token = await page.locator('#requirementsCsrfToken').getAttribute('value');
     const response = await page.request.post('user/user.php', {
@@ -316,13 +315,16 @@ test.describe('application submission and cross-role recruitment workflow', () =
     expect(await prematureHire.json()).toMatchObject({ success: false });
 
     await login(page, accounts.pipeline);
+    const applicantToken = await csrfToken(page);
     const invalidReceipt = await page.request.post('user/upload_psych_receipt.php', {
+      headers: { 'X-CSRF-Token': applicantToken },
       multipart: {
         application_id: '1', psych_receipt: { name: 'invalid-upload.txt', mimeType: 'text/plain', buffer: readFileSync(invalidPath) },
       },
     });
     expect(await invalidReceipt.json()).toMatchObject({ success: false });
     const receipt = await page.request.post('user/upload_psych_receipt.php', {
+      headers: { 'X-CSRF-Token': applicantToken },
       multipart: {
         application_id: '1', psych_receipt: { name: 'valid-document.pdf', mimeType: 'application/pdf', buffer: readFileSync(pdfPath) },
       },

@@ -118,9 +118,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode($response);
         exit();
     }
+
+    require_once __DIR__ . '/../config/csrf.php';
+    nc_require_csrf();
     
-    // Debug: Log what POST data we received
-    error_log("POST data in save_profile_data.php: " . print_r($_POST, true));
+    // Debug: Log the action without exposing profile values.
+    error_log("Profile mutation received by legacy user/api endpoint.");
     
     // Handle Profile Picture Upload
     if (isset($_POST['upload_profile_picture']) && isset($_FILES['profile_picture'])) {
@@ -174,12 +177,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $applicant_num = $conn->real_escape_string($_POST['applicant_num'] ?? '');
         $applicant_address = $conn->real_escape_string($_POST['applicant_address'] ?? '');
         
-        // Validate Philippine phone number format (09XXXXXXXXX)
-        if (!empty($applicant_num) && !preg_match('/^09[0-9]{9}$/', $applicant_num)) {
+        // Validate Philippine phone number format (+639XXXXXXXXX or legacy 09XXXXXXXXX).
+        if (!empty($applicant_num) && !preg_match('/^(?:\+639|09)[0-9]{9}$/', $applicant_num)) {
             $response['success'] = false;
-            $response['message'] = 'Invalid phone number format. Please use Philippine mobile format (e.g., 09123456789)';
+            $response['message'] = 'Enter a valid Philippine mobile number in the format +639XXXXXXXXX (e.g., +639356389098).';
             echo json_encode($response);
             exit();
+        }
+        if (!empty($applicant_num) && preg_match('/^09[0-9]{9}$/', $applicant_num)) {
+            $applicant_num = '+639' . substr($applicant_num, 2);
         }
         
         // Update applicants table

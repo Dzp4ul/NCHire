@@ -5,6 +5,7 @@
  */
 
 require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../../config/mail.php';
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
@@ -22,17 +23,11 @@ function sendForgotPasswordEmail($recipientEmail, $recipientName, $temporaryPass
     $mail = new PHPMailer(true);
     
     try {
-        // Server settings
-        $mail->isSMTP();
-        $mail->Host       = 'smtp.gmail.com';
-        $mail->SMTPAuth   = true;
-        $mail->Username   = 'manansalajohnpaul120@gmail.com';
-        $mail->Password   = 'dcuv npdb mmnz lyfa';
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-        $mail->Port       = 465;
+        nc_apply_mail_config($mail);
+        $mailConfig = nc_mail_config();
 
         // Recipients
-        $mail->setFrom('no-reply@nchire.local', 'NCHire - Norzagaray College');
+        $mail->setFrom($mailConfig['from_email'], $mailConfig['from_name']);
         $mail->addAddress($recipientEmail, $recipientName);
         
         // Embed the logo
@@ -42,9 +37,9 @@ function sendForgotPasswordEmail($recipientEmail, $recipientName, $temporaryPass
         }
 
         // Determine login URL based on user type
-        $loginUrl = 'http://localhost/FinalResearch%20-%20Copy/index.php';
+        $loginUrl = nc_app_url('/public/index.php');
         if (in_array($userType, ['Admin', 'Department Head', 'Secretary', 'HR Manager', 'Recruiter'])) {
-            $loginUrl = 'http://localhost/FinalResearch%20-%20Copy/admin';
+            $loginUrl = nc_app_url('/admin/index.php');
         }
 
         // Email content

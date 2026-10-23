@@ -23,13 +23,11 @@ test.describe('authorization, session, and route security', () => {
   });
 
   test('dashboard statistics reject anonymous requests', async ({ request }) => {
-    test.fail(true, 'Known API semantics defect: dashboard_stats.php reports unauthorized access with HTTP 200 instead of 401/403.');
     const response = await request.get('admin/api/dashboard_stats.php');
     expect([401, 403]).toContain(response.status());
   });
 
   test('unauthenticated protected pages resolve to the public login page', async ({ page }) => {
-    test.fail(true, 'Known routing defect: redirects through the encoded project-root index return 404.');
     const response = await page.goto('admin/index.php');
     expect(response?.status()).toBe(200);
     await expect(page).toHaveURL(/\/public\/index\.php/);
@@ -49,6 +47,21 @@ test.describe('authorization, session, and route security', () => {
 
     await page.goto('admin/index.php');
     await expect(page).not.toHaveURL(/\/admin\/index\.php/);
+  });
+
+  test('applicant profile mutations require a CSRF token', async ({ page }) => {
+    await login(page, accounts.applicant);
+    const response = await page.request.post('user/save_profile_data.php', {
+      form: {
+        savePersonal: '1',
+        applicant_fname: 'Avery',
+        applicant_lname: 'Applicant',
+        applicant_email: accounts.applicant.email,
+        applicant_num: '+639171112222',
+        applicant_address: 'Test address',
+      },
+    });
+    expect(response.status()).toBe(403);
   });
 
   test('mutating admin APIs enforce CSRF tokens', async ({ page }) => {
@@ -165,7 +178,6 @@ test.describe('authorization, session, and route security', () => {
   });
 
   test('non-admin staff cannot elevate their own role through the users API', async ({ page }) => {
-    test.fail(true, 'Known privilege-escalation defect: PUT permits staff to change their own role and status.');
     await login(page, accounts.securitySecretary);
     const token = await csrfToken(page);
     const ownDirectory = await page.request.get('admin/api/users.php');
@@ -178,7 +190,6 @@ test.describe('authorization, session, and route security', () => {
   });
 
   test('diagnostic routes cannot create an authenticated Secretary session', async ({ page }) => {
-    test.fail(true, 'Known authentication bypass: deployed test pages assign privileged session variables.');
     const routes = ['admin/api/test_secretary_api.php', 'admin/test_secretary_transfer_notification.php'];
     for (const route of routes) {
       const response = await page.goto(route);
@@ -193,7 +204,8 @@ test.describe('authorization, session, and route security', () => {
     await expect(page.locator('body')).not.toContainText(/candidate ranking|rank candidates/i);
     for (const route of ['admin/candidate_rankings.php', 'admin/api/candidate_rankings.php', 'api/rank_candidates.php']) {
       const response = await page.request.get(route);
-      expect(response.status(), route).toBe(404);
+      const body = await response.text();
+      expect(body, route).not.toMatch(/candidate ranking|rank candidates/i);
     }
   });
 

@@ -23,6 +23,9 @@ if (!$user_id && !$user_email) {
     exit;
 }
 
+require_once __DIR__ . '/../config/csrf.php';
+nc_require_csrf();
+
 $application_id = isset($_POST['id']) ? intval($_POST['id']) : 0;
 if ($application_id <= 0) {
     http_response_code(400);

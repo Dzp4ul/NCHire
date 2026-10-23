@@ -42,6 +42,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login_submit'])) {
                 header("Location: index.php");
                 exit();
             } 
+            session_regenerate_id(true);
             // Set session variables for admin
             $_SESSION['admin_logged_in'] = true;
             $_SESSION['admin_id'] = $row['id'];
@@ -83,7 +84,22 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login_submit'])) {
         $row = $result->fetch_assoc();
         $stmt->close();
 
-        if ($password === $row['applicant_password']) {
+        $storedPassword = (string)($row['applicant_password'] ?? '');
+        $passwordInfo = password_get_info($storedPassword);
+        $legacyPlaintextMatch = ($passwordInfo['algoName'] ?? 'unknown') === 'unknown'
+            && $storedPassword !== ''
+            && hash_equals($storedPassword, $password);
+        if (password_verify($password, $storedPassword) || $legacyPlaintextMatch) {
+            if ($legacyPlaintextMatch || password_needs_rehash($storedPassword, PASSWORD_DEFAULT)) {
+                $rehash = password_hash($password, PASSWORD_DEFAULT);
+                $rehashStmt = $conn->prepare("UPDATE applicants SET applicant_password = ? WHERE id = ?");
+                if ($rehashStmt) {
+                    $rehashStmt->bind_param("si", $rehash, $row['id']);
+                    $rehashStmt->execute();
+                    $rehashStmt->close();
+                }
+            }
+            session_regenerate_id(true);
             // Save user info in session
             $_SESSION['user_logged_in'] = true;
             $_SESSION['user_email'] = $row['applicant_email'];
@@ -147,6 +163,7 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
 require __DIR__ . '/../vendor/autoload.php'; // Include Composer's autoloader
+require_once __DIR__ . '/../config/mail.php';
 
 
 
@@ -188,7 +205,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['signup_submit'])) {
                 'first_name' => $signup_firstname,
                 'last_name' => $signup_lastname,
                 'email' => $signup_email,
-                'password' => $signup_password,
+                'password' => password_hash($signup_password, PASSWORD_DEFAULT),
                 'verification_code' => $verification_code
             ];
 
@@ -201,17 +218,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['signup_submit'])) {
                 // Send verification email without saving to database first
                 $mail = new PHPMailer(true);
                 try {
-                // Server settings
-                $mail->isSMTP();
-                $mail->Host       = 'smtp.gmail.com';
-                $mail->SMTPAuth   = true;
-                $mail->Username   = 'manansalajohnpaul120@gmail.com'; // Your Gmail
-                $mail->Password   = 'dcuv npdb mmnz lyfa';            // App password
-                $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-                $mail->Port       = 465;
+                nc_apply_mail_config($mail);
+                $mailConfig = nc_mail_config();
 
                 // Recipients
-                $mail->setFrom('no-reply@nchire.local', 'NCHire - Norzagaray College');
+                $mail->setFrom($mailConfig['from_email'], $mailConfig['from_name']);
                 $mail->addAddress($signup_email, "$signup_firstname $signup_lastname");
                 
                 // Embed the logo image

@@ -129,7 +129,7 @@ function sendAdminNotificationEmail($email, $name, $title, $message, $type = 'in
                 </div>
                 
                 <div style='text-align: center; margin-top: 30px;'>
-                    <a href='http://localhost/FinalResearch - Copy/admin/index.php' 
+                    <a href='" . nc_app_url('/admin/index.php') . "'
                        style='background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
                               color: white;
                               padding: 12px 30px;

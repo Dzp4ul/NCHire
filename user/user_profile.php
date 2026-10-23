@@ -2,6 +2,9 @@
 
 session_start();
 
+require_once __DIR__ . '/../config/csrf.php';
+nc_csrf_token();
+
 // Check if user is logged in
 if (!isset($_SESSION['user_id']) && !isset($_SESSION['user_email'])) {
     header("Location: ../public/index.php");
@@ -28,9 +31,9 @@ $error_message = '';
 error_log("user_profile.php - Session user_id: " . ($_SESSION['user_id'] ?? 'NOT SET'));
 error_log("user_profile.php - Session user_email: " . ($_SESSION['user_email'] ?? 'NOT SET'));
 
-// Debug: Log POST data for troubleshooting
+// Debug: Log POST data for troubleshooting without credentials or profile values.
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    error_log("POST data received: " . print_r($_POST, true));
+    error_log("Profile POST received with fields: " . implode(', ', array_keys($_POST)));
 }
 
 // Create education table if it doesn't exist
@@ -250,6 +253,9 @@ foreach ($required_columns as $column => $definition) {
 
 // Handle Personal Information form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['savePersonal'])) {
+    if (!nc_csrf_is_valid($_POST['csrf_token'] ?? '')) {
+        $error_message = 'Your session has expired. Please refresh the page and try again.';
+    } else {
     // Validate required fields
     if (empty($_POST['applicant_fname']) || empty($_POST['applicant_lname']) || empty($_POST['applicant_email'])) {
         $error_message = "Please fill in all required fields (First Name, Last Name, Email).";
@@ -328,6 +334,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['savePersonal'])) {
                 error_log("Prepare error: " . $conn->error);
             }
         }
+    }
     }
 }
 
@@ -517,6 +524,8 @@ $account_status_label = !empty($applicant['is_verified']) ? 'Verified' : 'Verifi
 <head><script src="https://static.readdy.ai/static/e.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="csrf-token" content="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+<script src="../public/assets/js/csrf-fetch.js"></script>
 <title>NCHire - My Profile</title>
 <link rel="icon" type="image/png" href="../public/assets/images/image-removebg-preview (1).png">
 <link rel="shortcut icon" type="image/png" href="../public/assets/images/image-removebg-preview (1).png">
@@ -929,6 +938,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- Hidden form for personal information -->
 <form id="personalInfoForm" method="POST" action="" style="display: none;">
+  <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
   <input type="hidden" name="savePersonal" value="1">
   <input type="hidden" name="applicant_fname" id="form_fname">
   <input type="hidden" name="applicant_lname" id="form_lname">

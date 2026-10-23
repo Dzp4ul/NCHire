@@ -22,6 +22,9 @@ if (!$user_email) {
     exit;
 }
 
+require_once __DIR__ . '/../config/csrf.php';
+nc_require_csrf();
+
 $action = $_POST['action'] ?? 'mark_one';
 $notification_id = $_POST['notification_id'] ?? null;
 

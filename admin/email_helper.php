@@ -3,6 +3,7 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
 require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../config/mail.php';
 
 /**
  * Send email notification to applicant
@@ -23,17 +24,11 @@ function sendEmailNotification($to_email, $to_name, $subject, $title, $message, 
     $mail = new PHPMailer(true);
     
     try {
-        // Server settings
-        $mail->isSMTP();
-        $mail->Host       = 'smtp.gmail.com';
-        $mail->SMTPAuth   = true;
-        $mail->Username   = 'manansalajohnpaul120@gmail.com';
-        $mail->Password   = 'dcuv npdb mmnz lyfa';
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-        $mail->Port       = 465;
+        nc_apply_mail_config($mail);
+        $mailConfig = nc_mail_config();
 
         // Recipients
-        $mail->setFrom('no-reply@nchire.local', 'NCHire - Norzagaray College');
+        $mail->setFrom($mailConfig['from_email'], $mailConfig['from_name']);
         $mail->addAddress($to_email, $to_name);
         foreach ($bcc as $bccEmail) {
             $mail->addBCC($bccEmail);
@@ -95,7 +90,7 @@ function sendEmailNotification($to_email, $to_name, $subject, $title, $message, 
                     <p style='color: #6b7280; font-size: 14px;'>
                         Please log in to your NCHire account to view more details about your application status.
                     </p>
-                    <a href='http://localhost/FinalResearch%20-%20Copy/user/user.php?view=applications' class='button' style='color: white;'>
+                    <a href=nc_app_url('/user/user.php?view=applications') class='button' style='color: white;'>
                         View My Applications
                     </a>
                 </div>

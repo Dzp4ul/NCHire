@@ -171,13 +171,13 @@ if ($show_applicant_stats) {
 // Total Applications
 if ($show_applicant_stats) {
     if (!empty($department_params)) {
-        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status != 'Rejected'" . $department_filter);
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status NOT IN ('Rejected', 'Cancelled')" . $department_filter);
         $stmt->bind_param("s", ...$department_params);
         $stmt->execute();
         $result = $stmt->get_result();
         $stats['total_applicants'] = $result->fetch_assoc()['count'];
     } else {
-        $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status != 'Rejected'");
+        $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status NOT IN ('Rejected', 'Cancelled')");
         $stats['total_applicants'] = $result ? $result->fetch_assoc()['count'] : 0;
     }
 } else {
@@ -4683,6 +4683,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (notificationBtn && notificationsDropdown) {
         notificationBtn.addEventListener('click', function(e) {
             e.stopPropagation();
+            if (profileDropdown) profileDropdown.classList.add('hidden');
             notificationsDropdown.classList.toggle('hidden');
             // Load notifications when opened
             if (!notificationsDropdown.classList.contains('hidden')) {
@@ -4710,6 +4711,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (profileDropdownBtn && profileDropdown) {
         profileDropdownBtn.addEventListener('click', function(e) {
             e.stopPropagation();
+            if (notificationsDropdown) notificationsDropdown.classList.add('hidden');
             profileDropdown.classList.toggle('hidden');
         });
         

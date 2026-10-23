@@ -242,11 +242,14 @@ Navigate to: http://localhost/FinalResearch - Copy/database/migrations/add_passw
 ### Email Settings
 **File:** `shared/helpers/send_temp_password_email.php`
 ```php
-$mail->Host       = 'smtp.gmail.com';
-$mail->Username   = 'manansalajohnpaul120@gmail.com';
-$mail->Password   = 'dcuv npdb mmnz lyfa';
-$mail->Port       = 465;
+nc_apply_mail_config($mail);
+$mailConfig = nc_mail_config();
+$mail->setFrom($mailConfig['from_email'], $mailConfig['from_name']);
 ```
+Set `NCHIRE_SMTP_HOST`, `NCHIRE_SMTP_PORT`, `NCHIRE_SMTP_SECURE`,
+`NCHIRE_SMTP_USERNAME`, `NCHIRE_SMTP_PASSWORD`, `NCHIRE_SMTP_FROM_EMAIL`,
+and `NCHIRE_SMTP_FROM_NAME` in the deployment environment. Never commit
+SMTP credentials to the repository.
 
 ### Database Settings
 **All Files Use:**

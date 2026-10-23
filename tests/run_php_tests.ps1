@@ -23,9 +23,9 @@ foreach ($testFile in $directTests) {
 }
 
 $env:NCHIRE_TEST_MODE = '1'
-$env:NCHIRE_TEST_BASE_URL = 'http://127.0.0.1:4174/FinalResearch%20-%20Copy'
+$env:NCHIRE_TEST_BASE_URL = 'http://127.0.0.1:4174'
 $server = Start-Process -FilePath 'php' `
-    -ArgumentList @('-S', '127.0.0.1:4174', '-t', '..') `
+    -ArgumentList @('-S', '127.0.0.1:4174', '-t', '.') `
     -WorkingDirectory $projectRoot `
     -WindowStyle Hidden `
     -PassThru

@@ -31,6 +31,9 @@ try {
         echo json_encode(['success' => false, 'error' => 'Invalid application ID']);
         exit;
     }
+
+    require_once __DIR__ . '/../config/csrf.php';
+    nc_require_csrf();
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'error' => 'Parameter error: ' . $e->getMessage()]);
     exit;

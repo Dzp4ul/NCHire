@@ -130,7 +130,6 @@ test.describe('authentication and account management', () => {
   });
 
   test('login rotates the PHP session identifier to prevent fixation', async ({ page, context }) => {
-    test.fail(true, 'Known security defect: login does not regenerate the PHP session ID.');
     await page.goto('public/index.php');
     const before = (await context.cookies()).find(cookie => cookie.name === 'PHPSESSID')?.value;
     await login(page, accounts.applicant);

@@ -6,7 +6,7 @@
     "test:e2e:core": "playwright test --project=chromium-desktop",
     "test:e2e:matrix": "playwright test tests/e2e/cross-browser.spec.ts",
     "test:e2e:report": "playwright show-report",
-    "test:php": "powershell -NoProfile -ExecutionPolicy Bypass -File tests/run_php_tests.ps1",
+    "test:php": "node tests/run_php_tests.mjs",
     "test:groq": "php tests/GroqConnectivityTest.php"
   },
   "devDependencies": {

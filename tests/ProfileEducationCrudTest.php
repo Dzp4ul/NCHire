@@ -12,7 +12,7 @@ $failed = 0;
 $userId = 0;
 $educationId = 0;
 $applicationId = 0;
-$baseUrl = rtrim((string)(getenv('NCHIRE_TEST_BASE_URL') ?: 'http://localhost/FinalResearch%20-%20Copy'), '/') . '/user';
+$baseUrl = rtrim((string)(getenv('NCHIRE_TEST_BASE_URL') ?: 'http://localhost'), '/') . '/user';
 
 function profile_crud_check(bool $condition, string $message): void
 {
@@ -31,6 +31,7 @@ function profile_crud_request(string $url, string $sessionId, string $method = '
     $headers = [
         'Cookie: PHPSESSID=' . $sessionId,
         'Accept: application/json',
+        'X-CSRF-Token: test-csrf-token',
     ];
     $options = [
         'method' => $method,
@@ -84,6 +85,7 @@ try {
 
     $_SESSION['user_id'] = $userId;
     $_SESSION['user_email'] = $email;
+    $_SESSION['csrf_token'] = 'test-csrf-token';
     session_write_close();
 
     $application = $conn->prepare("

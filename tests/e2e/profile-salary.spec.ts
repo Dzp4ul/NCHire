@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { accounts, login } from './helpers';
+import { accounts, csrfToken, login } from './helpers';
 
 test.describe('applicant profile CRUD and salary projection', () => {
   test.describe.configure({ mode: 'serial' });
@@ -55,6 +55,7 @@ test.describe('applicant profile CRUD and salary projection', () => {
   });
 
   test('Master’s unit boundaries and completion precedence persist through the backend', async ({ page }) => {
+    const token = await csrfToken(page);
     const listResponse = await page.request.get('user/get_profile_lists.php?type=education');
     const list = await listResponse.json();
     const master = list.data.find((row: Record<string, unknown>) => row.education_level === 'master');
@@ -62,6 +63,7 @@ test.describe('applicant profile CRUD and salary projection', () => {
 
     const save = async (units: string, status = 'ongoing') => {
       const response = await page.request.post('user/save_profile_data.php', {
+        headers: { 'X-CSRF-Token': token },
         form: {
           saveEducation: '1',
           edit_id: String(master.id),

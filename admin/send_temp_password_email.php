@@ -1,6 +1,7 @@
 <?php
 // Fix path - go up to root, then to vendor
 require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../config/mail.php';
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
@@ -9,17 +10,11 @@ function sendTemporaryPasswordEmail($recipientEmail, $recipientName, $temporaryP
     $mail = new PHPMailer(true);
     
     try {
-        // Server settings
-        $mail->isSMTP();
-        $mail->Host       = 'smtp.gmail.com';
-        $mail->SMTPAuth   = true;
-        $mail->Username   = 'manansalajohnpaul120@gmail.com';
-        $mail->Password   = 'dcuv npdb mmnz lyfa';
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-        $mail->Port       = 465;
+        nc_apply_mail_config($mail);
+        $mailConfig = nc_mail_config();
 
         // Recipients
-        $mail->setFrom('no-reply@nchire.local', 'NCHire - Norzagaray College');
+        $mail->setFrom($mailConfig['from_email'], $mailConfig['from_name']);
         $mail->addAddress($recipientEmail, $recipientName);
         
         // Embed the logo
@@ -106,7 +101,7 @@ function sendTemporaryPasswordEmail($recipientEmail, $recipientName, $temporaryP
                     </div>
                     
                     <div style='text-align: center;'>
-                        <a href='http://localhost/FinalResearch%20-%20Copy/admin' class='btn'>Go to Admin Login</a>
+                        <a href=nc_app_url('/admin/index.php') class='btn'>Go to Admin Login</a>
                     </div>
                     
                     <p style='margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 14px;'>

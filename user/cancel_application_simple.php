@@ -38,6 +38,9 @@ if (!$user_id && !$user_email) {
     exit;
 }
 
+require_once __DIR__ . '/../config/csrf.php';
+nc_require_csrf();
+
 // Get application details
 $app_query = "SELECT user_id, applicant_email FROM job_applicants WHERE id = ?";
 $app_stmt = $conn->prepare($app_query);

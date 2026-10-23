@@ -31,6 +31,7 @@ if ($conn->connect_error) {
 }
 
 require_once __DIR__ . '/../shared/helpers/recruitment.php';
+require_once __DIR__ . '/../config/csrf.php';
 
 // Get user ID from session with fallback
 $user_id = $_SESSION['user_id'] ?? null;
@@ -52,6 +53,8 @@ if (!$user_id) {
     echo json_encode(['success' => false, 'message' => 'User ID not found']);
     exit();
 }
+
+nc_require_csrf();
 
 function getProfileQualificationProjection(mysqli $conn, int $userId): array
 {
@@ -791,8 +794,17 @@ if (isset($_POST['updatePassword'])) {
     $stmt->close();
     error_log("Stored password retrieved (length: " . strlen($stored_password) . ")");
     
-    // Verify current password
-    if ($current_password !== $stored_password) {
+    // Verify current password, supporting a one-time legacy plaintext upgrade.
+    $currentMatches = password_verify($current_password, $stored_password);
+    $legacyCurrent = false;
+    if (!$currentMatches) {
+        $storedInfo = password_get_info($stored_password);
+        $legacyCurrent = ($storedInfo['algoName'] ?? 'unknown') === 'unknown'
+            && $stored_password !== ''
+            && hash_equals($stored_password, $current_password);
+        $currentMatches = $legacyCurrent;
+    }
+    if (!$currentMatches) {
         error_log("ERROR: Current password does not match stored password");
         echo json_encode(['success' => false, 'message' => 'Current password is incorrect']);
         exit();
@@ -809,9 +821,10 @@ if (isset($_POST['updatePassword'])) {
     
     // Update password in database
     error_log("Updating password in database...");
+    $new_password_hash = password_hash($new_password, PASSWORD_DEFAULT);
     $update_sql = "UPDATE applicants SET applicant_password = ?, password_change_required = 0 WHERE id = ?";
     $update_stmt = $conn->prepare($update_sql);
-    $update_stmt->bind_param("si", $new_password, $user_id);
+    $update_stmt->bind_param("si", $new_password_hash, $user_id);
     
     if ($update_stmt->execute()) {
         error_log("SUCCESS: Password updated successfully");

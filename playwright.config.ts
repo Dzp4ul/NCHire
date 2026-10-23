@@ -1,10 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 import path from 'node:path';
 
-const appRoot = '/FinalResearch%20-%20Copy';
+const appRoot = process.env.NCHIRE_E2E_APP_ROOT || '';
 const host = process.env.NCHIRE_E2E_HOST || '127.0.0.1';
 const port = Number(process.env.NCHIRE_E2E_PORT || 4173);
 const origin = `http://${host}:${port}`;
+const baseURL = `${origin}${appRoot}`;
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -20,7 +21,7 @@ export default defineConfig({
     ['json', { outputFile: 'test-results/playwright-results.json' }],
   ],
   use: {
-    baseURL: `${origin}${appRoot}/`,
+    baseURL: `${baseURL}/`,
     actionTimeout: 10_000,
     navigationTimeout: 20_000,
     screenshot: 'only-on-failure',
@@ -28,9 +29,9 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   webServer: {
-    command: `php -S ${host}:${port} -t ..`,
+    command: `php -S ${host}:${port} -t .`,
     cwd: path.resolve(__dirname),
-    url: `${origin}${appRoot}/public/index.php`,
+    url: `${baseURL}/public/index.php`,
     timeout: 30_000,
     reuseExistingServer: false,
     stdout: 'ignore',

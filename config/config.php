@@ -14,8 +14,8 @@ define('SHARED_PATH', ROOT_PATH . '/shared');
 define('UPLOADS_PATH', ROOT_PATH . '/uploads');
 define('VENDOR_PATH', ROOT_PATH . '/vendor');
 
-// Define URL paths (adjust based on your server configuration)
-define('BASE_URL', '/FinalResearch - Copy'); // Update this for production
+// Define URL paths (override with NCHIRE_BASE_URL when deployed under a subdirectory)
+define('BASE_URL', rtrim((string)getenv('NCHIRE_BASE_URL'), '/'));
 define('PUBLIC_URL', BASE_URL . '/public');
 define('ADMIN_URL', BASE_URL . '/admin');
 define('USER_URL', BASE_URL . '/user');
@@ -30,14 +30,14 @@ define('APP_NAME', 'NCHire');
 define('APP_VERSION', '1.0.0');
 define('APP_ENV', 'development'); // development, staging, production
 
-// Email configuration
-define('SMTP_HOST', 'smtp.gmail.com');
-define('SMTP_PORT', 465);
-define('SMTP_SECURE', 'ssl');
-define('SMTP_USERNAME', 'nchire.norzagaray@gmail.com');
-define('SMTP_PASSWORD', 'rqsg tlub bwwd kqoo');
-define('SMTP_FROM_EMAIL', 'no-reply@nchire.local');
-define('SMTP_FROM_NAME', 'NCHire - Norzagaray College');
+// Email configuration (set NCHIRE_SMTP_* in the deployment environment)
+define('SMTP_HOST', getenv('NCHIRE_SMTP_HOST') ?: 'smtp.gmail.com');
+define('SMTP_PORT', (int)(getenv('NCHIRE_SMTP_PORT') ?: 465));
+define('SMTP_SECURE', getenv('NCHIRE_SMTP_SECURE') ?: 'ssl');
+define('SMTP_USERNAME', (string)(getenv('NCHIRE_SMTP_USERNAME') ?: ''));
+define('SMTP_PASSWORD', (string)(getenv('NCHIRE_SMTP_PASSWORD') ?: ''));
+define('SMTP_FROM_EMAIL', getenv('NCHIRE_SMTP_FROM_EMAIL') ?: 'no-reply@nchire.local');
+define('SMTP_FROM_NAME', getenv('NCHIRE_SMTP_FROM_NAME') ?: 'NCHire - Norzagaray College');
 
 // File upload settings
 define('MAX_FILE_SIZE', 5 * 1024 * 1024); // 5MB

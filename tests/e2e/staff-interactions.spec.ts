@@ -8,7 +8,6 @@ test.describe('staff interactive controls', () => {
   });
 
   test('opening the profile menu closes the notifications menu', async ({ page }) => {
-    test.fail(true, 'Known defect: the two header dropdowns remain open at the same time.');
     await page.locator('#notificationBtn').click();
     await expect(page.locator('#notificationsDropdown')).toBeVisible();
     await page.locator('#profileDropdownBtn').click();

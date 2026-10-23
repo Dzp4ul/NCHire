@@ -33,7 +33,7 @@ try {
         // Total Applicants (excluding rejected)
         $sql = "SELECT COUNT(*) as count 
                 FROM job_applicants 
-                WHERE workflow_stage != 'rejected' 
+                WHERE workflow_stage NOT IN ('rejected', 'cancelled')
                 AND (secretary_id IS NULL OR secretary_id = 0 OR workflow_stage = 'secretary_review' 
                      OR secretary_id = :secretary_id)";
         $stmt = $pdo->prepare($sql);

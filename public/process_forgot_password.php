@@ -98,9 +98,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email'])) {
         $stmt = $conn->prepare("UPDATE admin_users SET password = ?, password_change_required = 1 WHERE id = ?");
         $stmt->bind_param("si", $hashed_password, $user_id);
     } else {
-        // Applicants use plain text passwords (as per current system)
+        // Applicant passwords are stored using password_hash.
+        $hashed_password = password_hash($temporaryPassword, PASSWORD_DEFAULT);
         $stmt = $conn->prepare("UPDATE applicants SET applicant_password = ?, password_change_required = 1 WHERE id = ?");
-        $stmt->bind_param("si", $temporaryPassword, $user_id);
+        $stmt->bind_param("si", $hashed_password, $user_id);
     }
     
     if (!$stmt->execute()) {

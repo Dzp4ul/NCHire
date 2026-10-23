@@ -1,17 +1,15 @@
 <?php
 session_start();
 
-// Enable error reporting for debugging
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+// Keep production responses JSON-only; log details without credentials.
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
 error_reporting(E_ALL);
 
 header('Content-Type: application/json');
 
 // Add debugging at the very start
 error_log("=== VERIFY.PHP CALLED ===");
-error_log("POST data: " . json_encode($_POST));
-error_log("Session data: " . json_encode($_SESSION));
 
 include __DIR__ . "/../config/db.php";
 
@@ -28,16 +26,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['verification_code']))
     // Ensure stored verification code is also uppercase
     $expected_code = strtoupper(trim($pending_signup['verification_code']));
 
-    // Debug: Log the verification attempt
-    error_log("Verification attempt - Code entered: '$code', Expected: '$expected_code'");
+    // Debug: Log the verification attempt without exposing the codes.
+    error_log("Verification attempt received.");
     
     // Check if the verification code matches
     if ($code === $expected_code) {
         // Verification successful - now save to database
         try {
-            // Debug: Log the data being inserted
-            error_log("Inserting user data: " . json_encode($pending_signup));
-            
             // Check if email already exists (double-check)
             $check_stmt = $conn->prepare("SELECT id FROM applicants WHERE applicant_email = ?");
             $check_stmt->bind_param("s", $pending_signup['email']);
@@ -60,12 +55,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['verification_code']))
             $max_id_stmt->close();
             
             $is_verified = 1;
+            $storedPassword = (string)$pending_signup['password'];
+            if (($passwordInfo = password_get_info($storedPassword)) && ($passwordInfo['algoName'] ?? 'unknown') === 'unknown') {
+                $storedPassword = password_hash($storedPassword, PASSWORD_DEFAULT);
+            }
             $stmt = $conn->prepare("INSERT INTO applicants (first_name, last_name, applicant_email, applicant_password, is_verified) VALUES (?, ?, ?, ?, ?)");
             $stmt->bind_param("ssssi", 
                 $pending_signup['first_name'], 
                 $pending_signup['last_name'], 
                 $pending_signup['email'], 
-                $pending_signup['password'],
+                $storedPassword,
                 $is_verified
             );
 

@@ -91,11 +91,12 @@ try {
     $applicantInsert = $server->prepare(
         'INSERT INTO applicants (first_name, last_name, applicant_email, applicant_password, is_verified, contact_number, address, password_change_required) VALUES (?, ?, ?, ?, 1, ?, ?, 0)'
     );
+    $applicantPassword = password_hash('ApplicantPass1!', PASSWORD_DEFAULT);
     $applicants = [
-        ['Avery', 'Applicant', 'applicant.e2e@example.test', 'ApplicantPass1!', '09170000001', 'Norzagaray, Bulacan'],
-        ['Casey', 'Pipeline', 'pipeline.e2e@example.test', 'ApplicantPass1!', '09170000002', 'Norzagaray, Bulacan'],
-        ['Ivy', 'Incomplete', 'incomplete.e2e@example.test', 'ApplicantPass1!', '', ''],
-        ['Riley', 'Restricted', 'restricted.e2e@example.test', 'ApplicantPass1!', '09170000004', 'Norzagaray, Bulacan'],
+        ['Avery', 'Applicant', 'applicant.e2e@example.test', $applicantPassword, '09170000001', 'Norzagaray, Bulacan'],
+        ['Casey', 'Pipeline', 'pipeline.e2e@example.test', $applicantPassword, '09170000002', 'Norzagaray, Bulacan'],
+        ['Ivy', 'Incomplete', 'incomplete.e2e@example.test', $applicantPassword, '', ''],
+        ['Riley', 'Restricted', 'restricted.e2e@example.test', $applicantPassword, '09170000004', 'Norzagaray, Bulacan'],
     ];
     $applicantIds = [];
     foreach ($applicants as [$first, $last, $email, $password, $phone, $address]) {

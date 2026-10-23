@@ -4,6 +4,7 @@ header('Content-Type: application/json');
 
 // Check if admin is logged in
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit();
 }
@@ -81,13 +82,13 @@ if ($show_applicant_stats) {
 // 3. Total Applications
 if ($show_applicant_stats) {
     if (!empty($department_params)) {
-        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status != 'Rejected'" . $department_filter);
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM job_applicants WHERE status NOT IN ('Rejected', 'Cancelled')" . $department_filter);
         $stmt->bind_param("s", ...$department_params);
         $stmt->execute();
         $result = $stmt->get_result();
         $stats['total_applicants'] = $result->fetch_assoc()['count'];
     } else {
-        $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status != 'Rejected'");
+        $result = $conn->query("SELECT COUNT(*) as count FROM job_applicants WHERE status NOT IN ('Rejected', 'Cancelled')");
         $stats['total_applicants'] = $result ? $result->fetch_assoc()['count'] : 0;
     }
 } else {

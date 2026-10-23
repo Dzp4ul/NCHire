@@ -1,6 +1,9 @@
 <?php
 session_start();
 
+require_once __DIR__ . '/../config/csrf.php';
+nc_csrf_token();
+
 // Check if user is logged in
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true) {
     header("Location: ../public/index.php");
@@ -29,6 +32,9 @@ $success = '';
 
 // Handle password change submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!nc_csrf_is_valid($_POST['csrf_token'] ?? '')) {
+        $error = 'Your session has expired. Please refresh the page and try again.';
+    } else {
     $new_password = trim($_POST['new_password'] ?? '');
     $confirm_password = trim($_POST['confirm_password'] ?? '');
     
@@ -47,8 +53,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Passwords do not match.';
     } else {
         // Update password and set password_change_required to 0
+        $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
         $stmt = $conn->prepare("UPDATE applicants SET applicant_password = ?, password_change_required = 0 WHERE id = ?");
-        $stmt->bind_param("si", $new_password, $_SESSION['user_id']);
+        $stmt->bind_param("si", $hashed_password, $_SESSION['user_id']);
         
         if ($stmt->execute()) {
             $_SESSION['password_change_required'] = 0;
@@ -67,6 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Failed to update password. Please try again.';
         }
         $stmt->close();
+    }
     }
 }
 
@@ -161,6 +169,7 @@ $conn->close();
             <?php endif; ?>
 
             <form method="POST" action="">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">

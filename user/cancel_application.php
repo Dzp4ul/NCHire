@@ -33,6 +33,9 @@ try {
         echo '{"success":false,"error":"Not authenticated"}';
         exit;
     }
+
+    require_once __DIR__ . '/../config/csrf.php';
+    nc_require_csrf();
     
     // Update application: set status, workflow_stage, rejected_date, and rejection_reason
     $cancellation_reason = "Application cancelled by applicant";

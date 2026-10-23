@@ -1213,6 +1213,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
         
     } else {
         // NEW APPLICATION - Insert into job_applicants table
+        $duplicateStmt = $conn->prepare("SELECT id FROM job_applicants
+            WHERE user_id = ? AND job_id = ?
+              AND status NOT IN ('Cancelled', 'Rejected')
+              AND (workflow_stage IS NULL OR workflow_stage NOT IN ('cancelled', 'rejected'))
+            LIMIT 1");
+        if ($duplicateStmt) {
+            $duplicateStmt->bind_param("ii", $user_id, $job_id);
+            $duplicateStmt->execute();
+            $duplicateResult = $duplicateStmt->get_result();
+            $hasDuplicate = $duplicateResult && $duplicateResult->num_rows > 0;
+            $duplicateStmt->close();
+            if ($hasDuplicate) {
+                foreach (array_merge($secured_legacy_upload_paths, $dynamic_requirement_upload_paths) as $storedPath) {
+                    if (is_file($storedPath)) @unlink($storedPath);
+                }
+                $duplicateError = 'You have already applied to this teaching load.';
+                if ($is_ajax_submit) {
+                    while (ob_get_level()) { ob_end_clean(); }
+                    http_response_code(409);
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'error' => $duplicateError, 'message' => $duplicateError]);
+                    exit();
+                }
+                $_SESSION['application_error'] = $duplicateError;
+                header("Location: " . $_SERVER['PHP_SELF']);
+                exit();
+            }
+        }
+
         // Applications now go to Secretary first for document review
         $workflow_stage = 'secretary_review';
         // The legacy schema keeps this column NOT NULL. Dynamic teaching-load
@@ -1394,6 +1423,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_application'])
 <head><script src="https://static.readdy.ai/static/e.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="csrf-token" content="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+<script src="../public/assets/js/csrf-fetch.js"></script>
 <title>NCHire - Job Opportunities</title>
 <link rel="icon" type="image/png" href="../public/assets/images/image-removebg-preview (1).png">
 <link rel="shortcut icon" type="image/png" href="../public/assets/images/image-removebg-preview (1).png">

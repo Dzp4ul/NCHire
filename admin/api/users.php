@@ -273,23 +273,26 @@ switch ($method) {
         } else {
             // Try JSON format
             $input = json_decode(file_get_contents('php://input'), true);
-            $user_id = isset($input['id']) ? intval($input['id']) : 0;
+            $user_id = isset($input['id']) ? intval($input['id']) : (isset($input['user_id']) ? intval($input['user_id']) : 0);
         }
         
-        // Debug logging
-        error_log("PUT Request - User ID: " . $user_id);
-        error_log("PUT Request - Input: " . json_encode($input));
-        error_log("PUT Request - Files: " . json_encode(array_keys($uploaded_files)));
+        // Do not log request bodies; they may contain passwords.
+        error_log("PUT staff user request for user ID: " . $user_id);
         
         if (empty($user_id)) {
             echo json_encode(['success' => false, 'message' => 'User ID is required', 'debug' => ['input' => $input, 'content_type' => $content_type]]);
             break;
         }
 
-        if (!$isAdmin && $user_id !== $currentAdminId) {
-            http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Forbidden']);
-            break;
+        if (!$isAdmin) {
+            $forbiddenFields = is_array($input)
+                ? array_intersect(array_keys($input), ['role', 'department', 'status', 'password'])
+                : [];
+            if ($user_id !== $currentAdminId || !empty($forbiddenFields)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Forbidden']);
+                break;
+            }
         }
         
         // Handle profile picture upload if present

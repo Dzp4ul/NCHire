@@ -114,6 +114,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
+require_once __DIR__ . '/../config/csrf.php';
+nc_require_csrf();
+
 function nc_store_attachment_upload(string $field, bool $multiple, string $uploadDir): ?array
 {
     if (!isset($_FILES[$field])) {

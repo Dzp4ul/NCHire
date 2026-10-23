@@ -120,8 +120,8 @@ function validateEmail(email) {
  * Validate phone (Philippine format)
  */
 function validatePhone(phone) {
-    const re = /^09[0-9]{9}$/;
-    return re.test(phone);
+    const digits = String(phone || '').replace(/\D/g, '');
+    return /^(?:639[0-9]{9}|09[0-9]{9}|9[0-9]{9})$/.test(digits);
 }
 
 /**

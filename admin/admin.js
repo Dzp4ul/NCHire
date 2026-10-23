@@ -1926,9 +1926,8 @@ async function editUser(id) {
         // NOW open the modal
         document.getElementById('editUserModal').classList.remove('hidden');
         
-        // Remove readonly and change password type AFTER modal is visible
+        // Remove password readonly after the modal is visible; the email remains immutable.
         setTimeout(() => {
-            emailInput.removeAttribute('readonly');
             passwordInput.removeAttribute('readonly');
             // Change password field to password type so it shows dots when typing
             passwordInput.setAttribute('type', 'password');

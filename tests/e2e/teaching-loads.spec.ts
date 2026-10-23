@@ -174,26 +174,26 @@ test.describe('teaching-load and dynamic-requirement management', () => {
   });
 
   test('deleting an available load cancels and archives its related applications', async ({ page }) => {
-    const row = page.locator('#jobsTableBody tr').filter({ hasText: 'CS 101 - Web Systems' });
+    const row = page.locator('#jobsTableBody tr').filter({ hasText: 'EDU 201 - Learning Design' });
     await row.locator('details summary').click();
     await row.getByRole('button', { name: 'Delete' }).click();
 
     const deleteModal = page.locator('#deleteJobModal');
     await expect(deleteModal).toBeVisible();
-    await expect(deleteModal).toContainText('cancel 2 related applications');
+    await expect(deleteModal).toContainText('cancel 1 related application');
     await deleteModal.getByRole('button', { name: 'Delete' }).click();
 
-    await expect(page.locator('body')).toContainText('2 related applications were cancelled and moved to Archive');
-    await expect(page.locator('#jobsTableBody')).not.toContainText('CS 101 - Web Systems');
+    await expect(page.locator('body')).toContainText('1 related application was cancelled and moved to Archive');
+    await expect(page.locator('#jobsTableBody')).not.toContainText('EDU 201 - Learning Design');
 
     const archiveResponse = await page.request.get('admin/get_archive.php');
     expect(archiveResponse.status()).toBe(200);
     const archived = await archiveResponse.json();
     const cancelled = archived.filter((application: Record<string, unknown>) =>
-      application.applicant_email === accounts.pipeline.email
-      && application.position === 'E2E CS 101 - Web Systems'
+      application.applicant_email === accounts.restricted.email
+      && application.position === 'E2E EDU 201 - Learning Design'
     );
-    expect(cancelled).toHaveLength(2);
+    expect(cancelled).toHaveLength(1);
     expect(cancelled).toEqual(expect.arrayContaining([
       expect.objectContaining({ status: 'Cancelled', workflow_stage: 'cancelled' }),
     ]));
@@ -202,7 +202,7 @@ test.describe('teaching-load and dynamic-requirement management', () => {
     expect(activeResponse.status()).toBe(200);
     const activeApplications = await activeResponse.json();
     expect(activeApplications).not.toEqual(expect.arrayContaining([
-      expect.objectContaining({ position: 'E2E CS 101 - Web Systems' }),
+      expect.objectContaining({ position: 'E2E EDU 201 - Learning Design' }),
     ]));
   });
 });

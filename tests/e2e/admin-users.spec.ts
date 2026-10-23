@@ -60,8 +60,8 @@ test.describe('administrator user management', () => {
     await row.getByTitle('Edit User').click();
     const modal = page.locator('#editUserModal');
     await expect(modal).toBeVisible();
-    // Current implementation removes readonly after opening, despite the UI text saying email cannot change.
-    await expect(modal.locator('#editUserEmail')).toBeEditable();
+    // Email is immutable after account creation.
+    await expect(modal.locator('#editUserEmail')).not.toBeEditable();
     await modal.locator('#editUserName').fill('E2E Temporary Dean');
     await modal.locator('#editUserRole').selectOption('Department Head');
     await modal.locator('#editUserDepartment').selectOption('Education');
