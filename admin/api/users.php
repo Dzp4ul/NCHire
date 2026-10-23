@@ -357,8 +357,24 @@ switch ($method) {
             $types .= "s";
         }
         if (isset($input['email']) && !empty($input['email'])) {
+            $email = trim((string)$input['email']);
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                http_response_code(422);
+                echo json_encode(['success' => false, 'message' => 'Enter a valid email address']);
+                break;
+            }
+            $email_check = $conn->prepare("SELECT id FROM admin_users WHERE email = ? AND id <> ? LIMIT 1");
+            $email_check->bind_param("si", $email, $user_id);
+            $email_check->execute();
+            $email_taken = $email_check->get_result()->num_rows > 0;
+            $email_check->close();
+            if ($email_taken) {
+                http_response_code(409);
+                echo json_encode(['success' => false, 'message' => 'Email already exists']);
+                break;
+            }
             $updates[] = "email = ?";
-            $params[] = $input['email'];
+            $params[] = $email;
             $types .= "s";
         }
         if (isset($input['role']) && !empty($input['role'])) {

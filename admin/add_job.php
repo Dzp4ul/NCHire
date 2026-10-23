@@ -106,6 +106,11 @@ if ($hasUnitBreakdown && ($title === '' || $department === '' || $type === '' ||
     echo json_encode(['success' => false, 'message' => 'Complete all required teaching load and subject fields.']);
     exit;
 }
+if ($deadline !== '' && $deadline < date('Y-m-d')) {
+    http_response_code(422);
+    echo json_encode(['success' => false, 'message' => 'Application deadline cannot be in the past.']);
+    exit;
+}
 $teaching_hours = $hasUnitBreakdown
     ? nc_calculate_teaching_hours((float)$lecture_units, (float)$laboratory_units)
     : ((isset($data["teaching_hours_per_week"]) && $data["teaching_hours_per_week"] !== "") ? (float)$data["teaching_hours_per_week"] : null);

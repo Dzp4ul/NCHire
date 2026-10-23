@@ -5122,6 +5122,22 @@ document.addEventListener('DOMContentLoaded', function() {
         const input = article.querySelector('input[type="file"]');
         if (submission) input.dataset.existingSubmission = '1';
         input.addEventListener('change', () => {
+          const file = input.files && input.files[0];
+          if (file) {
+            const allowedExtensions = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
+            const extension = String(file.name || '').split('.').pop().toLowerCase();
+            const message = file.size <= 0
+              ? 'The selected file is empty.'
+              : (file.size > 5 * 1024 * 1024
+                ? 'This file is larger than 5 MB.'
+                : (!allowedExtensions.includes(extension) ? 'Use PDF, DOC, DOCX, JPG, or PNG files only.' : ''));
+            if (message) {
+              input.value = '';
+              setDocumentInlineError(input, message);
+              updateRequiredDocumentsStatus();
+              return;
+            }
+          }
           setDocumentInlineError(input, '');
           updateRequiredDocumentsStatus();
         });
