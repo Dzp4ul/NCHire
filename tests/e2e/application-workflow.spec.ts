@@ -50,6 +50,28 @@ test.describe('application submission and cross-role recruitment workflow', () =
     expect(expired.body.error).toContain('no longer open');
   });
 
+  test('incomplete applicant opens the profile without replacing the dashboard header', async ({ page }) => {
+    await login(page, accounts.incomplete);
+
+    const dashboardHeader = page.locator('header.bg-primary');
+    await expect(dashboardHeader).toBeVisible();
+    await dashboardHeader.evaluate(element => element.setAttribute('data-e2e-shell-header', 'preserved'));
+
+    await page.locator('.apply-btn[data-job-id="1"]').click();
+    await expect(page.locator('#termsModal')).toBeVisible();
+    await page.locator('#agreeTerms').check();
+    await page.locator('#proceedToApplication').click();
+
+    const completeProfileLink = page.locator('[data-complete-profile]');
+    await expect(completeProfileLink).toBeVisible();
+    await completeProfileLink.click();
+
+    await expect(page).toHaveURL(/\/user\/user\.php(?:$|\?)/);
+    await expect(page.locator('header[data-e2e-shell-header="preserved"]')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'My Profile' })).toBeVisible();
+    await expect(page.locator('#profileLink')).toHaveClass(/active/);
+  });
+
   test('applicant accepts terms, sees the current checklist, handles invalid files, and submits without an optional file', async ({ page }) => {
     await login(page, accounts.applicant);
     const apply = page.locator('.apply-btn[data-job-id="1"]');

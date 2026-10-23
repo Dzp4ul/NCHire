@@ -5385,7 +5385,22 @@ document.addEventListener('DOMContentLoaded', function() {
     if (missingProfileFields.length) {
       const notice = document.createElement('div');
       notice.className = 'fixed top-4 right-4 z-[10001] max-w-md p-4 bg-amber-50 border border-amber-300 rounded-lg shadow-lg text-amber-900';
-      notice.innerHTML = '<p class="font-semibold">Please complete your profile before applying for this job.</p><p class="text-sm mt-1">Missing: ' + missingProfileFields.join(', ') + '</p><a href="user_profile.php" class="inline-flex mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Complete Profile</a><button type="button" class="ml-2 text-sm text-gray-600 hover:text-gray-900">Dismiss</button>';
+      notice.innerHTML = '<p class="font-semibold">Please complete your profile before applying for this job.</p><p class="text-sm mt-1">Missing: ' + missingProfileFields.join(', ') + '</p><a href="user_profile.php" data-complete-profile class="inline-flex mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Complete Profile</a><button type="button" class="ml-2 text-sm text-gray-600 hover:text-gray-900">Dismiss</button>';
+      notice.querySelector('[data-complete-profile]').addEventListener('click', function(event) {
+        event.preventDefault();
+        notice.remove();
+
+        // Use the dashboard's existing Profile navigation so the applicant shell
+        // and header remain mounted while the profile content is loaded.
+        const dashboardProfileLink = document.getElementById('profileLink');
+        if (dashboardProfileLink) {
+          dashboardProfileLink.click();
+          return;
+        }
+
+        // Keep the link usable if this notice is ever rendered outside the shell.
+        window.location.href = 'user_profile.php';
+      });
       notice.querySelector('button').addEventListener('click', () => notice.remove());
       document.body.appendChild(notice);
       return;
